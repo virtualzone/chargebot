@@ -75,10 +75,8 @@ func ServeHTTP() {
 		ReadTimeout:  time.Second * 15,
 		IdleTimeout:  time.Second * 60,
 	}
-	/*
-		http.HandleFunc("/api/optioncodes/url", GetOptionCodesURLHandler)
-		http.HandleFunc("/api/optioncodes/codes", GetOptionCodesCodesHandler)
-	*/
+	http.HandleFunc("/api/1/auth/init3rdparty", GetAuthRouterInitThirdParty)
+	http.HandleFunc("/api/1/auth/callback", GetAuthRouterInitThirdParty)
 	fs := http.FileServer(http.Dir("./static"))
 	http.Handle("/", fs)
 	go func() {
