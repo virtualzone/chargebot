@@ -41,11 +41,12 @@ func SendMethodNotAllowed(w http.ResponseWriter) {
 	w.WriteHeader(http.StatusMethodNotAllowed)
 }
 
-func UnmarshalBody(r *http.Request, o interface{}) error {
-	if r.Body == nil {
+func UnmarshalBody(r io.ReadCloser, o interface{}) error {
+	if r == nil {
 		return errors.New("body is NIL")
 	}
-	body, err := io.ReadAll(r.Body)
+	defer r.Close()
+	body, err := io.ReadAll(r)
 	if err != nil {
 		return err
 	}
@@ -55,7 +56,7 @@ func UnmarshalBody(r *http.Request, o interface{}) error {
 	return nil
 }
 
-func UnmarshalValidateBody(r *http.Request, o interface{}) error {
+func UnmarshalValidateBody(r io.ReadCloser, o interface{}) error {
 	err := UnmarshalBody(r, &o)
 	if err != nil {
 		return err
@@ -76,7 +77,7 @@ func ServeHTTP() {
 		IdleTimeout:  time.Second * 60,
 	}
 	http.HandleFunc("/api/1/auth/init3rdparty", GetAuthRouterInitThirdParty)
-	http.HandleFunc("/api/1/auth/callback", GetAuthRouterInitThirdParty)
+	http.HandleFunc("/api/1/auth/callback", GetAuthRouterCallback)
 	fs := http.FileServer(http.Dir("./static"))
 	http.Handle("/", fs)
 	go func() {
