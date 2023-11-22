@@ -56,6 +56,19 @@ func UnmarshalBody(r io.ReadCloser, o interface{}) error {
 	return nil
 }
 
+func DebugPrintResponseBody(r io.ReadCloser) error {
+	if r == nil {
+		return errors.New("body is NIL")
+	}
+	defer r.Close()
+	body, err := io.ReadAll(r)
+	if err != nil {
+		return err
+	}
+	log.Println(string(body))
+	return nil
+}
+
 func UnmarshalValidateBody(r io.ReadCloser, o interface{}) error {
 	err := UnmarshalBody(r, &o)
 	if err != nil {
