@@ -1,2 +1,2 @@
 #!/bin/sh
-HOSTNAME=tgc-dev.virtualzone.de go run `ls *.go | grep -v _test.go`
+HOSTNAME=localhost:8080 DEV_PROXY=1 go run `ls *.go | grep -v _test.go`

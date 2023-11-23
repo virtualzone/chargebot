@@ -7,12 +7,20 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"os"
 	"os/signal"
+	"strings"
 	"time"
 
 	"github.com/go-playground/validator"
+	"github.com/gorilla/mux"
 )
+
+type Route interface {
+	SetupRoutes(s *mux.Router)
+}
 
 func SendNotFound(w http.ResponseWriter) {
 	w.WriteHeader(http.StatusNotFound)
@@ -69,6 +77,14 @@ func DebugPrintResponseBody(r io.ReadCloser) error {
 	return nil
 }
 
+func GetAuthTokenFromRequest(r *http.Request) string {
+	bearer := r.Header.Get("Authorization")
+	if strings.Index(bearer, "Bearer ") != 0 {
+		return ""
+	}
+	return strings.TrimLeft(bearer, "Bearer ")
+}
+
 func UnmarshalValidateBody(r io.ReadCloser, o interface{}) error {
 	err := UnmarshalBody(r, &o)
 	if err != nil {
@@ -83,16 +99,34 @@ func UnmarshalValidateBody(r io.ReadCloser, o interface{}) error {
 
 func ServeHTTP() {
 	log.Println("Initializing REST services...")
+
+	router := mux.NewRouter()
+	routers := make(map[string]Route)
+	routers["/api/1/auth/"] = &AuthRouter{}
+	routers["/api/1/tesla/"] = &TeslaRouter{}
+
+	for prefix, route := range routers {
+		subRouter := router.PathPrefix(prefix).Subrouter()
+		route.SetupRoutes(subRouter)
+	}
+
+	if GetConfig().DevProxy {
+		target, _ := url.Parse("http://localhost:3000")
+		proxy := httputil.NewSingleHostReverseProxy(target)
+		router.PathPrefix("/").Handler(proxy)
+	} else {
+		fs := http.FileServer(http.Dir("./static"))
+		router.PathPrefix("/").Handler(fs)
+	}
+
 	httpServer := &http.Server{
 		Addr:         "0.0.0.0:8080",
 		WriteTimeout: time.Second * 15,
 		ReadTimeout:  time.Second * 15,
 		IdleTimeout:  time.Second * 60,
+		Handler:      router,
 	}
-	http.HandleFunc("/api/1/auth/init3rdparty", GetAuthRouterInitThirdParty)
-	http.HandleFunc("/api/1/auth/callback", GetAuthRouterCallback)
-	fs := http.FileServer(http.Dir("./static"))
-	http.Handle("/", fs)
+
 	go func() {
 		if err := httpServer.ListenAndServe(); err != nil {
 			log.Fatal(err)
