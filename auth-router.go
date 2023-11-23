@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/gorilla/mux"
 )
 
 type TokenReponse struct {
@@ -12,10 +14,25 @@ type TokenReponse struct {
 	AccessToken  string `json:"access_token"`
 }
 
-func GetAuthRouterInitThirdParty(w http.ResponseWriter, r *http.Request) {
+type AuthRouter struct {
+}
+
+func (router *AuthRouter) SetupRoutes(s *mux.Router) {
+	s.HandleFunc("/init3rdparty", router.initThirdParty).Methods("GET")
+	s.HandleFunc("/callback", router.callback).Methods("GET")
+	s.HandleFunc("/refresh", router.refresh).Methods("POST")
+}
+
+func (router *AuthRouter) getRedirectURI() string {
+	if strings.Index(GetConfig().Hostname, "localhost") != -1 {
+		return "http://" + GetConfig().Hostname + "/callback"
+	}
+	return "https://" + GetConfig().Hostname + "/callback"
+}
+
+func (router *AuthRouter) initThirdParty(w http.ResponseWriter, r *http.Request) {
 	code := CreateAuthCode()
 
-	redirectURI := "https://" + GetConfig().Hostname + "/api/1/auth/callback"
 	scope := []string{
 		"openid",
 		"vehicle_device_data",
@@ -26,7 +43,7 @@ func GetAuthRouterInitThirdParty(w http.ResponseWriter, r *http.Request) {
 	params := url.Values{}
 	params.Add("client_id", GetConfig().ClientID)
 	params.Add("prompt", "login")
-	params.Add("redirect_uri", redirectURI)
+	params.Add("redirect_uri", router.getRedirectURI())
 	params.Add("response_type", "code")
 	params.Add("scope", strings.Join(scope, " "))
 	params.Add("state", code)
@@ -36,29 +53,37 @@ func GetAuthRouterInitThirdParty(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
 
-func GetAuthRouterCallback(w http.ResponseWriter, r *http.Request) {
+func (router *AuthRouter) callback(w http.ResponseWriter, r *http.Request) {
+	SendJSON(w, TokenReponse{AccessToken: "abc", RefreshToken: "def"})
+	return
+
 	state := r.URL.Query().Get("state")
 	if !IsValidAuthCode(state) {
 		SendNotFound(w)
 		return
 	}
-	tokens, err := getTokens(r.URL.Query().Get("code"))
+	tokens, err := router.getTokens(r.URL.Query().Get("code"))
 	if err != nil {
 		log.Println(err)
 		SendBadRequest(w)
 		return
 	}
-	log.Println(tokens)
+	// TODO Save somehow?!
+	SendJSON(w, tokens)
 }
 
-func getTokens(code string) (*TokenReponse, error) {
+func (router *AuthRouter) refresh(w http.ResponseWriter, r *http.Request) {
+	// TODO
+}
+
+func (router *AuthRouter) getTokens(code string) (*TokenReponse, error) {
 	target := "https://auth.tesla.com/oauth2/v3/token"
 	data := url.Values{}
 	data.Set("grant_type", "authorization_code")
 	data.Set("client_id", GetConfig().ClientID)
 	data.Set("client_secret", GetConfig().ClientSecret)
 	data.Set("code", code)
-	data.Set("redirect_uri", "https://"+GetConfig().Hostname+"/api/1/auth/callback")
+	data.Set("redirect_uri", router.getRedirectURI())
 	data.Set("audience", GetConfig().Audience)
 	r, _ := http.NewRequest("POST", target, strings.NewReader(data.Encode()))
 	r.Header.Add("Content-Type", "application/x-www-form-urlencoded")

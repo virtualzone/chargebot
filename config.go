@@ -13,6 +13,7 @@ type Config struct {
 	Audience     string
 	DBFile       string
 	Hostname     string
+	DevProxy     bool
 }
 
 var _configInstance *Config
@@ -32,6 +33,7 @@ func (c *Config) ReadConfig() {
 	c.Audience = c.getEnv("AUDIENCE", "https://fleet-api.prd.eu.vn.cloud.tesla.com")
 	c.DBFile = c.getEnv("DB_FILE", "/tmp/tgc.db")
 	c.Hostname = c.getEnv("HOSTNAME", "tgc.virtualzone.de")
+	c.DevProxy = (c.getEnv("DEV_PROXY", "0") == "1")
 }
 
 func (c *Config) Print() {
