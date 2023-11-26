@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { getBaseUrl, saveAccessToken, saveRefreshToken } from "../util";
-import { redirect, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 export default function CallbackPage() {
   const [data, setData] = useState(null)
@@ -13,14 +13,18 @@ export default function CallbackPage() {
     const state = searchParams.get("state");
     const code = searchParams.get("code");
     const url = getBaseUrl() + "/api/1/auth/callback?state=" + state + "&code=" + code;
-    fetch(url, { method: 'GET' }).then(res => res.json()).then(json => {
-      if (json.access_token) {
-        saveAccessToken(json.access_token);
-        saveRefreshToken(json.refresh_token);
-        setData(json);
-        router.push('/authorized');
-      }
-    });
+    fetch(url, { method: 'GET' })
+      .then(res => res.json())
+        .then(json => {
+          if (json.access_token) {
+            saveAccessToken(json.access_token);
+            saveRefreshToken(json.refresh_token);
+            setData(json);
+            router.push('/authorized');
+          }
+        })
+        .catch(e => router.push('/loginfailed'))
+      .catch(e => router.push('/loginfailed'));
   }, []);
 
   return (
