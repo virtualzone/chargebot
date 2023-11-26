@@ -5,22 +5,26 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/mux"
 )
 
-type TokenReponse struct {
-	RefreshToken string `json:"refresh_token"`
-	AccessToken  string `json:"access_token"`
+type AuthRouter struct {
 }
 
-type AuthRouter struct {
+type LoginResponse struct {
+	RefreshToken string `json:"refresh_token"`
+	AccessToken  string `json:"access_token"`
+	UserID       string `json:"user_id"`
 }
 
 func (router *AuthRouter) SetupRoutes(s *mux.Router) {
 	s.HandleFunc("/init3rdparty", router.initThirdParty).Methods("GET")
 	s.HandleFunc("/callback", router.callback).Methods("GET")
 	s.HandleFunc("/refresh", router.refresh).Methods("POST")
+	s.HandleFunc("/tokenvalid", router.isTokenValid).Methods("GET")
 }
 
 func (router *AuthRouter) getRedirectURI() string {
@@ -54,51 +58,100 @@ func (router *AuthRouter) initThirdParty(w http.ResponseWriter, r *http.Request)
 }
 
 func (router *AuthRouter) callback(w http.ResponseWriter, r *http.Request) {
-	SendJSON(w, TokenReponse{AccessToken: "abc", RefreshToken: "def"})
-	return
+	/*
+		SendJSON(w, TokenReponse{AccessToken: "abc", RefreshToken: "def"})
+		return
+	*/
 
 	state := r.URL.Query().Get("state")
 	if !IsValidAuthCode(state) {
 		SendNotFound(w)
 		return
 	}
-	tokens, err := router.getTokens(r.URL.Query().Get("code"))
+	tokens, err := TeslaAPIGetTokens(r.URL.Query().Get("code"), router.getRedirectURI())
 	if err != nil {
 		log.Println(err)
 		SendBadRequest(w)
 		return
 	}
-	// TODO Save somehow?!
-	SendJSON(w, tokens)
+
+	parsedToken, _ := jwt.Parse(tokens.AccessToken, nil)
+	if parsedToken == nil || parsedToken.Claims == nil {
+		SendInternalServerError(w)
+		return
+	}
+	sub, _ := parsedToken.Claims.GetSubject()
+	user := &User{
+		ID:           sub,
+		RefreshToken: tokens.RefreshToken,
+	}
+	CreateUpdateUser(user)
+
+	loginResponse := LoginResponse{
+		AccessToken:  tokens.AccessToken,
+		RefreshToken: tokens.RefreshToken,
+		UserID:       user.ID,
+	}
+	SendJSON(w, loginResponse)
 }
 
 func (router *AuthRouter) refresh(w http.ResponseWriter, r *http.Request) {
-	// TODO
+	var m TeslaAPITokenReponse
+	if err := UnmarshalValidateBody(r.Body, &m); err != nil {
+		SendBadRequest(w)
+		return
+	}
+
+	tokens, err := TeslaAPIRefreshToken(m.RefreshToken)
+	if err != nil {
+		log.Println(err)
+		SendBadRequest(w)
+		return
+	}
+
+	parsedToken, _ := jwt.Parse(tokens.AccessToken, nil)
+	if parsedToken == nil || parsedToken.Claims == nil {
+		SendInternalServerError(w)
+		return
+	}
+	sub, _ := parsedToken.Claims.GetSubject()
+	user := &User{
+		ID:           sub,
+		RefreshToken: tokens.RefreshToken,
+	}
+	CreateUpdateUser(user)
+
+	loginResponse := LoginResponse{
+		AccessToken:  tokens.AccessToken,
+		RefreshToken: tokens.RefreshToken,
+		UserID:       "",
+	}
+	SendJSON(w, loginResponse)
 }
 
-func (router *AuthRouter) getTokens(code string) (*TokenReponse, error) {
-	target := "https://auth.tesla.com/oauth2/v3/token"
-	data := url.Values{}
-	data.Set("grant_type", "authorization_code")
-	data.Set("client_id", GetConfig().ClientID)
-	data.Set("client_secret", GetConfig().ClientSecret)
-	data.Set("code", code)
-	data.Set("redirect_uri", router.getRedirectURI())
-	data.Set("audience", GetConfig().Audience)
-	r, _ := http.NewRequest("POST", target, strings.NewReader(data.Encode()))
-	r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+func (router *AuthRouter) isTokenValid(w http.ResponseWriter, r *http.Request) {
+	authToken := GetAuthTokenFromRequest(r)
+	if authToken == "" {
+		SendJSON(w, false)
+		return
+	}
 
-	client := &http.Client{}
-	resp, err := client.Do(r)
+	parsedToken, _ := jwt.Parse(authToken, nil)
+	if parsedToken == nil || parsedToken.Claims == nil {
+		SendInternalServerError(w)
+		return
+	}
+
+	exp, err := parsedToken.Claims.GetExpirationTime()
 	if err != nil {
-		// TODO
 		log.Println(err)
-		return nil, err
+		SendInternalServerError(w)
+		return
 	}
-
-	var m TokenReponse
-	if err := UnmarshalValidateBody(resp.Body, &m); err != nil {
-		return nil, err
+	now := time.Now().UTC()
+	if exp.Before(now) {
+		SendJSON(w, false)
+		return
 	}
-	return &m, nil
+	SendJSON(w, true)
 }

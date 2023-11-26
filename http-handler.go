@@ -15,7 +15,15 @@ import (
 	"time"
 
 	"github.com/go-playground/validator"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/mux"
+)
+
+type contextKey string
+
+var (
+	contextKeyUserID     = contextKey("UserID")
+	contextKeyAuthHeader = contextKey("AuthHeader")
 )
 
 type Route interface {
@@ -28,6 +36,10 @@ func SendNotFound(w http.ResponseWriter) {
 
 func SendBadRequest(w http.ResponseWriter) {
 	w.WriteHeader(http.StatusBadRequest)
+}
+
+func SendUnauthorized(w http.ResponseWriter) {
+	w.WriteHeader(http.StatusUnauthorized)
 }
 
 func SendInternalServerError(w http.ResponseWriter) {
@@ -78,11 +90,19 @@ func DebugPrintResponseBody(r io.ReadCloser) error {
 }
 
 func GetAuthTokenFromRequest(r *http.Request) string {
-	bearer := r.Header.Get("Authorization")
-	if strings.Index(bearer, "Bearer ") != 0 {
+	authHeader := r.Context().Value(contextKeyAuthHeader)
+	if authHeader == nil {
 		return ""
 	}
-	return strings.TrimLeft(bearer, "Bearer ")
+	return authHeader.(string)
+}
+
+func GetUserIDFromRequest(r *http.Request) string {
+	userID := r.Context().Value(contextKeyUserID)
+	if userID == nil {
+		return ""
+	}
+	return userID.(string)
 }
 
 func UnmarshalValidateBody(r io.ReadCloser, o interface{}) error {
@@ -95,6 +115,53 @@ func UnmarshalValidateBody(r io.ReadCloser, o interface{}) error {
 		return err
 	}
 	return nil
+}
+
+func VerifyAuthMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		bearer := r.Header.Get("Authorization")
+		authHeader := ""
+		userID := ""
+		tokenValid := false
+		if strings.Index(bearer, "Bearer ") == 0 {
+			h := strings.TrimPrefix(bearer, "Bearer ")
+			if h != "" {
+				parsedToken, _ := jwt.Parse(h, nil)
+				if !(parsedToken == nil || parsedToken.Claims == nil) {
+					exp, err := parsedToken.Claims.GetExpirationTime()
+					if err == nil {
+						now := time.Now().UTC()
+						if exp.After(now) {
+							userID, _ = parsedToken.Claims.GetSubject()
+							authHeader = h
+							tokenValid = true
+						}
+					}
+
+				}
+			}
+		}
+
+		if !tokenValid {
+			authURLs := []string{
+				"/api/1/tesla/",
+			}
+			url := r.URL.RequestURI()
+			for _, authURL := range authURLs {
+				authURL = strings.TrimSpace(authURL)
+				authURL = strings.TrimSuffix(authURL, "/")
+				if authURL != "" && (url == authURL || strings.HasPrefix(url, authURL+"/")) {
+					log.Println(authURL + " // " + url)
+					SendUnauthorized(w)
+					return
+				}
+			}
+		}
+
+		ctx := context.WithValue(r.Context(), contextKeyUserID, userID)
+		ctx = context.WithValue(ctx, contextKeyAuthHeader, authHeader)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
 }
 
 func ServeHTTP() {
@@ -118,6 +185,8 @@ func ServeHTTP() {
 		fs := http.FileServer(http.Dir("./static"))
 		router.PathPrefix("/").Handler(fs)
 	}
+
+	router.Use(VerifyAuthMiddleware)
 
 	httpServer := &http.Server{
 		Addr:         "0.0.0.0:8080",

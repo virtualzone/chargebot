@@ -1,5 +1,7 @@
 'use client'
 
+import { NextRouter } from "next/router";
+
 export function getBaseUrl() {
   if (typeof window !== "undefined") {
     const currentLocation = window.location;
@@ -32,4 +34,66 @@ export function getRefreshToken() {
     return window.sessionStorage.getItem("refreshToken")
   }
   return '';
+}
+
+export async function getAPI(endpoint: string): Promise<any> {
+  const res = await fetch(getBaseUrl() + endpoint, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${getAccessToken()}`,
+    }
+  });
+  const json = await res.json();
+  return json;
+}
+
+export async function postAPI(endpoint: string, data: any): Promise<any> {
+  const res = await fetch(getBaseUrl() + endpoint, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${getAccessToken()}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+  const json = await res.json();
+  return json;
+}
+
+export async function checkAuth() {
+  return new Promise<void>((resolve, reject) => {
+    if (!getAccessToken()) {
+      window.location.href = "/";
+      reject();
+      return;
+    }
+
+    fetch(getBaseUrl() + "/api/1/auth/tokenvalid", {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${getAccessToken()}`,
+      }
+    }).then(valid => {
+      valid.json().then(validBool => {
+        if (validBool) {
+          resolve();
+          return;
+        } 
+        fetch(getBaseUrl() + "/api/1/auth/refresh", {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${getAccessToken()}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ access_token: getAccessToken(), refresh_token: getRefreshToken() }),
+        }).then(resp => {
+          resp.json().then(json => {
+            saveAccessToken(json.access_token);
+            saveRefreshToken(json.refresh_token);
+            resolve();
+          })
+        });
+      });
+    });
+  });
 }

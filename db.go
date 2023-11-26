@@ -8,13 +8,32 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+type User struct {
+	ID           string `json:"id"`
+	RefreshToken string `json:"refresh_token"`
+}
+
+type Vehicle struct {
+	ID          int    `json:"id"`
+	UserID      string `json:"user_id"`
+	VIN         string `json:"vin"`
+	DisplayName string `json:"display_name"`
+}
+
+type APIToken struct {
+	Token     string `json:"token"`
+	VehicleID string `json:"vehicle_id"`
+}
+
 var DB_CONNECTION *sql.DB
 
 func ConnectDB() {
-	db, err := sql.Open("sqlite", GetConfig().DBFile)
+	db, err := sql.Open("sqlite", GetConfig().DBFile+"?_pragma=busy_timeout=10000&_pragma=journal_mode=WAL")
 	if err != nil {
 		log.Panicln(err)
 	}
+	db.SetMaxOpenConns(10000)
+	db.SetMaxIdleConns(10000)
 	DB_CONNECTION = db
 }
 
@@ -25,7 +44,11 @@ func GetDB() *sql.DB {
 func InitDBStructure() {
 	_, err := GetDB().Exec(`
 create table if not exists auth_codes(id text primary key, ts text);
-	`)
+create table if not exists users(id text primary key, refresh_token text);
+create table if not exists vehicles(id int primary key, user_id text, vin text, display_name text);
+create table if not exists api_tokens(token text primary key, vehicle_id int);
+`)
+	//create table if not exists surpluses(id int primary key, vehicle_id text, surplus_watts int);
 	if err != nil {
 		log.Panicln(err)
 	}
@@ -62,4 +85,87 @@ func DeleteExpiredAuthCodes() {
 	if err != nil {
 		log.Panicln(err)
 	}
+}
+
+func CreateUpdateUser(user *User) {
+	_, err := GetDB().Exec("replace into users values(?, ?)", user.ID, user.RefreshToken)
+	if err != nil {
+		log.Panicln(err)
+	}
+}
+
+func GetUser(ID string) *User {
+	e := &User{}
+	err := GetDB().QueryRow("select id, refresh_token from users where id = ?",
+		ID).
+		Scan(&e.ID, &e.RefreshToken)
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+	return e
+}
+
+func CreateUpdateVehicle(e *Vehicle) {
+	_, err := GetDB().Exec("replace into vehicles values(?, ?, ?, ?)", e.ID, e.UserID, e.VIN, e.DisplayName)
+	if err != nil {
+		log.Panicln(err)
+	}
+}
+
+func GetVehicleByID(ID string) *Vehicle {
+	e := &Vehicle{}
+	err := GetDB().QueryRow("select id, user_id, vin, display_name from vehicles where user_id = ?",
+		ID).
+		Scan(&e.ID, &e.UserID, e.VIN, e.DisplayName)
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+	return e
+}
+
+func GetVehicles(UserID string) []*Vehicle {
+	var result []*Vehicle
+	rows, err := GetDB().Query("select id, user_id, vin, display_name from vehicles where user_id = ?",
+		UserID)
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+	defer rows.Close()
+	for rows.Next() {
+		e := &Vehicle{}
+		rows.Scan(&e.ID, &e.UserID, &e.VIN, &e.DisplayName)
+		result = append(result, e)
+	}
+	return result
+}
+
+func DeleteVehicle(ID string) {
+	_, err := GetDB().Exec("delete from vehicles where id = ?", ID)
+	if err != nil {
+		log.Panicln(err)
+	}
+}
+
+func CreateAPIToken(VehicleID string) string {
+	id := uuid.New().String()
+	_, err := GetDB().Exec("insert into api_tokens values(?, ?)", id, VehicleID)
+	if err != nil {
+		log.Panicln(err)
+	}
+	return id
+}
+
+func GetAPITokenVehicleID(token string) string {
+	var vehicleID string
+	err := GetDB().QueryRow("select vehicle_id from api_tokens where token = ?",
+		token).
+		Scan(&vehicleID)
+	if err != nil {
+		log.Println(err)
+		return ""
+	}
+	return vehicleID
 }
