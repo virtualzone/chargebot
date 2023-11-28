@@ -14,6 +14,7 @@ type Config struct {
 	DBFile       string
 	Hostname     string
 	DevProxy     bool
+	TibberToken  string
 }
 
 var _configInstance *Config
@@ -34,6 +35,7 @@ func (c *Config) ReadConfig() {
 	c.DBFile = c.getEnv("DB_FILE", "/tmp/tgc.db")
 	c.Hostname = c.getEnv("HOSTNAME", "tgc.virtualzone.de")
 	c.DevProxy = (c.getEnv("DEV_PROXY", "0") == "1")
+	c.TibberToken = c.getEnv("TIBBER_TOKEN", "")
 }
 
 func (c *Config) Print() {
