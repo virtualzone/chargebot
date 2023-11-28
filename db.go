@@ -1,8 +1,11 @@
 package main
 
 import (
+	"crypto/sha256"
 	"database/sql"
+	"fmt"
 	"log"
+	"math/rand"
 
 	"github.com/google/uuid"
 	_ "modernc.org/sqlite"
@@ -18,6 +21,7 @@ type Vehicle struct {
 	UserID      string `json:"user_id"`
 	VIN         string `json:"vin"`
 	DisplayName string `json:"display_name"`
+	APIToken    string `json:"api_token"`
 }
 
 type APIToken struct {
@@ -46,7 +50,7 @@ func InitDBStructure() {
 create table if not exists auth_codes(id text primary key, ts text);
 create table if not exists users(id text primary key, refresh_token text);
 create table if not exists vehicles(id int primary key, user_id text, vin text, display_name text);
-create table if not exists api_tokens(token text primary key, vehicle_id int);
+create table if not exists api_tokens(token text primary key, vehicle_id int, passhash text);
 `)
 	//create table if not exists surpluses(id int primary key, vehicle_id text, surplus_watts int);
 	if err != nil {
@@ -127,7 +131,10 @@ func GetVehicleByID(ID string) *Vehicle {
 
 func GetVehicles(UserID string) []*Vehicle {
 	var result []*Vehicle
-	rows, err := GetDB().Query("select id, user_id, vin, display_name from vehicles where user_id = ?",
+	rows, err := GetDB().Query("select id, user_id, vin, display_name, api_tokens.token "+
+		"from vehicles "+
+		"left join api_tokens on api_tokens.vehicle_id = vehicles.id "+
+		"where user_id = ?",
 		UserID)
 	if err != nil {
 		log.Println(err)
@@ -136,7 +143,7 @@ func GetVehicles(UserID string) []*Vehicle {
 	defer rows.Close()
 	for rows.Next() {
 		e := &Vehicle{}
-		rows.Scan(&e.ID, &e.UserID, &e.VIN, &e.DisplayName)
+		rows.Scan(&e.ID, &e.UserID, &e.VIN, &e.DisplayName, &e.APIToken)
 		result = append(result, e)
 	}
 	return result
@@ -149,23 +156,73 @@ func DeleteVehicle(ID string) {
 	}
 }
 
-func CreateAPIToken(VehicleID string) string {
+func CreateAPIToken(VehicleID int, password string) string {
 	id := uuid.New().String()
-	_, err := GetDB().Exec("insert into api_tokens values(?, ?)", id, VehicleID)
+	passhash := GetSHA256Hash(password)
+	_, err := GetDB().Exec("insert into api_tokens values(?, ?, ?)", id, VehicleID, passhash)
 	if err != nil {
 		log.Panicln(err)
 	}
 	return id
 }
 
-func GetAPITokenVehicleID(token string) string {
-	var vehicleID string
+func UpdateAPITokenPassword(token string, password string) {
+	passhash := GetSHA256Hash(password)
+	_, err := GetDB().Exec("update api_tokens set passhash = ? where token = ?", token, passhash)
+	if err != nil {
+		log.Panicln(err)
+	}
+}
+
+func GetAPITokenVehicleID(token string) int {
+	var vehicleID int
 	err := GetDB().QueryRow("select vehicle_id from api_tokens where token = ?",
 		token).
 		Scan(&vehicleID)
 	if err != nil {
 		log.Println(err)
-		return ""
+		return 0
 	}
 	return vehicleID
+}
+
+func IsUserOwnerOfVehicle(userID string, vehicleID int) bool {
+	list := GetVehicles(userID)
+	for _, e := range list {
+		if e.UserID == userID {
+			return true
+		}
+	}
+	return false
+}
+
+func GeneratePassword(length int, includeNumber bool, includeSpecial bool) string {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	var password []byte
+	var charSource string
+
+	if includeNumber {
+		charSource += "0123456789"
+	}
+	if includeSpecial {
+		charSource += "!@#$%^&*()_+=-"
+	}
+	charSource += charset
+
+	for i := 0; i < length; i++ {
+		randNum := rand.Intn(len(charSource))
+		password = append(password, charSource[randNum])
+	}
+	return string(password)
+}
+
+func GetSHA256Hash(s string) string {
+	h := sha256.New()
+	h.Write([]byte(s))
+	return fmt.Sprintf("%x", h.Sum(nil))
+}
+
+func IsValidHash(plain string, hash string) bool {
+	s := GetSHA256Hash(plain)
+	return s == hash
 }

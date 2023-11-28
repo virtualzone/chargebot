@@ -6,6 +6,7 @@ import Loading from "../loading";
 import NoData from "../nodata";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ListGroup } from "react-bootstrap";
 
 export default function Authorized() {
   const [vehicles, setVehicles] = useState([] as any[])
@@ -54,22 +55,20 @@ export default function Authorized() {
   }
 
   return (
-    <main className="">
-      <div className="pt-6 md:p-8 text-center md:text-left space-y-4">
-        <Link href="/authorized">Back</Link>
-      </div>
-      <div className="pt-6 md:p-8 text-center md:text-left space-y-4">
-        <p className="text-lg font-medium">Select the Tesla you want to charge with green power:</p>
-      </div>
-      <ul className="divide-y divide-slate-100">
+    <main>
+      <Link href="/authorized" className="btn btn-primary">&lt; Back</Link>
+      <p className="text-lg font-medium">Select the Tesla you want to charge with green power:</p>
+      <ListGroup>
         {(vehicles as any[]).map(e => {
           return (
-            <article onClick={() => selectVehicle(e.vehicle_id)} key={e.vehicle_id} className="flex items-start space-x-6 p-6">
-              <li>{e.display_name} ({e.vin})</li>
-            </article>
+            <ListGroup.Item onClick={() => selectVehicle(e.vehicle_id)} key={e.vehicle_id}>
+              <strong>{e.display_name}</strong>
+              <br />
+              {e.vin}
+            </ListGroup.Item>
           )
         })}
-      </ul>
+      </ListGroup>
     </main>
   )
 }
