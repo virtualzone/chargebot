@@ -185,7 +185,7 @@ export default function Authorized() {
               <Modal.Body>
                 <p>Regularly push your enegery surplus available for charging your vehicle (inverter active power minus consumption) using HTTP POST:</p>
                 <CopyBlock text={code1} language="bash" wrapLongLines={true} showLineNumbers={false} />
-                <p>Alternatively, you can push your current inverter active power and your household's consumption separately:</p>
+                <p>Alternatively, you can push your current inverter active power and your household&apos;s consumption separately:</p>
                 <CopyBlock text={code2} language="bash" wrapLongLines={true} showLineNumbers={false} />
               </Modal.Body>
             </Modal>

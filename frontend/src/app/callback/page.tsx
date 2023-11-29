@@ -25,7 +25,7 @@ export default function CallbackPage() {
         })
         .catch(e => router.push('/loginfailed'))
       .catch(e => router.push('/loginfailed'));
-  }, []);
+  }, [router]);
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-between p-24">
