@@ -4,7 +4,8 @@ import Link from "next/link";
 import { checkAuth, deleteAPI, getAPI, getAccessToken, getBaseUrl, postAPI, putAPI } from "../util";
 import { useEffect, useState } from "react";
 import Loading from "../loading";
-import { Accordion, Button, Form, InputGroup, ListGroup } from "react-bootstrap";
+import { Accordion, Button, Form, InputGroup, ListGroup, Modal } from "react-bootstrap";
+import { CopyBlock } from "react-code-blocks";
 
 export default function Authorized() {
   const [vehicles, setVehicles] = useState([] as any[])
@@ -16,6 +17,7 @@ export default function Authorized() {
   const [minChargetime, setMinChargetime] = useState(new Map<number, number>())
   const [chargeOnTibber, setChargeOnTibber] = useState(new Map<number, boolean>())
   const [maxPrice, setMaxPrice] = useState(new Map<number, number>())
+  const [showTokenHelp, setShowTokenHelp] = useState(new Map<number, boolean>())
 
   function updateChargingEnabled(id: number, value: boolean) {
     let res = new Map(chargingEnabled);
@@ -59,6 +61,12 @@ export default function Authorized() {
     setMaxPrice(res);
   }
 
+  function updateShowTokenHelp(id: number, value: boolean) {
+    let res = new Map(showTokenHelp);
+    res.set(id, value);
+    setShowTokenHelp(res);
+  }
+
   const loadVehicles = async () => {
     const json = await getAPI("/api/1/tesla/my_vehicles");
     setVehicles(json);
@@ -70,6 +78,7 @@ export default function Authorized() {
       updateMinChargetime(e.id, e.min_chargetime);
       updateChargeOnTibber(e.id, e.lowcost_charging);
       updateMaxPrice(e.id, e.max_price);
+      updateShowTokenHelp(e.id, false);
     });
   }
 
@@ -164,6 +173,24 @@ export default function Authorized() {
     vehicleList = (
       <ListGroup>
         {(vehicles as any[]).map(v => {
+
+          let code1 = "curl --header 'Content-Type: application/json' --data '{\"password\": \"\", \"surplus_watts\": 1500}' https://tgc.virtualzone.de/api/1/user/"+v.api_token+"/surplus";
+          let code2 = "curl --header 'Content-Type: application/json' --data '{\"password\": \"\", \"inverter_active_power_watts\": 2000, \"consumption_watts\": 200}' https://tgc.virtualzone.de/api/1/user/"+v.api_token+"/surplus";
+          let tokenHelp = (
+            <Modal show={showTokenHelp.get(v.id)} onHide={() => updateShowTokenHelp(v.id, false)}>
+              <Modal.Header closeButton>
+                <Modal.Title>How to use your API Token</Modal.Title>
+              </Modal.Header>
+
+              <Modal.Body>
+                <p>Regularly push your enegery surplus available for charging your vehicle (inverter active power minus consumption) using HTTP POST:</p>
+                <CopyBlock text={code1} language="bash" wrapLongLines={true} showLineNumbers={false} />
+                <p>Alternatively, you can push your current inverter active power and your household's consumption separately:</p>
+                <CopyBlock text={code2} language="bash" wrapLongLines={true} showLineNumbers={false} />
+              </Modal.Body>
+            </Modal>
+          );
+
           let token = <Button variant="link" onClick={() => generateAPIToken(v.id)}>Generate API Token</Button>
           if (v.api_token) {
             token = <>
@@ -266,6 +293,10 @@ export default function Authorized() {
                   <Accordion.Header>API Token</Accordion.Header>
                   <Accordion.Body>
                     {token}
+                    <div>
+                      {tokenHelp}
+                      <Button variant="primary" onClick={e => updateShowTokenHelp(v.id, true)}>How to use</Button>
+                    </div>
                   </Accordion.Body>
                 </Accordion.Item>
                 <Accordion.Item eventKey="1">
