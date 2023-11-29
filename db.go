@@ -17,11 +17,18 @@ type User struct {
 }
 
 type Vehicle struct {
-	ID          int    `json:"id"`
-	UserID      string `json:"user_id"`
-	VIN         string `json:"vin"`
-	DisplayName string `json:"display_name"`
-	APIToken    string `json:"api_token"`
+	ID              int    `json:"id"`
+	UserID          string `json:"user_id"`
+	VIN             string `json:"vin"`
+	DisplayName     string `json:"display_name"`
+	APIToken        string `json:"api_token"`
+	Enabled         bool   `json:"enabled"`
+	TargetSoC       int    `json:"target_soc"`
+	SurplusCharging bool   `json:"surplus_charging"`
+	MinSurplus      int    `json:"min_surplus"`
+	MinChargeTime   int    `json:"min_chargetime"`
+	LowcostCharging bool   `json:"lowcost_charging"`
+	MaxPrice        int    `json:"max_price"`
 }
 
 type APIToken struct {
@@ -49,7 +56,7 @@ func InitDBStructure() {
 	_, err := GetDB().Exec(`
 create table if not exists auth_codes(id text primary key, ts text);
 create table if not exists users(id text primary key, refresh_token text);
-create table if not exists vehicles(id int primary key, user_id text, vin text, display_name text);
+create table if not exists vehicles(id int primary key, user_id text, vin text, display_name text, enabled int, target_soc int, surplus_charging int, min_surplus int, min_chargetime int, lowcost_charging int, max_price int);
 create table if not exists api_tokens(token text primary key, vehicle_id int, passhash text);
 `)
 	//create table if not exists surpluses(id int primary key, vehicle_id text, surplus_watts int);
@@ -111,12 +118,15 @@ func GetUser(ID string) *User {
 }
 
 func CreateUpdateVehicle(e *Vehicle) {
-	_, err := GetDB().Exec("replace into vehicles values(?, ?, ?, ?)", e.ID, e.UserID, e.VIN, e.DisplayName)
+	_, err := GetDB().Exec("replace into vehicles values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		e.ID, e.UserID, e.VIN, e.DisplayName,
+		e.Enabled, e.TargetSoC, e.SurplusCharging, e.MinSurplus, e.MinChargeTime, e.LowcostCharging, e.MaxPrice)
 	if err != nil {
 		log.Panicln(err)
 	}
 }
 
+/*
 func GetVehicleByID(ID string) *Vehicle {
 	e := &Vehicle{}
 	err := GetDB().QueryRow("select id, user_id, vin, display_name from vehicles where user_id = ?",
@@ -128,10 +138,12 @@ func GetVehicleByID(ID string) *Vehicle {
 	}
 	return e
 }
+*/
 
 func GetVehicles(UserID string) []*Vehicle {
-	var result []*Vehicle
-	rows, err := GetDB().Query("select id, user_id, vin, display_name, api_tokens.token "+
+	result := []*Vehicle{}
+	rows, err := GetDB().Query("select id, user_id, vin, display_name, api_tokens.token, "+
+		"enabled, target_soc, surplus_charging, min_surplus, min_chargetime, lowcost_charging, max_price "+
 		"from vehicles "+
 		"left join api_tokens on api_tokens.vehicle_id = vehicles.id "+
 		"where user_id = ?",
@@ -143,13 +155,13 @@ func GetVehicles(UserID string) []*Vehicle {
 	defer rows.Close()
 	for rows.Next() {
 		e := &Vehicle{}
-		rows.Scan(&e.ID, &e.UserID, &e.VIN, &e.DisplayName, &e.APIToken)
+		rows.Scan(&e.ID, &e.UserID, &e.VIN, &e.DisplayName, &e.APIToken, &e.Enabled, &e.TargetSoC, &e.SurplusCharging, &e.MinSurplus, &e.MinChargeTime, &e.LowcostCharging, &e.MaxPrice)
 		result = append(result, e)
 	}
 	return result
 }
 
-func DeleteVehicle(ID string) {
+func DeleteVehicle(ID int) {
 	_, err := GetDB().Exec("delete from vehicles where id = ?", ID)
 	if err != nil {
 		log.Panicln(err)

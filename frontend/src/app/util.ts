@@ -47,9 +47,33 @@ export async function getAPI(endpoint: string): Promise<any> {
   return json;
 }
 
+export async function deleteAPI(endpoint: string): Promise<any> {
+  const res = await fetch(getBaseUrl() + endpoint, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${getAccessToken()}`,
+    }
+  });
+  const json = await res.json();
+  return json;
+}
+
 export async function postAPI(endpoint: string, data: any): Promise<any> {
   const res = await fetch(getBaseUrl() + endpoint, {
     method: 'POST',
+    headers: {
+      Authorization: `Bearer ${getAccessToken()}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+  const json = await res.json();
+  return json;
+}
+
+export async function putAPI(endpoint: string, data: any): Promise<any> {
+  const res = await fetch(getBaseUrl() + endpoint, {
+    method: 'PUT',
     headers: {
       Authorization: `Bearer ${getAccessToken()}`,
       'Content-Type': 'application/json',

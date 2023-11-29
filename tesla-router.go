@@ -25,6 +25,8 @@ func (router *TeslaRouter) SetupRoutes(s *mux.Router) {
 	s.HandleFunc("/vehicles", router.listVehicles).Methods("GET")
 	s.HandleFunc("/my_vehicles", router.myVehicles).Methods("GET")
 	s.HandleFunc("/vehicle_add/{id}", router.addVehicle).Methods("POST")
+	s.HandleFunc("/vehicle_update/{id}", router.updateVehicle).Methods("PUT")
+	s.HandleFunc("/vehicle_delete/{id}", router.deleteVehicle).Methods("DELETE")
 	s.HandleFunc("/api_token_create", router.createAPIToken).Methods("POST")
 	s.HandleFunc("/api_token_update/{id}", router.updateAPIToken).Methods("POST")
 }
@@ -71,12 +73,91 @@ func (router *TeslaRouter) addVehicle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	e := &Vehicle{
-		ID:          vehicle.VehicleID,
-		UserID:      GetUserIDFromRequest(r),
-		VIN:         vehicle.VIN,
-		DisplayName: vehicle.DisplayName,
+		ID:              vehicle.VehicleID,
+		UserID:          GetUserIDFromRequest(r),
+		VIN:             vehicle.VIN,
+		DisplayName:     vehicle.DisplayName,
+		Enabled:         false,
+		TargetSoC:       70,
+		SurplusCharging: true,
+		MinChargeTime:   15,
+		MinSurplus:      2000,
+		LowcostCharging: false,
+		MaxPrice:        20,
 	}
 	CreateUpdateVehicle(e)
+	SendJSON(w, true)
+}
+
+func (router *TeslaRouter) updateVehicle(w http.ResponseWriter, r *http.Request) {
+	authToken := GetAuthTokenFromRequest(r)
+	vars := mux.Vars(r)
+	vehicleId, _ := strconv.Atoi(vars["id"])
+
+	// Check if vehicle belongs to request user
+	list, err := TeslaAPIListVehicles(authToken)
+	if err != nil {
+		log.Println(err)
+		SendInternalServerError(w)
+		return
+	}
+	var vehicle *TeslaAPIVehicleEntity = nil
+	for _, v := range list.Response {
+		if v.VehicleID == vehicleId {
+			vehicle = &v
+		}
+	}
+
+	if vehicle == nil {
+		SendBadRequest(w)
+		return
+	}
+
+	var m *Vehicle
+	UnmarshalValidateBody(r.Body, &m)
+
+	e := &Vehicle{
+		ID:              vehicle.VehicleID,
+		UserID:          GetUserIDFromRequest(r),
+		VIN:             vehicle.VIN,
+		DisplayName:     vehicle.DisplayName,
+		Enabled:         m.Enabled,
+		TargetSoC:       m.TargetSoC,
+		SurplusCharging: m.SurplusCharging,
+		MinChargeTime:   m.MinChargeTime,
+		MinSurplus:      m.MinSurplus,
+		LowcostCharging: m.LowcostCharging,
+		MaxPrice:        m.MaxPrice,
+	}
+	CreateUpdateVehicle(e)
+	SendJSON(w, true)
+}
+
+func (router *TeslaRouter) deleteVehicle(w http.ResponseWriter, r *http.Request) {
+	authToken := GetAuthTokenFromRequest(r)
+	vars := mux.Vars(r)
+	vehicleId, _ := strconv.Atoi(vars["id"])
+
+	// Check if vehicle belongs to request user
+	list, err := TeslaAPIListVehicles(authToken)
+	if err != nil {
+		log.Println(err)
+		SendInternalServerError(w)
+		return
+	}
+	var vehicle *TeslaAPIVehicleEntity = nil
+	for _, v := range list.Response {
+		if v.VehicleID == vehicleId {
+			vehicle = &v
+		}
+	}
+
+	if vehicle == nil {
+		SendBadRequest(w)
+		return
+	}
+
+	DeleteVehicle(vehicle.VehicleID)
 	SendJSON(w, true)
 }
 
