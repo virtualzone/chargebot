@@ -175,6 +175,7 @@ func ServeHTTP() {
 	routers := make(map[string]Route)
 	routers["/api/1/auth/"] = &AuthRouter{}
 	routers["/api/1/tesla/"] = &TeslaRouter{}
+	routers["/api/1/user/"] = &UserRouter{}
 
 	for prefix, route := range routers {
 		subRouter := router.PathPrefix(prefix).Subrouter()
