@@ -204,7 +204,7 @@ export default function Authorized() {
           if (surpluses.get(v.id) && surpluses.get(v.id).length > 0) {
             surplusRows = surpluses.get(v.id).map((s: any) => {
               return (
-                <tr>
+                <tr key={"surplus-" + s.ts}>
                   <td>{s.ts.replace('T', ' ').replace('Z', '')}</td>
                   <td>{s.surplus_watts} W</td>
                 </tr>
