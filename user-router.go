@@ -15,8 +15,12 @@ type SurplusRecordingRequest struct {
 	Consumption         int    `json:"consumption_watts"`
 }
 
+type SurplusRecordingResponse struct {
+}
+
 func (router *UserRouter) SetupRoutes(s *mux.Router) {
 	s.HandleFunc("/{token}/surplus", router.recordSurplus).Methods("POST")
+	s.HandleFunc("/{token}/surplus", router.getLatestSurpluses).Methods("GET")
 }
 
 func (router *UserRouter) recordSurplus(w http.ResponseWriter, r *http.Request) {
@@ -55,4 +59,18 @@ func (router *UserRouter) recordSurplus(w http.ResponseWriter, r *http.Request) 
 
 	RecordSurplus(vehicle.ID, surplus)
 	SendJSON(w, true)
+}
+
+func (router *UserRouter) getLatestSurpluses(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	token := vars["token"]
+
+	vehicleID := GetAPITokenVehicleID(token)
+	if vehicleID == 0 {
+		SendBadRequest(w)
+		return
+	}
+
+	res := GetLatestSurplusRecords(vehicleID, 20)
+	SendJSON(w, res)
 }

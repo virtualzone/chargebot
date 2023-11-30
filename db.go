@@ -6,10 +6,13 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"time"
 
 	"github.com/google/uuid"
 	_ "modernc.org/sqlite"
 )
+
+var SQLITE_DATETIME_LAYOUT string = "2006-01-02 15:04:05"
 
 type User struct {
 	ID           string `json:"id"`
@@ -34,6 +37,11 @@ type Vehicle struct {
 type APIToken struct {
 	Token     string `json:"token"`
 	VehicleID string `json:"vehicle_id"`
+}
+
+type SurplusRecord struct {
+	Timestamp    time.Time `json:"ts"`
+	SurplusWatts int       `json:"surplus_watts"`
 }
 
 var DB_CONNECTION *sql.DB
@@ -205,6 +213,30 @@ func RecordSurplus(vehicleID int, surplus int) {
 	if err != nil {
 		log.Panicln(err)
 	}
+}
+
+func GetLatestSurplusRecords(vehicleID int, num int) []*SurplusRecord {
+	result := []*SurplusRecord{}
+	rows, err := GetDB().Query("select ts, surplus_watts "+
+		"from surpluses where vehicle_id = ? order by ts desc limit ?",
+		vehicleID, num)
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var ts string
+		var surplus int
+		rows.Scan(&ts, &surplus)
+		parsedTime, _ := time.Parse(SQLITE_DATETIME_LAYOUT, ts)
+		e := &SurplusRecord{
+			Timestamp:    parsedTime,
+			SurplusWatts: surplus,
+		}
+		result = append(result, e)
+	}
+	return result
 }
 
 func IsUserOwnerOfVehicle(userID string, vehicleID int) bool {

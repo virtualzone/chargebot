@@ -4,7 +4,7 @@ import Link from "next/link";
 import { checkAuth, deleteAPI, getAPI, getAccessToken, getBaseUrl, postAPI, putAPI } from "../util";
 import { useEffect, useState } from "react";
 import Loading from "../loading";
-import { Accordion, Button, Form, InputGroup, ListGroup, Modal } from "react-bootstrap";
+import { Accordion, Button, Form, InputGroup, ListGroup, Modal, Table } from "react-bootstrap";
 import { CopyBlock } from "react-code-blocks";
 
 export default function Authorized() {
@@ -18,6 +18,7 @@ export default function Authorized() {
   const [chargeOnTibber, setChargeOnTibber] = useState(new Map<number, boolean>())
   const [maxPrice, setMaxPrice] = useState(new Map<number, number>())
   const [showTokenHelp, setShowTokenHelp] = useState(new Map<number, boolean>())
+  const [surpluses, setSurpluses] = useState(new Map<number, any>())
 
   function updateChargingEnabled(id: number, value: boolean) {
     let res = new Map(chargingEnabled);
@@ -67,6 +68,13 @@ export default function Authorized() {
     setShowTokenHelp(res);
   }
 
+  const loadLatestSurpluses = async (id: number, token: string) => {
+    const json = await getAPI("/api/1/user/" + token + "/surplus");
+    let res = new Map(surpluses);
+    res.set(id, json);
+    setSurpluses(res);
+  }
+
   const loadVehicles = async () => {
     const json = await getAPI("/api/1/tesla/my_vehicles");
     setVehicles(json);
@@ -79,6 +87,7 @@ export default function Authorized() {
       updateChargeOnTibber(e.id, e.lowcost_charging);
       updateMaxPrice(e.id, e.max_price);
       updateShowTokenHelp(e.id, false);
+      loadLatestSurpluses(e.id, e.api_token);
     });
   }
 
@@ -174,8 +183,8 @@ export default function Authorized() {
       <ListGroup>
         {(vehicles as any[]).map(v => {
 
-          let code1 = "curl --header 'Content-Type: application/json' --data '{\"password\": \"\", \"surplus_watts\": 1500}' https://tgc.virtualzone.de/api/1/user/"+v.api_token+"/surplus";
-          let code2 = "curl --header 'Content-Type: application/json' --data '{\"password\": \"\", \"inverter_active_power_watts\": 2000, \"consumption_watts\": 200}' https://tgc.virtualzone.de/api/1/user/"+v.api_token+"/surplus";
+          let code1 = "curl --header 'Content-Type: application/json' --data '{\"password\": \"\", \"surplus_watts\": 1500}' https://tgc.virtualzone.de/api/1/user/" + v.api_token + "/surplus";
+          let code2 = "curl --header 'Content-Type: application/json' --data '{\"password\": \"\", \"inverter_active_power_watts\": 2000, \"consumption_watts\": 200}' https://tgc.virtualzone.de/api/1/user/" + v.api_token + "/surplus";
           let tokenHelp = (
             <Modal show={showTokenHelp.get(v.id)} onHide={() => updateShowTokenHelp(v.id, false)}>
               <Modal.Header closeButton>
@@ -189,6 +198,31 @@ export default function Authorized() {
                 <CopyBlock text={code2} language="bash" wrapLongLines={true} showLineNumbers={false} />
               </Modal.Body>
             </Modal>
+          );
+
+          let surplusRows = <tr><td colSpan={2}>No records founds</td></tr>;
+          if (surpluses.get(v.id) && surpluses.get(v.id).length > 0) {
+            surplusRows = surpluses.get(v.id).map((s: any) => {
+              return (
+                <tr>
+                  <td>{s.ts.replace('T', ' ').replace('Z', '')}</td>
+                  <td>{s.surplus_watts} W</td>
+                </tr>
+              );
+            });
+          }
+          let surplusTable = (
+            <Table>
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Surplus</th>
+                </tr>
+              </thead>
+              <tbody>
+                {surplusRows}
+              </tbody>
+            </Table>
           );
 
           let token = <Button variant="link" onClick={() => generateAPIToken(v.id)}>Generate API Token</Button>
@@ -303,6 +337,12 @@ export default function Authorized() {
                   <Accordion.Header>Charging Preferences</Accordion.Header>
                   <Accordion.Body>
                     {chargePrefs}
+                  </Accordion.Body>
+                </Accordion.Item>
+                <Accordion.Item eventKey="2">
+                  <Accordion.Header>Latest recorded surpluses</Accordion.Header>
+                  <Accordion.Body>
+                    {surplusTable}
                   </Accordion.Body>
                 </Accordion.Item>
               </Accordion>
