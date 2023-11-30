@@ -5,7 +5,6 @@ RUN npm install
 RUN npm run build
 
 FROM golang:1.21-alpine AS server-builder
-RUN apk --update add --no-cache git curl bash
 RUN export GOBIN=$HOME/work/bin
 WORKDIR /go/src/app
 ADD . .
