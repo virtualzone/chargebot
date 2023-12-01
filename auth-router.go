@@ -58,11 +58,6 @@ func (router *AuthRouter) initThirdParty(w http.ResponseWriter, r *http.Request)
 }
 
 func (router *AuthRouter) callback(w http.ResponseWriter, r *http.Request) {
-	/*
-		SendJSON(w, TokenReponse{AccessToken: "abc", RefreshToken: "def"})
-		return
-	*/
-
 	state := r.URL.Query().Get("state")
 	if !IsValidAuthCode(state) {
 		SendNotFound(w)

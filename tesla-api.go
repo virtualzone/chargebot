@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 )
 
@@ -18,9 +19,27 @@ type TeslaAPIVehicleEntity struct {
 	DisplayName string `json:"display_name"`
 }
 
+type TeslaAPIBoolResponse struct {
+	Result bool   `json:"result"`
+	Reason string `json:"reason"`
+}
+
 type TeslaAPIListVehiclesResponse struct {
 	Response []TeslaAPIVehicleEntity `json:"response"`
 	Count    int                     `json:"count"`
+}
+
+type TeslaAPIChargeState struct {
+	BatteryLevel   int    `json:"battery_level"`
+	ChargeAmps     int    `json:"charge_amps"`
+	ChargeLimitSoC int    `json:"charge_limit_soc"`
+	ChargingState  string `json:"charging_state"`
+	Timestamp      int    `json:"timestamp"`
+}
+
+type TeslaAPIVehicleData struct {
+	VehicleID   int                 `json:"vehicle_id"`
+	ChargeState TeslaAPIChargeState `json:"charge_state"`
 }
 
 func TeslaAPIGetTokens(code string, redirectURI string) (*TeslaAPITokenReponse, error) {
@@ -90,5 +109,65 @@ func TeslaAPIListVehicles(authToken string) (*TeslaAPIListVehiclesResponse, erro
 	if err := UnmarshalValidateBody(resp.Body, &m); err != nil {
 		return nil, err
 	}
+	return &m, nil
+}
+
+func TeslaAPIBoolRequest(authToken string, vehicleID string, cmd string, data string) (bool, error) {
+	target := GetConfig().Audience + "/api/1/vehicles/" + vehicleID + "/command/" + cmd
+	r, _ := http.NewRequest("POST", target, strings.NewReader(data))
+	r.Header.Add("Content-Type", "application/json")
+	r.Header.Add("Authorization", "Bearer "+authToken)
+
+	client := &http.Client{}
+	resp, err := client.Do(r)
+	if err != nil {
+		log.Println(err)
+		return false, err
+	}
+
+	var m TeslaAPIBoolResponse
+	if err := UnmarshalValidateBody(resp.Body, &m); err != nil {
+		return false, err
+	}
+
+	return m.Result, nil
+}
+
+func TeslaAPIChargeStart(authToken string, vehicleID string) (bool, error) {
+	return TeslaAPIBoolRequest(authToken, vehicleID, "charge_start", `{}`)
+}
+
+func TeslaAPIChargeStop(authToken string, vehicleID string) (bool, error) {
+	return TeslaAPIBoolRequest(authToken, vehicleID, "charge_stop", `{}`)
+}
+
+func TeslaAPISetChargeLimit(authToken string, vehicleID string, limitPercent int) (bool, error) {
+	data := `{"percent": "` + strconv.Itoa(limitPercent) + `"}`
+	return TeslaAPIBoolRequest(authToken, vehicleID, "set_charge_limit", data)
+}
+
+func TeslaAPISetChargeAmps(authToken string, vehicleID string, amps int) (bool, error) {
+	data := `{"charging_amps": "` + strconv.Itoa(amps) + `"}`
+	return TeslaAPIBoolRequest(authToken, vehicleID, "set_charging_amps", data)
+}
+
+func TeslaAPIGetVehicleData(authToken string, vehicleID string) (*TeslaAPIVehicleData, error) {
+	target := GetConfig().Audience + "/api/1/vehicles/" + vehicleID + "/vehicle_data"
+	r, _ := http.NewRequest("POST", target, strings.NewReader("{}"))
+	r.Header.Add("Content-Type", "application/json")
+	r.Header.Add("Authorization", "Bearer "+authToken)
+
+	client := &http.Client{}
+	resp, err := client.Do(r)
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+
+	var m TeslaAPIVehicleData
+	if err := UnmarshalValidateBody(resp.Body, &m); err != nil {
+		return nil, err
+	}
+
 	return &m, nil
 }

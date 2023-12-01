@@ -44,6 +44,12 @@ type SurplusRecord struct {
 	SurplusWatts int       `json:"surplus_watts"`
 }
 
+type VehicleState struct {
+	VehicleID int
+	PluggedIn bool
+	Charging  bool
+}
+
 var DB_CONNECTION *sql.DB
 
 func ConnectDB() {
@@ -67,6 +73,8 @@ create table if not exists users(id text primary key, refresh_token text);
 create table if not exists vehicles(id int primary key, user_id text, vin text, display_name text, enabled int, target_soc int, surplus_charging int, min_surplus int, min_chargetime int, lowcost_charging int, max_price int);
 create table if not exists api_tokens(token text primary key, vehicle_id int, passhash text);
 create table if not exists surpluses(vehicle_id int, ts text, surplus_watts int);
+create table if not exists logs(vehicle_id int, event_id int, details text);
+create table if not exists vehicle_states(vehicle_id int primary key, plugged_in int default 0, charging int default 0);
 `)
 	if err != nil {
 		log.Panicln(err)
@@ -171,6 +179,25 @@ func GetVehicles(UserID string) []*Vehicle {
 	return result
 }
 
+func GetAllVehicles() []*Vehicle {
+	result := []*Vehicle{}
+	rows, err := GetDB().Query("select id, user_id, vin, display_name, api_tokens.token, " +
+		"enabled, target_soc, surplus_charging, min_surplus, min_chargetime, lowcost_charging, max_price " +
+		"from vehicles " +
+		"left join api_tokens on api_tokens.vehicle_id = vehicles.id")
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+	defer rows.Close()
+	for rows.Next() {
+		e := &Vehicle{}
+		rows.Scan(&e.ID, &e.UserID, &e.VIN, &e.DisplayName, &e.APIToken, &e.Enabled, &e.TargetSoC, &e.SurplusCharging, &e.MinSurplus, &e.MinChargeTime, &e.LowcostCharging, &e.MaxPrice)
+		result = append(result, e)
+	}
+	return result
+}
+
 func DeleteVehicle(ID int) {
 	_, err := GetDB().Exec("delete from vehicles where id = ?", ID)
 	if err != nil {
@@ -206,6 +233,34 @@ func GetAPITokenVehicleID(token string) int {
 		return 0
 	}
 	return vehicleID
+}
+
+func GetVehicleState(vehicleID int) *VehicleState {
+	e := &VehicleState{}
+	err := GetDB().QueryRow("select vehicle_id, plugged_in, charging from vehicle_states where vehicle_id = ?",
+		vehicleID).
+		Scan(&e.VehicleID, &e.PluggedIn, &e.Charging)
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+	return e
+}
+
+func SetVehicleStatePluggedIn(vehicleID int, pluggedIn bool) {
+	_, err := GetDB().Exec("replace into vehicle_states (vehicle_id, plugged_in) values(?, ?)",
+		vehicleID, pluggedIn)
+	if err != nil {
+		log.Fatalln(err)
+	}
+}
+
+func SetVehicleStateCharging(vehicleID int, charging bool) {
+	_, err := GetDB().Exec("replace into vehicle_states (vehicle_id, charging) values(?, ?)",
+		vehicleID, charging)
+	if err != nil {
+		log.Fatalln(err)
+	}
 }
 
 func RecordSurplus(vehicleID int, surplus int) {

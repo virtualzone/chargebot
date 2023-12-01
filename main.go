@@ -10,6 +10,7 @@ func main() {
 	GetConfig().ReadConfig()
 	ConnectDB()
 	InitDBStructure()
+	InitPeriodicChargeControl()
 	ServeHTTP()
 	os.Exit(0)
 }

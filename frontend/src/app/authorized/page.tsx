@@ -185,6 +185,8 @@ export default function Authorized() {
 
           let code1 = "curl --header 'Content-Type: application/json' --data '{\"password\": \"\", \"surplus_watts\": 1500}' https://tgc.virtualzone.de/api/1/user/" + v.api_token + "/surplus";
           let code2 = "curl --header 'Content-Type: application/json' --data '{\"password\": \"\", \"inverter_active_power_watts\": 2000, \"consumption_watts\": 200}' https://tgc.virtualzone.de/api/1/user/" + v.api_token + "/surplus";
+          let code3 = "curl --header 'Content-Type: application/json' --data '{\"password\": \"\"}' https://tgc.virtualzone.de/api/1/user/" + v.api_token + "/plugged_in";
+          let code4 = "curl --header 'Content-Type: application/json' --data '{\"password\": \"\"}' https://tgc.virtualzone.de/api/1/user/" + v.api_token + "/unplugged";
           let tokenHelp = (
             <Modal show={showTokenHelp.get(v.id)} onHide={() => updateShowTokenHelp(v.id, false)}>
               <Modal.Header closeButton>
@@ -192,10 +194,16 @@ export default function Authorized() {
               </Modal.Header>
 
               <Modal.Body>
+                <h5>Update surplus</h5>
                 <p>Regularly push your enegery surplus available for charging your vehicle (inverter active power minus consumption) using HTTP POST:</p>
                 <CopyBlock text={code1} language="bash" wrapLongLines={true} showLineNumbers={false} />
                 <p>Alternatively, you can push your current inverter active power and your household&apos;s consumption separately:</p>
                 <CopyBlock text={code2} language="bash" wrapLongLines={true} showLineNumbers={false} />
+                <h5>Update plugged in status</h5>
+                <p>If your vehicles gets plugged in:</p>
+                <CopyBlock text={code3} language="bash" wrapLongLines={true} showLineNumbers={false} />
+                <p>If your vehicles gets unplugged:</p>
+                <CopyBlock text={code4} language="bash" wrapLongLines={true} showLineNumbers={false} />
               </Modal.Body>
             </Modal>
           );
