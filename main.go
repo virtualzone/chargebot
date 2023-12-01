@@ -10,6 +10,7 @@ func main() {
 	GetConfig().ReadConfig()
 	ConnectDB()
 	InitDBStructure()
+	TeslaAPIInitTokenCache()
 	InitPeriodicChargeControl()
 	ServeHTTP()
 	os.Exit(0)

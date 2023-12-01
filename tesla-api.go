@@ -1,11 +1,15 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/allegro/bigcache/v3"
 )
 
 type TeslaAPITokenReponse struct {
@@ -42,6 +46,24 @@ type TeslaAPIVehicleData struct {
 	ChargeState TeslaAPIChargeState `json:"charge_state"`
 }
 
+var TeslaAPITokenCache *bigcache.BigCache = nil
+
+func TeslaAPIInitTokenCache() {
+	config := bigcache.DefaultConfig(8 * time.Hour)
+	config.CleanWindow = 1 * time.Minute
+	config.HardMaxCacheSize = 1024
+	cache, err := bigcache.New(context.Background(), config)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	TeslaAPITokenCache = cache
+}
+
+func TeslaAPIIsKnownAccessToken(token string) bool {
+	v, err := TeslaAPITokenCache.Get(token)
+	return err == nil && v != nil
+}
+
 func TeslaAPIGetTokens(code string, redirectURI string) (*TeslaAPITokenReponse, error) {
 	target := "https://auth.tesla.com/oauth2/v3/token"
 	data := url.Values{}
@@ -66,6 +88,10 @@ func TeslaAPIGetTokens(code string, redirectURI string) (*TeslaAPITokenReponse, 
 	if err := UnmarshalValidateBody(resp.Body, &m); err != nil {
 		return nil, err
 	}
+
+	// Cache token
+	TeslaAPITokenCache.Set(m.AccessToken, []byte("1"))
+
 	return &m, nil
 }
 
@@ -90,6 +116,10 @@ func TeslaAPIRefreshToken(refreshToken string) (*TeslaAPITokenReponse, error) {
 	if err := UnmarshalValidateBody(resp.Body, &m); err != nil {
 		return nil, err
 	}
+
+	// Cache token
+	TeslaAPITokenCache.Set(m.AccessToken, []byte("1"))
+
 	return &m, nil
 }
 
