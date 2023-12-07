@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -32,6 +33,7 @@ type Vehicle struct {
 	MinChargeTime   int    `json:"min_chargetime"`
 	LowcostCharging bool   `json:"lowcost_charging"`
 	MaxPrice        int    `json:"max_price"`
+	TibberToken     string `json:"tibber_token"`
 }
 
 type APIToken struct {
@@ -48,7 +50,13 @@ type VehicleState struct {
 	VehicleID int
 	PluggedIn bool
 	Charging  bool
+	SoC       int
 }
+
+const (
+	LogEventChargeStart = 1 << iota
+	LogEventChargeStop  = 1 << iota
+)
 
 var DB_CONNECTION *sql.DB
 
@@ -70,11 +78,12 @@ func InitDBStructure() {
 	_, err := GetDB().Exec(`
 create table if not exists auth_codes(id text primary key, ts text);
 create table if not exists users(id text primary key, refresh_token text);
-create table if not exists vehicles(id int primary key, user_id text, vin text, display_name text, enabled int, target_soc int, surplus_charging int, min_surplus int, min_chargetime int, lowcost_charging int, max_price int);
+create table if not exists vehicles(id int primary key, user_id text, vin text, display_name text, enabled int, target_soc int, surplus_charging int, min_surplus int, min_chargetime int, lowcost_charging int, max_price int, tibber_token text);
 create table if not exists api_tokens(token text primary key, vehicle_id int, passhash text);
 create table if not exists surpluses(vehicle_id int, ts text, surplus_watts int);
-create table if not exists logs(vehicle_id int, event_id int, details text);
-create table if not exists vehicle_states(vehicle_id int primary key, plugged_in int default 0, charging int default 0);
+create table if not exists logs(vehicle_id int, ts text, event_id int, details text);
+create table if not exists vehicle_states(vehicle_id int primary key, plugged_in int default 0, charging int default 0, soc int default -1);
+create table if not exists tibber_prices(vehicle_id int not null, hourstamp int not null, price real, primary key(vehicle_id, hourstamp))
 `)
 	if err != nil {
 		log.Panicln(err)
@@ -134,9 +143,9 @@ func GetUser(ID string) *User {
 }
 
 func CreateUpdateVehicle(e *Vehicle) {
-	_, err := GetDB().Exec("replace into vehicles values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+	_, err := GetDB().Exec("replace into vehicles values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 		e.ID, e.UserID, e.VIN, e.DisplayName,
-		e.Enabled, e.TargetSoC, e.SurplusCharging, e.MinSurplus, e.MinChargeTime, e.LowcostCharging, e.MaxPrice)
+		e.Enabled, e.TargetSoC, e.SurplusCharging, e.MinSurplus, e.MinChargeTime, e.LowcostCharging, e.MaxPrice, e.TibberToken)
 	if err != nil {
 		log.Panicln(err)
 	}
@@ -144,13 +153,13 @@ func CreateUpdateVehicle(e *Vehicle) {
 
 func GetVehicleByID(ID int) *Vehicle {
 	e := &Vehicle{}
-	err := GetDB().QueryRow("select id, user_id, vin, display_name, api_tokens.token, "+
-		"enabled, target_soc, surplus_charging, min_surplus, min_chargetime, lowcost_charging, max_price "+
+	err := GetDB().QueryRow("select id, user_id, vin, display_name, ifnull(api_tokens.token, ''), "+
+		"enabled, target_soc, surplus_charging, min_surplus, min_chargetime, lowcost_charging, max_price, tibber_token "+
 		"from vehicles "+
 		"left join api_tokens on api_tokens.vehicle_id = vehicles.id "+
 		"where vehicles.id = ?",
 		ID).
-		Scan(&e.ID, &e.UserID, &e.VIN, &e.DisplayName, &e.APIToken, &e.Enabled, &e.TargetSoC, &e.SurplusCharging, &e.MinSurplus, &e.MinChargeTime, &e.LowcostCharging, &e.MaxPrice)
+		Scan(&e.ID, &e.UserID, &e.VIN, &e.DisplayName, &e.APIToken, &e.Enabled, &e.TargetSoC, &e.SurplusCharging, &e.MinSurplus, &e.MinChargeTime, &e.LowcostCharging, &e.MaxPrice, &e.TibberToken)
 	if err != nil {
 		log.Println(err)
 		return nil
@@ -160,8 +169,8 @@ func GetVehicleByID(ID int) *Vehicle {
 
 func GetVehicles(UserID string) []*Vehicle {
 	result := []*Vehicle{}
-	rows, err := GetDB().Query("select id, user_id, vin, display_name, api_tokens.token, "+
-		"enabled, target_soc, surplus_charging, min_surplus, min_chargetime, lowcost_charging, max_price "+
+	rows, err := GetDB().Query("select id, user_id, vin, display_name, ifnull(api_tokens.token, ''), "+
+		"enabled, target_soc, surplus_charging, min_surplus, min_chargetime, lowcost_charging, max_price, tibber_token "+
 		"from vehicles "+
 		"left join api_tokens on api_tokens.vehicle_id = vehicles.id "+
 		"where user_id = ?",
@@ -173,7 +182,7 @@ func GetVehicles(UserID string) []*Vehicle {
 	defer rows.Close()
 	for rows.Next() {
 		e := &Vehicle{}
-		rows.Scan(&e.ID, &e.UserID, &e.VIN, &e.DisplayName, &e.APIToken, &e.Enabled, &e.TargetSoC, &e.SurplusCharging, &e.MinSurplus, &e.MinChargeTime, &e.LowcostCharging, &e.MaxPrice)
+		rows.Scan(&e.ID, &e.UserID, &e.VIN, &e.DisplayName, &e.APIToken, &e.Enabled, &e.TargetSoC, &e.SurplusCharging, &e.MinSurplus, &e.MinChargeTime, &e.LowcostCharging, &e.MaxPrice, &e.TibberToken)
 		result = append(result, e)
 	}
 	return result
@@ -181,8 +190,8 @@ func GetVehicles(UserID string) []*Vehicle {
 
 func GetAllVehicles() []*Vehicle {
 	result := []*Vehicle{}
-	rows, err := GetDB().Query("select id, user_id, vin, display_name, api_tokens.token, " +
-		"enabled, target_soc, surplus_charging, min_surplus, min_chargetime, lowcost_charging, max_price " +
+	rows, err := GetDB().Query("select id, user_id, vin, display_name, ifnull(api_tokens.token, ''), " +
+		"enabled, target_soc, surplus_charging, min_surplus, min_chargetime, lowcost_charging, max_price, tibber_token " +
 		"from vehicles " +
 		"left join api_tokens on api_tokens.vehicle_id = vehicles.id")
 	if err != nil {
@@ -192,7 +201,7 @@ func GetAllVehicles() []*Vehicle {
 	defer rows.Close()
 	for rows.Next() {
 		e := &Vehicle{}
-		rows.Scan(&e.ID, &e.UserID, &e.VIN, &e.DisplayName, &e.APIToken, &e.Enabled, &e.TargetSoC, &e.SurplusCharging, &e.MinSurplus, &e.MinChargeTime, &e.LowcostCharging, &e.MaxPrice)
+		rows.Scan(&e.ID, &e.UserID, &e.VIN, &e.DisplayName, &e.APIToken, &e.Enabled, &e.TargetSoC, &e.SurplusCharging, &e.MinSurplus, &e.MinChargeTime, &e.LowcostCharging, &e.MaxPrice, &e.TibberToken)
 		result = append(result, e)
 	}
 	return result
@@ -237,9 +246,9 @@ func GetAPITokenVehicleID(token string) int {
 
 func GetVehicleState(vehicleID int) *VehicleState {
 	e := &VehicleState{}
-	err := GetDB().QueryRow("select vehicle_id, plugged_in, charging from vehicle_states where vehicle_id = ?",
+	err := GetDB().QueryRow("select vehicle_id, plugged_in, charging, soc from vehicle_states where vehicle_id = ?",
 		vehicleID).
-		Scan(&e.VehicleID, &e.PluggedIn, &e.Charging)
+		Scan(&e.VehicleID, &e.PluggedIn, &e.Charging, &e.SoC)
 	if err != nil {
 		log.Println(err)
 		return nil
@@ -258,6 +267,14 @@ func SetVehicleStatePluggedIn(vehicleID int, pluggedIn bool) {
 func SetVehicleStateCharging(vehicleID int, charging bool) {
 	_, err := GetDB().Exec("replace into vehicle_states (vehicle_id, charging) values(?, ?)",
 		vehicleID, charging)
+	if err != nil {
+		log.Fatalln(err)
+	}
+}
+
+func SetVehicleStateSoC(vehicleID int, soc int) {
+	_, err := GetDB().Exec("replace into vehicle_states (vehicle_id, soc) values(?, ?)",
+		vehicleID, soc)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -294,6 +311,81 @@ func GetLatestSurplusRecords(vehicleID int, num int) []*SurplusRecord {
 	return result
 }
 
+func SetTibberPrice(vehicleID int, year int, month int, day int, hour int, price float32) {
+	hourstamp, _ := strconv.Atoi(fmt.Sprintf("%4d%02d%02d%02d", year, month, day, hour))
+	_, err := GetDB().Exec("replace into tibber_prices (vehicle_id, hourstamp, price) values(?, ?, ?)",
+		vehicleID, hourstamp, price)
+	if err != nil {
+		log.Fatalln(err)
+	}
+}
+
+func GetUpcomingTibberPrices(vehicleID int) []*TibberPrice {
+	now := time.Now().UTC()
+	hourstampStart, _ := strconv.Atoi(fmt.Sprintf("%4d%02d%02d%02d", now.Year(), now.Month(), now.Day(), now.Hour()))
+	result := []*TibberPrice{}
+	rows, err := GetDB().Query("select hourstamp, price "+
+		"from tibber_prices "+
+		"where vehicle_id = ? and hourstamp >= ?"+
+		"order by hourstamp asc",
+		vehicleID, hourstampStart)
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var hourstamp string
+		var price float32
+		rows.Scan(&hourstamp, &price)
+
+		year, _ := strconv.Atoi(hourstamp[0:4])
+		month, _ := strconv.Atoi(hourstamp[4:6])
+		day, _ := strconv.Atoi(hourstamp[6:8])
+		hour, _ := strconv.Atoi(hourstamp[8:])
+
+		ts := time.Date(year, time.Month(month), day, hour, 0, 0, 0, now.Location())
+
+		e := &TibberPrice{
+			Total:    price,
+			StartsAt: ts,
+		}
+		result = append(result, e)
+	}
+	return result
+}
+
+func GetVehicleIDsWithTibberTokenWithoutPricesForStarttime(startTime time.Time, limit int) []int {
+	hourstampStart, _ := strconv.Atoi(fmt.Sprintf("%4d%02d%02d%02d", startTime.Year(), startTime.Month(), startTime.Day(), 0))
+	result := []int{}
+	rows, err := GetDB().Query("select vehicles.id "+
+		"from vehicles "+
+		"where ifnull(vehicles.tibber_token, '') != '' and (select count(*) from tibber_prices where tibber_prices.vehicle_id = vehicles.id and hourstamp >= ?) = 0 "+
+		"limit ?",
+		hourstampStart, limit)
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var vehicleID int
+		rows.Scan(&vehicleID)
+		result = append(result, vehicleID)
+	}
+	return result
+}
+
+func GetVehicleIDsWithTibberTokenWithoutPricesForTomorrow(limit int) []int {
+	startTime := time.Now().UTC().AddDate(0, 0, 1)
+	return GetVehicleIDsWithTibberTokenWithoutPricesForStarttime(startTime, limit)
+}
+
+func GetVehicleIDsWithTibberTokenWithoutPricesForToday(limit int) []int {
+	startTime := time.Now().UTC()
+	return GetVehicleIDsWithTibberTokenWithoutPricesForStarttime(startTime, limit)
+}
+
 func IsUserOwnerOfVehicle(userID string, vehicleID int) bool {
 	list := GetVehicles(userID)
 	for _, e := range list {
@@ -315,6 +407,13 @@ func IsTokenPasswordValid(token string, password string) bool {
 		return false
 	}
 	return IsValidHash(password, passhash)
+}
+
+func LogChargingEvent(vehicleID int, eventType int, text string) {
+	_, err := GetDB().Exec("insert into logs values(?, datetime(), ?, ?)", vehicleID, eventType, text)
+	if err != nil {
+		log.Panicln(err)
+	}
 }
 
 func GeneratePassword(length int, includeNumber bool, includeSpecial bool) string {

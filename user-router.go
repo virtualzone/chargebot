@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -100,6 +101,20 @@ func (router *UserRouter) updateVehiclePlugState(w http.ResponseWriter, r *http.
 	if vehicleID == 0 {
 		SendBadRequest(w)
 		return
+	}
+
+	vehicle := GetVehicleByID(vehicleID)
+
+	authToken := TeslaAPIGetCachedAccessToken(vehicle.UserID)
+	if authToken != "" {
+		data, err := TeslaAPIGetVehicleData(authToken, vehicleID)
+		if err != nil {
+			log.Println(err)
+		} else {
+			SetVehicleStateSoC(vehicleID, data.ChargeState.BatteryLevel)
+		}
+	} else {
+		log.Printf("could not get access token to update vehicle data on plug in/out for vehicle id %d\n", vehicleID)
 	}
 
 	SetVehicleStatePluggedIn(vehicleID, pluggedIn)

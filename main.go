@@ -12,6 +12,7 @@ func main() {
 	InitDBStructure()
 	TeslaAPIInitTokenCache()
 	InitPeriodicChargeControl()
+	InitPeriodicPriceUpdateControl()
 	ServeHTTP()
 	os.Exit(0)
 }

@@ -17,6 +17,7 @@ export default function Authorized() {
   const [minChargetime, setMinChargetime] = useState(new Map<number, number>())
   const [chargeOnTibber, setChargeOnTibber] = useState(new Map<number, boolean>())
   const [maxPrice, setMaxPrice] = useState(new Map<number, number>())
+  const [tibberToken, setTibberToken] = useState(new Map<number, string>())
   const [showTokenHelp, setShowTokenHelp] = useState(new Map<number, boolean>())
   const [surpluses, setSurpluses] = useState(new Map<number, any>())
 
@@ -56,6 +57,12 @@ export default function Authorized() {
     setChargeOnTibber(res);
   }
 
+  function updateTibberToken(id: number, value: string) {
+    let res = new Map(tibberToken);
+    res.set(id, value);
+    setTibberToken(res);
+  }
+
   function updateMaxPrice(id: number, value: number) {
     let res = new Map(maxPrice);
     res.set(id, value);
@@ -69,6 +76,9 @@ export default function Authorized() {
   }
 
   const loadLatestSurpluses = async (id: number, token: string) => {
+    if (!token) {
+      return
+    }
     const json = await getAPI("/api/1/user/" + token + "/surplus");
     let res = new Map(surpluses);
     res.set(id, json);
@@ -86,6 +96,7 @@ export default function Authorized() {
       updateMinChargetime(e.id, e.min_chargetime);
       updateChargeOnTibber(e.id, e.lowcost_charging);
       updateMaxPrice(e.id, e.max_price);
+      updateTibberToken(e.id, e.tibber_token);
       updateShowTokenHelp(e.id, false);
       loadLatestSurpluses(e.id, e.api_token);
     });
@@ -146,7 +157,8 @@ export default function Authorized() {
         "min_surplus": minSurplus.get(id),
         "min_chargetime": minChargetime.get(id),
         "lowcost_charging": chargeOnTibber.get(id),
-        "max_price": maxPrice.get(id)
+        "max_price": maxPrice.get(id),
+        "tibber_token": tibberToken.get(id)
       };
       await putAPI("/api/1/tesla/vehicle_update/" + id, payload);
       await loadVehicles();
@@ -246,7 +258,7 @@ export default function Authorized() {
             }
           }
           let chargePrefs = (
-            <Form onSubmit={e => { e.preventDefault(); saveVehicle(v.id) }}>
+            <Form onSubmit={e => { e.preventDefault(); e.stopPropagation(); saveVehicle(v.id) }}>
               <Form.Check // prettier-ignore
                 type="switch"
                 label="Enable smart charging control"
@@ -257,15 +269,16 @@ export default function Authorized() {
                 <Form.Control
                   placeholder="Target SoC"
                   aria-label="Target SoC"
-                  aria-describedby="basic-addon1"
+                  aria-describedby="target-soc-addon1"
                   type="number"
                   min={1}
                   max={100}
+                  required={chargingEnabled.get(v.id)}
                   disabled={!chargingEnabled.get(v.id)}
                   value={targetSoC.get(v.id)}
                   onChange={e => updateTargetSoC(v.id, Number(e.target.value))}
                 />
-                <InputGroup.Text id="basic-addon1">%</InputGroup.Text>
+                <InputGroup.Text id="target-soc-addon1">%</InputGroup.Text>
               </InputGroup>
               <Form.Check // prettier-ignore
                 type="switch"
@@ -277,29 +290,31 @@ export default function Authorized() {
                 <Form.Control
                   placeholder="Minimum surplus"
                   aria-label="Minimum surplus"
-                  aria-describedby="basic-addon1"
+                  aria-describedby="min-surplus-addon1"
                   type="number"
                   min={1}
                   max={10000}
+                  required={chargeOnSurplus.get(v.id)}
                   disabled={!chargeOnSurplus.get(v.id)}
                   value={minSurplus.get(v.id)}
                   onChange={e => updateMinSurplus(v.id, Number(e.target.value))}
                 />
-                <InputGroup.Text id="basic-addon1">Watts</InputGroup.Text>
+                <InputGroup.Text id="min-surplus-addon1">Watts</InputGroup.Text>
               </InputGroup>
               <InputGroup className="mb-3">
                 <Form.Control
                   placeholder="Minimum Charging Time"
                   aria-label="Minimum Charging Time"
-                  aria-describedby="basic-addon1"
+                  aria-describedby="chargetime-addon1"
                   type="number"
                   min={1}
                   max={120}
+                  required={chargeOnSurplus.get(v.id)}
                   disabled={!chargeOnSurplus.get(v.id)}
                   value={minChargetime.get(v.id)}
                   onChange={e => updateMinChargetime(v.id, Number(e.target.value))}
                 />
-                <InputGroup.Text id="basic-addon1">Minutes</InputGroup.Text>
+                <InputGroup.Text id="chargetime-addon1">Minutes</InputGroup.Text>
               </InputGroup>
               <Form.Check // prettier-ignore
                 type="switch"
@@ -311,15 +326,27 @@ export default function Authorized() {
                 <Form.Control
                   placeholder="Maximum Tibber Price"
                   aria-label="Maximum Tibber Price"
-                  aria-describedby="basic-addon1"
+                  aria-describedby="tibber-price-addon1"
                   type="number"
                   min={1}
                   max={100}
+                  required={chargeOnTibber.get(v.id)}
                   disabled={!chargeOnTibber.get(v.id)}
                   value={maxPrice.get(v.id)}
                   onChange={e => updateMaxPrice(v.id, Number(e.target.value))}
                 />
-                <InputGroup.Text id="basic-addon1">Cents</InputGroup.Text>
+                <InputGroup.Text id="tibber-price-addon1">Cents</InputGroup.Text>
+              </InputGroup>
+              <InputGroup className="mb-3">
+                <Form.Control
+                  placeholder="Tibber Token"
+                  aria-label="Tibber Token"
+                  type="text"
+                  required={chargeOnTibber.get(v.id)}
+                  disabled={!chargeOnTibber.get(v.id)}
+                  value={tibberToken.get(v.id)}
+                  onChange={e => updateTibberToken(v.id, e.target.value)}
+                />
               </InputGroup>
               <Button type="submit" variant="primary">Save</Button>
             </Form>
