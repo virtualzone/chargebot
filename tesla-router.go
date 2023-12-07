@@ -84,6 +84,7 @@ func (router *TeslaRouter) addVehicle(w http.ResponseWriter, r *http.Request) {
 		MinSurplus:      2000,
 		LowcostCharging: false,
 		MaxPrice:        20,
+		TibberToken:     "",
 	}
 	CreateUpdateVehicle(e)
 	SendJSON(w, true)
@@ -128,6 +129,7 @@ func (router *TeslaRouter) updateVehicle(w http.ResponseWriter, r *http.Request)
 		MinSurplus:      m.MinSurplus,
 		LowcostCharging: m.LowcostCharging,
 		MaxPrice:        m.MaxPrice,
+		TibberToken:     m.TibberToken,
 	}
 	CreateUpdateVehicle(e)
 	SendJSON(w, true)
