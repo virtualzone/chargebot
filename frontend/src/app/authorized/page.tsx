@@ -12,6 +12,7 @@ export default function Authorized() {
   const [isLoading, setLoading] = useState(true)
   const [chargingEnabled, setChargingEnabled] = useState(new Map<number, boolean>())
   const [targetSoC, setTargetSoC] = useState(new Map<number, number>())
+  const [maxAmps, setMaxAmps] = useState(new Map<number, number>())
   const [chargeOnSurplus, setChargeOnSurplus] = useState(new Map<number, boolean>())
   const [minSurplus, setMinSurplus] = useState(new Map<number, number>())
   const [minChargetime, setMinChargetime] = useState(new Map<number, number>())
@@ -20,6 +21,7 @@ export default function Authorized() {
   const [tibberToken, setTibberToken] = useState(new Map<number, string>())
   const [showTokenHelp, setShowTokenHelp] = useState(new Map<number, boolean>())
   const [surpluses, setSurpluses] = useState(new Map<number, any>())
+  const [chargingEvents, setChargingEvents] = useState(new Map<number, any>())
 
   function updateChargingEnabled(id: number, value: boolean) {
     let res = new Map(chargingEnabled);
@@ -31,6 +33,12 @@ export default function Authorized() {
     let res = new Map(targetSoC);
     res.set(id, value);
     setTargetSoC(res);
+  }
+
+  function updateMaxAmps(id: number, value: number) {
+    let res = new Map(maxAmps);
+    res.set(id, value);
+    setMaxAmps(res);
   }
 
   function updateChargeOnSurplus(id: number, value: boolean) {
@@ -85,12 +93,23 @@ export default function Authorized() {
     setSurpluses(res);
   }
 
+  const loadLatestChargingEvents = async (id: number, token: string) => {
+    if (!token) {
+      return
+    }
+    const json = await getAPI("/api/1/user/" + token + "/events");
+    let res = new Map(chargingEvents);
+    res.set(id, json);
+    setChargingEvents(res);
+  }
+
   const loadVehicles = async () => {
     const json = await getAPI("/api/1/tesla/my_vehicles");
     setVehicles(json);
     (json as any[]).forEach(e => {
       updateChargingEnabled(e.id, e.enabled);
       updateTargetSoC(e.id, e.target_soc);
+      updateMaxAmps(e.id, e.max_amps);
       updateChargeOnSurplus(e.id, e.surplus_charging);
       updateMinSurplus(e.id, e.min_surplus);
       updateMinChargetime(e.id, e.min_chargetime);
@@ -99,6 +118,7 @@ export default function Authorized() {
       updateTibberToken(e.id, e.tibber_token);
       updateShowTokenHelp(e.id, false);
       loadLatestSurpluses(e.id, e.api_token);
+      loadLatestChargingEvents(e.id, e.api_token);
     });
   }
 
@@ -153,6 +173,7 @@ export default function Authorized() {
       let payload = {
         "enabled": chargingEnabled.get(id),
         "target_soc": targetSoC.get(id),
+        "max_amps": maxAmps.get(id),
         "surplus_charging": chargeOnSurplus.get(id),
         "min_surplus": minSurplus.get(id),
         "min_chargetime": minChargetime.get(id),
@@ -178,6 +199,15 @@ export default function Authorized() {
       setLoading(false);
     }
     fetchData();
+  }
+
+  function getChargingEventText(id: number) {
+    if (id === 1) return 'Charging started';
+    if (id === 2) return 'Charging stopped';
+    if (id === 3) return 'Vehicle plugged in';
+    if (id === 4) return 'Vehicle unplugged';
+    if (id === 5) return 'Updated vehicle data';
+    return 'Unknown';
   }
 
   if (isLoading) {
@@ -235,12 +265,39 @@ export default function Authorized() {
             <Table>
               <thead>
                 <tr>
-                  <th>Time</th>
+                  <th>Time (UTC)</th>
                   <th>Surplus</th>
                 </tr>
               </thead>
               <tbody>
                 {surplusRows}
+              </tbody>
+            </Table>
+          );
+
+          let eventRows = <tr><td colSpan={3}>No records founds</td></tr>;
+          if (chargingEvents.get(v.id) && chargingEvents.get(v.id).length > 0) {
+            eventRows = chargingEvents.get(v.id).map((s: any) => {
+              return (
+                <tr key={"event-" + s.ts}>
+                  <td>{s.ts.replace('T', ' ').replace('Z', '')}</td>
+                  <td>{getChargingEventText(s.event)}</td>
+                  <td>{s.data}</td>
+                </tr>
+              );
+            });
+          }
+          let eventsTable = (
+            <Table>
+              <thead>
+                <tr>
+                  <th>Time (UTC)</th>
+                  <th>Event</th>
+                  <th>Details</th>
+                </tr>
+              </thead>
+              <tbody>
+                {eventRows}
               </tbody>
             </Table>
           );
@@ -279,6 +336,21 @@ export default function Authorized() {
                   onChange={e => updateTargetSoC(v.id, Number(e.target.value))}
                 />
                 <InputGroup.Text id="target-soc-addon1">%</InputGroup.Text>
+              </InputGroup>
+              <InputGroup className="mb-3">
+                <Form.Control
+                  placeholder="Max. Amps"
+                  aria-label="Max. Amps"
+                  aria-describedby="maxamps-addon1"
+                  type="number"
+                  min={1}
+                  max={32}
+                  required={chargingEnabled.get(v.id)}
+                  disabled={!chargingEnabled.get(v.id)}
+                  value={maxAmps.get(v.id)}
+                  onChange={e => updateMaxAmps(v.id, Number(e.target.value))}
+                />
+                <InputGroup.Text id="maxamps-addon1">A</InputGroup.Text>
               </InputGroup>
               <Form.Check // prettier-ignore
                 type="switch"
@@ -378,6 +450,12 @@ export default function Authorized() {
                   <Accordion.Header>Latest recorded surpluses</Accordion.Header>
                   <Accordion.Body>
                     {surplusTable}
+                  </Accordion.Body>
+                </Accordion.Item>
+                <Accordion.Item eventKey="3">
+                  <Accordion.Header>Latest charging events</Accordion.Header>
+                  <Accordion.Body>
+                    {eventsTable}
                   </Accordion.Body>
                 </Accordion.Item>
               </Accordion>
