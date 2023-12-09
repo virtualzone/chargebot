@@ -279,3 +279,33 @@ func TeslaAPIGetVehicleData(authToken string, vehicle *Vehicle) (*TeslaAPIVehicl
 
 	return &m.Response, nil
 }
+
+func TeslaAPIWakeUpVehicle(authToken string, vehicle *Vehicle) error {
+	target := GetConfig().Audience + "/api/1/vehicles/" + vehicle.VIN + "/wake_up"
+	r, _ := http.NewRequest("POST", target, strings.NewReader("{}"))
+	r.Header.Add("Content-Type", "application/json")
+	r.Header.Add("Authorization", "Bearer "+authToken)
+
+	client := &http.Client{}
+	resp, err := client.Do(r)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	var m TeslaAPIErrorResponse
+	if err := UnmarshalValidateBody(resp.Body, &m); err != nil {
+		return err
+	}
+
+	if m.Error != "" {
+		return fmt.Errorf("api response error: %s (%s)", m.Error, m.ErrorDescription)
+	}
+
+	return nil
+}
+
+func TeslaAPISetScheduledCharging(authToken string, vehicle *Vehicle, enable bool, minutesAfterMidnight int) (bool, error) {
+	payload := `{"enable": ` + strconv.FormatBool(enable) + `, "time": ` + strconv.Itoa(minutesAfterMidnight) + `}`
+	return TeslaAPIBoolRequest(authToken, vehicle, "set_scheduled_charging", payload)
+}
