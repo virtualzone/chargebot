@@ -71,6 +71,7 @@ const (
 var DB_CONNECTION *sql.DB
 
 func ConnectDB() {
+	log.Println("Connecting to database...")
 	db, err := sql.Open("sqlite", GetConfig().DBFile+"?_pragma=busy_timeout=10000&_pragma=journal_mode=WAL")
 	if err != nil {
 		log.Panicln(err)
@@ -84,7 +85,25 @@ func GetDB() *sql.DB {
 	return DB_CONNECTION
 }
 
+func ResetDBStructure() {
+	log.Println("Resetting database...")
+	_, err := GetDB().Exec(`
+drop table if exists auth_codes;
+drop table if exists users;
+drop table if exists vehicles;
+drop table if exists api_tokens;
+drop table if exists surpluses;
+drop table if exists logs;
+drop table if exists vehicle_states;
+drop table if exists tibber_prices;
+`)
+	if err != nil {
+		log.Panicln(err)
+	}
+}
+
 func InitDBStructure() {
+	log.Println("Initialization database structure...")
 	_, err := GetDB().Exec(`
 create table if not exists auth_codes(id text primary key, ts text);
 create table if not exists users(id text primary key, refresh_token text);

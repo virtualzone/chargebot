@@ -9,6 +9,9 @@ func main() {
 	log.Println("Starting Tesla Green Charge...")
 	GetConfig().ReadConfig()
 	ConnectDB()
+	if GetConfig().Reset {
+		ResetDBStructure()
+	}
 	InitDBStructure()
 	TeslaAPIInitTokenCache()
 	InitPeriodicChargeControl()
