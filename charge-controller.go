@@ -57,7 +57,7 @@ func PeriodicChargeControlProcessVehicle(vehicle *Vehicle) {
 }
 
 func ChargeControlStopCharging(accessToken string, vehicle *Vehicle) {
-	TeslaAPIChargeStop(accessToken, vehicle.ID)
+	TeslaAPIChargeStop(accessToken, vehicle)
 	SetVehicleStateCharging(vehicle.ID, false)
 	LogChargingEvent(vehicle.ID, LogEventChargeStop, "smart charging is disabled")
 }
@@ -73,7 +73,7 @@ func ChargeControlCheckStartCharging(accessToken string, vehicle *Vehicle, state
 
 func ChargeControlCheckChargeProcess(accessToken string, vehicle *Vehicle, state *VehicleState) {
 	// get current SoC
-	data, err := TeslaAPIGetVehicleData(accessToken, vehicle.ID)
+	data, err := TeslaAPIGetVehicleData(accessToken, vehicle)
 	if err != nil {
 		log.Println(err)
 	} else {

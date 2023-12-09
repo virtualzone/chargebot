@@ -39,7 +39,7 @@ func (router *TeslaRouter) listVehicles(w http.ResponseWriter, r *http.Request) 
 		SendInternalServerError(w)
 		return
 	}
-	SendJSON(w, list.Response)
+	SendJSON(w, list)
 }
 
 func (router *TeslaRouter) myVehicles(w http.ResponseWriter, r *http.Request) {
@@ -61,7 +61,7 @@ func (router *TeslaRouter) addVehicle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var vehicle *TeslaAPIVehicleEntity = nil
-	for _, v := range list.Response {
+	for _, v := range list {
 		if v.VehicleID == vehicleId {
 			vehicle = &v
 		}
@@ -104,7 +104,7 @@ func (router *TeslaRouter) updateVehicle(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	var vehicle *TeslaAPIVehicleEntity = nil
-	for _, v := range list.Response {
+	for _, v := range list {
 		if v.VehicleID == vehicleId {
 			vehicle = &v
 		}
@@ -150,7 +150,7 @@ func (router *TeslaRouter) deleteVehicle(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	var vehicle *TeslaAPIVehicleEntity = nil
-	for _, v := range list.Response {
+	for _, v := range list {
 		if v.VehicleID == vehicleId {
 			vehicle = &v
 		}

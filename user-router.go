@@ -121,9 +121,16 @@ func (router *UserRouter) updateVehiclePlugState(w http.ResponseWriter, r *http.
 
 	vehicle := GetVehicleByID(vehicleID)
 
-	authToken := TeslaAPIGetCachedAccessToken(vehicle.UserID)
+	SetVehicleStatePluggedIn(vehicleID, pluggedIn)
+	if pluggedIn {
+		LogChargingEvent(vehicleID, LogEventVehiclePlugIn, "")
+	} else {
+		LogChargingEvent(vehicleID, LogEventVehicleUnplug, "")
+	}
+
+	authToken := TeslaAPIGetOrRefreshAccessToken(vehicle.UserID)
 	if authToken != "" {
-		data, err := TeslaAPIGetVehicleData(authToken, vehicleID)
+		data, err := TeslaAPIGetVehicleData(authToken, vehicle)
 		if err != nil {
 			log.Println(err)
 			LogChargingEvent(vehicleID, LogEventVehicleUpdateData, err.Error())
@@ -133,13 +140,6 @@ func (router *UserRouter) updateVehiclePlugState(w http.ResponseWriter, r *http.
 		}
 	} else {
 		log.Printf("could not get access token to update vehicle data on plug in/out for vehicle id %d\n", vehicleID)
-	}
-
-	SetVehicleStatePluggedIn(vehicleID, pluggedIn)
-	if pluggedIn {
-		LogChargingEvent(vehicleID, LogEventVehiclePlugIn, "")
-	} else {
-		LogChargingEvent(vehicleID, LogEventVehicleUnplug, "")
 	}
 }
 
