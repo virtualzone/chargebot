@@ -46,9 +46,14 @@ func PeriodicPriceUpdateControlProcessVehicle(vehicle *Vehicle) {
 		return
 	}
 	for _, price := range priceInfo.Today {
-		SetTibberPrice(vehicle.ID, price.StartsAt.Year(), int(price.StartsAt.Month()), price.StartsAt.Day(), price.StartsAt.Hour(), price.Total)
+		PeriodicPriceUpdateControlProcessPriceInfo(vehicle, &price)
 	}
 	for _, price := range priceInfo.Tomorrow {
-		SetTibberPrice(vehicle.ID, price.StartsAt.Year(), int(price.StartsAt.Month()), price.StartsAt.Day(), price.StartsAt.Hour(), price.Total)
+		PeriodicPriceUpdateControlProcessPriceInfo(vehicle, &price)
 	}
+}
+
+func PeriodicPriceUpdateControlProcessPriceInfo(vehicle *Vehicle, price *TibberPrice) {
+	ts := price.StartsAt.UTC()
+	SetTibberPrice(vehicle.ID, ts.Year(), int(ts.Month()), ts.Day(), ts.Hour(), price.Total)
 }
