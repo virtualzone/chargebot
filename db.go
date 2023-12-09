@@ -103,7 +103,7 @@ drop table if exists tibber_prices;
 }
 
 func InitDBStructure() {
-	log.Println("Initialization database structure...")
+	log.Println("Initializing database structure...")
 	_, err := GetDB().Exec(`
 create table if not exists auth_codes(id text primary key, ts text);
 create table if not exists users(id text primary key, refresh_token text);
