@@ -126,6 +126,7 @@ func (router *TeslaRouter) updateVehicle(w http.ResponseWriter, r *http.Request)
 		Enabled:         m.Enabled,
 		TargetSoC:       m.TargetSoC,
 		MaxAmps:         m.MaxAmps,
+		NumPhases:       m.NumPhases,
 		SurplusCharging: m.SurplusCharging,
 		MinChargeTime:   m.MinChargeTime,
 		MinSurplus:      m.MinSurplus,

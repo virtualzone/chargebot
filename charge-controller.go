@@ -48,10 +48,13 @@ func PeriodicChargeControlProcessVehicle(vehicle *Vehicle) {
 	}
 
 	if !vehicle.Enabled && state.Charging {
+		// Stop charging if vehicle is still charging but not enabled anymore
 		ChargeControlStopCharging(accessToken, vehicle)
 	} else if vehicle.Enabled && !state.Charging {
+		// Check if we need to start charging
 		ChargeControlCheckStartCharging(accessToken, vehicle, state)
 	} else if vehicle.Enabled && state.Charging {
+		// This car is currently charging - check the process
 		ChargeControlCheckChargeProcess(accessToken, vehicle, state)
 	}
 }
