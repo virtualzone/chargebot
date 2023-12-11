@@ -29,6 +29,7 @@ type Vehicle struct {
 	Enabled         bool   `json:"enabled"`
 	TargetSoC       int    `json:"target_soc"`
 	MaxAmps         int    `json:"max_amps"`
+	NumPhases       int    `json:"num_phases"`
 	SurplusCharging bool   `json:"surplus_charging"`
 	MinSurplus      int    `json:"min_surplus"`
 	MinChargeTime   int    `json:"min_chargetime"`
@@ -112,7 +113,8 @@ create table if not exists api_tokens(token text primary key, vehicle_id int, pa
 create table if not exists surpluses(vehicle_id int, ts text, surplus_watts int);
 create table if not exists logs(vehicle_id int, ts text, event_id int, details text);
 create table if not exists vehicle_states(vehicle_id int primary key, plugged_in int default 0, charging int default 0, soc int default -1);
-create table if not exists tibber_prices(vehicle_id int not null, hourstamp int not null, price real, primary key(vehicle_id, hourstamp))
+create table if not exists tibber_prices(vehicle_id int not null, hourstamp int not null, price real, primary key(vehicle_id, hourstamp));
+alter table vehicles add column num_phases int default 3;
 `)
 	if err != nil {
 		log.Panicln(err)
@@ -172,9 +174,9 @@ func GetUser(ID string) *User {
 }
 
 func CreateUpdateVehicle(e *Vehicle) {
-	_, err := GetDB().Exec("replace into vehicles values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+	_, err := GetDB().Exec("replace into vehicles values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 		e.ID, e.UserID, e.VIN, e.DisplayName,
-		e.Enabled, e.TargetSoC, e.MaxAmps, e.SurplusCharging, e.MinSurplus, e.MinChargeTime, e.LowcostCharging, e.MaxPrice, e.TibberToken)
+		e.Enabled, e.TargetSoC, e.MaxAmps, e.SurplusCharging, e.MinSurplus, e.MinChargeTime, e.LowcostCharging, e.MaxPrice, e.TibberToken, e.NumPhases)
 	if err != nil {
 		log.Panicln(err)
 	}
@@ -183,12 +185,12 @@ func CreateUpdateVehicle(e *Vehicle) {
 func GetVehicleByID(ID int) *Vehicle {
 	e := &Vehicle{}
 	err := GetDB().QueryRow("select id, user_id, vin, display_name, ifnull(api_tokens.token, ''), "+
-		"enabled, target_soc, max_amps, surplus_charging, min_surplus, min_chargetime, lowcost_charging, max_price, tibber_token "+
+		"enabled, target_soc, max_amps, num_phases, surplus_charging, min_surplus, min_chargetime, lowcost_charging, max_price, tibber_token "+
 		"from vehicles "+
 		"left join api_tokens on api_tokens.vehicle_id = vehicles.id "+
 		"where vehicles.id = ?",
 		ID).
-		Scan(&e.ID, &e.UserID, &e.VIN, &e.DisplayName, &e.APIToken, &e.Enabled, &e.TargetSoC, &e.MaxAmps, &e.SurplusCharging, &e.MinSurplus, &e.MinChargeTime, &e.LowcostCharging, &e.MaxPrice, &e.TibberToken)
+		Scan(&e.ID, &e.UserID, &e.VIN, &e.DisplayName, &e.APIToken, &e.Enabled, &e.TargetSoC, &e.MaxAmps, &e.NumPhases, &e.SurplusCharging, &e.MinSurplus, &e.MinChargeTime, &e.LowcostCharging, &e.MaxPrice, &e.TibberToken)
 	if err != nil {
 		log.Println(err)
 		return nil
@@ -199,7 +201,7 @@ func GetVehicleByID(ID int) *Vehicle {
 func GetVehicles(UserID string) []*Vehicle {
 	result := []*Vehicle{}
 	rows, err := GetDB().Query("select id, user_id, vin, display_name, ifnull(api_tokens.token, ''), "+
-		"enabled, target_soc, max_amps, surplus_charging, min_surplus, min_chargetime, lowcost_charging, max_price, tibber_token "+
+		"enabled, target_soc, max_amps, num_phases, surplus_charging, min_surplus, min_chargetime, lowcost_charging, max_price, tibber_token "+
 		"from vehicles "+
 		"left join api_tokens on api_tokens.vehicle_id = vehicles.id "+
 		"where user_id = ?",
@@ -211,7 +213,7 @@ func GetVehicles(UserID string) []*Vehicle {
 	defer rows.Close()
 	for rows.Next() {
 		e := &Vehicle{}
-		rows.Scan(&e.ID, &e.UserID, &e.VIN, &e.DisplayName, &e.APIToken, &e.Enabled, &e.TargetSoC, &e.MaxAmps, &e.SurplusCharging, &e.MinSurplus, &e.MinChargeTime, &e.LowcostCharging, &e.MaxPrice, &e.TibberToken)
+		rows.Scan(&e.ID, &e.UserID, &e.VIN, &e.DisplayName, &e.APIToken, &e.Enabled, &e.TargetSoC, &e.MaxAmps, &e.NumPhases, &e.SurplusCharging, &e.MinSurplus, &e.MinChargeTime, &e.LowcostCharging, &e.MaxPrice, &e.TibberToken)
 		result = append(result, e)
 	}
 	return result
@@ -220,7 +222,7 @@ func GetVehicles(UserID string) []*Vehicle {
 func GetAllVehicles() []*Vehicle {
 	result := []*Vehicle{}
 	rows, err := GetDB().Query("select id, user_id, vin, display_name, ifnull(api_tokens.token, ''), " +
-		"enabled, target_soc, max_amps, surplus_charging, min_surplus, min_chargetime, lowcost_charging, max_price, tibber_token " +
+		"enabled, target_soc, max_amps, num_phases, surplus_charging, min_surplus, min_chargetime, lowcost_charging, max_price, tibber_token " +
 		"from vehicles " +
 		"left join api_tokens on api_tokens.vehicle_id = vehicles.id")
 	if err != nil {
@@ -230,7 +232,7 @@ func GetAllVehicles() []*Vehicle {
 	defer rows.Close()
 	for rows.Next() {
 		e := &Vehicle{}
-		rows.Scan(&e.ID, &e.UserID, &e.VIN, &e.DisplayName, &e.APIToken, &e.Enabled, &e.TargetSoC, &e.MaxAmps, &e.SurplusCharging, &e.MinSurplus, &e.MinChargeTime, &e.LowcostCharging, &e.MaxPrice, &e.TibberToken)
+		rows.Scan(&e.ID, &e.UserID, &e.VIN, &e.DisplayName, &e.APIToken, &e.Enabled, &e.TargetSoC, &e.MaxAmps, &e.NumPhases, &e.SurplusCharging, &e.MinSurplus, &e.MinChargeTime, &e.LowcostCharging, &e.MaxPrice, &e.TibberToken)
 		result = append(result, e)
 	}
 	return result

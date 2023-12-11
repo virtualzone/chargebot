@@ -13,6 +13,7 @@ export default function Authorized() {
   const [chargingEnabled, setChargingEnabled] = useState(new Map<number, boolean>())
   const [targetSoC, setTargetSoC] = useState(new Map<number, number>())
   const [maxAmps, setMaxAmps] = useState(new Map<number, number>())
+  const [numPhases, setNumPhases] = useState(new Map<number, number>())
   const [chargeOnSurplus, setChargeOnSurplus] = useState(new Map<number, boolean>())
   const [minSurplus, setMinSurplus] = useState(new Map<number, number>())
   const [minChargetime, setMinChargetime] = useState(new Map<number, number>())
@@ -39,6 +40,12 @@ export default function Authorized() {
     let res = new Map(maxAmps);
     res.set(id, value);
     setMaxAmps(res);
+  }
+
+  function updateNumPhases(id: number, value: number) {
+    let res = new Map(numPhases);
+    res.set(id, value);
+    setNumPhases(res);
   }
 
   function updateChargeOnSurplus(id: number, value: boolean) {
@@ -110,6 +117,7 @@ export default function Authorized() {
       updateChargingEnabled(e.id, e.enabled);
       updateTargetSoC(e.id, e.target_soc);
       updateMaxAmps(e.id, e.max_amps);
+      updateNumPhases(e.id, e.num_phases);
       updateChargeOnSurplus(e.id, e.surplus_charging);
       updateMinSurplus(e.id, e.min_surplus);
       updateMinChargetime(e.id, e.min_chargetime);
@@ -174,6 +182,7 @@ export default function Authorized() {
         "enabled": chargingEnabled.get(id),
         "target_soc": targetSoC.get(id),
         "max_amps": maxAmps.get(id),
+        "num_phases": numPhases.get(id),
         "surplus_charging": chargeOnSurplus.get(id),
         "min_surplus": minSurplus.get(id),
         "min_chargetime": minChargetime.get(id),
@@ -208,6 +217,16 @@ export default function Authorized() {
     if (id === 4) return 'Vehicle unplugged';
     if (id === 5) return 'Updated vehicle data';
     return 'Unknown';
+  }
+
+  function getMaxChargingPower(id: number) {
+    let i = (maxAmps !== undefined && maxAmps.get(id) !== undefined) ? maxAmps.get(id) : 0;
+    let phases = (numPhases !== undefined && numPhases.get(id) !== undefined) ? numPhases.get(id) : 0;
+    let p = i * phases * 230;
+    if (p > 1000) {
+      return Math.round(p/1000) + " kW";
+    }
+    return p + " W";
   }
 
   if (isLoading) {
@@ -352,6 +371,16 @@ export default function Authorized() {
                 />
                 <InputGroup.Text id="maxamps-addon1">A</InputGroup.Text>
               </InputGroup>
+              <Form.Select
+                aria-label="Number of Phases"
+                  required={chargingEnabled.get(v.id)}
+                  disabled={!chargingEnabled.get(v.id)}
+                  value={numPhases.get(v.id)}
+                  onChange={e => updateNumPhases(v.id, Number(e.target.value))}>
+                <option value="1">uniphase</option>
+                <option value="3">three-phase</option>
+              </Form.Select>
+              <Form.Control plaintext={true} readOnly={true} defaultValue={'Up to '+getMaxChargingPower(v.id)} />
               <Form.Check // prettier-ignore
                 type="switch"
                 label="Charge on surplus of solar energy"
