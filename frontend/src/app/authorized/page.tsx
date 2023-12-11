@@ -220,8 +220,14 @@ export default function Authorized() {
   }
 
   function getMaxChargingPower(id: number) {
-    let i = (maxAmps !== undefined && maxAmps.get(id) !== undefined) ? maxAmps.get(id) : 0;
-    let phases = (numPhases !== undefined && numPhases.get(id) !== undefined) ? numPhases.get(id) : 0;
+    let i = 0;
+    if (maxAmps !== undefined && maxAmps.get(id) !== undefined) {
+      i = maxAmps.get(id)!;
+    }
+    let phases = 0;
+    if (numPhases !== undefined && numPhases.get(id) !== undefined) {
+      phases = numPhases.get(id)!;
+    }
     let p = i * phases * 230;
     if (p > 1000) {
       return Math.round(p/1000) + " kW";
