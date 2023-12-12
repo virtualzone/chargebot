@@ -8,10 +8,18 @@ env:
 
 jobs:
 
-  build:
-
+  test:
     runs-on: ubuntu-latest
+    container: golang:1.21-alpine
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install dependencies
+      run: go get -d -v ./...
+    - name: Run tests
+      run: go test -cover -v
 
+  build:
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
     - name: Set up QEMU
