@@ -216,6 +216,10 @@ export default function Authorized() {
     if (id === 3) return 'Vehicle plugged in';
     if (id === 4) return 'Vehicle unplugged';
     if (id === 5) return 'Updated vehicle data';
+    if (id === 6) return 'Wake vehicle';
+    if (id === 7) return 'Set target SoC';
+    if (id === 8) return 'Set charge amps';
+    if (id === 9) return 'Set scheduled charging';
     return 'Unknown';
   }
 

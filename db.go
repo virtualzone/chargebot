@@ -62,11 +62,15 @@ type ChargingEvent struct {
 }
 
 const (
-	LogEventChargeStart       = 1
-	LogEventChargeStop        = 2
-	LogEventVehiclePlugIn     = 3
-	LogEventVehicleUnplug     = 4
-	LogEventVehicleUpdateData = 5
+	LogEventChargeStart          = 1
+	LogEventChargeStop           = 2
+	LogEventVehiclePlugIn        = 3
+	LogEventVehicleUnplug        = 4
+	LogEventVehicleUpdateData    = 5
+	LogEventWakeVehicle          = 6
+	LogEventSetTargetSoC         = 7
+	LogEventSetChargingAmps      = 8
+	LogEventSetScheduledCharging = 9
 )
 
 var DB_CONNECTION *sql.DB
@@ -446,6 +450,27 @@ func LogChargingEvent(vehicleID int, eventType int, text string) {
 	if err != nil {
 		log.Panicln(err)
 	}
+}
+
+func GetLatestChargingEvent(vehicleID int, eventType int) *ChargingEvent {
+	var ts string
+	var eventId int
+	var details string
+	err := GetDB().QueryRow("select ts, event_id, details "+
+		"from logs where vehicle_id = ? and event_id = ? order by ts desc limit 1",
+		vehicleID, eventType).
+		Scan(&ts, &eventId, &details)
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+	parsedTime, _ := time.Parse(SQLITE_DATETIME_LAYOUT, ts)
+	e := &ChargingEvent{
+		Timestamp: parsedTime,
+		Event:     eventId,
+		Data:      details,
+	}
+	return e
 }
 
 func GetLatestChargingEvents(vehicleID int, num int) []*ChargingEvent {
