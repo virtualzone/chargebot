@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 
@@ -130,14 +129,7 @@ func (router *UserRouter) updateVehiclePlugState(w http.ResponseWriter, r *http.
 
 	authToken := TeslaAPIGetOrRefreshAccessToken(vehicle.UserID)
 	if authToken != "" {
-		data, err := TeslaAPIGetVehicleData(authToken, vehicle)
-		if err != nil {
-			log.Println(err)
-			LogChargingEvent(vehicleID, LogEventVehicleUpdateData, err.Error())
-		} else {
-			SetVehicleStateSoC(vehicleID, data.ChargeState.BatteryLevel)
-			LogChargingEvent(vehicleID, LogEventVehicleUpdateData, fmt.Sprintf("vehicle SoC updated: %d", data.ChargeState.BatteryLevel))
-		}
+		UpdateVehicleDataSaveSoC(authToken, vehicle)
 	} else {
 		log.Printf("could not get access token to update vehicle data on plug in/out for vehicle id %d\n", vehicleID)
 	}

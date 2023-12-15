@@ -48,11 +48,20 @@ type SurplusRecord struct {
 	SurplusWatts int       `json:"surplus_watts"`
 }
 
+type ChargeState int
+
+const (
+	ChargeStateNotCharging     ChargeState = 0
+	ChargeStateChargingOnSolar ChargeState = 1
+	ChargeStateChargingOnGrid  ChargeState = 2
+)
+
 type VehicleState struct {
 	VehicleID int
 	PluggedIn bool
-	Charging  bool
+	Charging  ChargeState
 	SoC       int
+	Amps      int
 }
 
 type ChargingEvent struct {
@@ -118,11 +127,12 @@ create table if not exists surpluses(vehicle_id int, ts text, surplus_watts int)
 create table if not exists logs(vehicle_id int, ts text, event_id int, details text);
 create table if not exists vehicle_states(vehicle_id int primary key, plugged_in int default 0, charging int default 0, soc int default -1);
 create table if not exists tibber_prices(vehicle_id int not null, hourstamp int not null, price real, primary key(vehicle_id, hourstamp));
-alter table vehicles add column num_phases int default 3;
 `)
 	if err != nil {
 		log.Panicln(err)
 	}
+	GetDB().Exec(`alter table vehicles add column num_phases int default 3;`)
+	GetDB().Exec(`alter table vehicle_states add column charge_amps int default 0;`)
 }
 
 func CreateAuthCode() string {
@@ -281,9 +291,9 @@ func GetAPITokenVehicleID(token string) int {
 
 func GetVehicleState(vehicleID int) *VehicleState {
 	e := &VehicleState{}
-	err := GetDB().QueryRow("select vehicle_id, plugged_in, charging, soc from vehicle_states where vehicle_id = ?",
+	err := GetDB().QueryRow("select vehicle_id, plugged_in, charging, soc, charge_amps from vehicle_states where vehicle_id = ?",
 		vehicleID).
-		Scan(&e.VehicleID, &e.PluggedIn, &e.Charging, &e.SoC)
+		Scan(&e.VehicleID, &e.PluggedIn, &e.Charging, &e.SoC, &e.Amps)
 	if err != nil {
 		log.Println(err)
 		return nil
@@ -299,7 +309,7 @@ func SetVehicleStatePluggedIn(vehicleID int, pluggedIn bool) {
 	}
 }
 
-func SetVehicleStateCharging(vehicleID int, charging bool) {
+func SetVehicleStateCharging(vehicleID int, charging ChargeState) {
 	_, err := GetDB().Exec("replace into vehicle_states (vehicle_id, charging) values(?, ?)",
 		vehicleID, charging)
 	if err != nil {
@@ -310,6 +320,14 @@ func SetVehicleStateCharging(vehicleID int, charging bool) {
 func SetVehicleStateSoC(vehicleID int, soc int) {
 	_, err := GetDB().Exec("replace into vehicle_states (vehicle_id, soc) values(?, ?)",
 		vehicleID, soc)
+	if err != nil {
+		log.Fatalln(err)
+	}
+}
+
+func SetVehicleStateAmps(vehicleID int, amps int) {
+	_, err := GetDB().Exec("replace into vehicle_states (vehicle_id, charge_amps) values(?, ?)",
+		vehicleID, amps)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -355,14 +373,18 @@ func SetTibberPrice(vehicleID int, year int, month int, day int, hour int, price
 	}
 }
 
-func GetUpcomingTibberPrices(vehicleID int) []*TibberPrice {
+func GetUpcomingTibberPrices(vehicleID int, sortByPriceAsc bool) []*TibberPrice {
 	now := time.Now().UTC()
 	hourstampStart, _ := strconv.Atoi(fmt.Sprintf("%4d%02d%02d%02d", now.Year(), now.Month(), now.Day(), now.Hour()))
 	result := []*TibberPrice{}
+	order := "hourstamp asc"
+	if sortByPriceAsc {
+		order = "price asc"
+	}
 	rows, err := GetDB().Query("select hourstamp, price "+
 		"from tibber_prices "+
 		"where vehicle_id = ? and hourstamp >= ?"+
-		"order by hourstamp asc",
+		"order by "+order,
 		vehicleID, hourstampStart)
 	if err != nil {
 		log.Println(err)
