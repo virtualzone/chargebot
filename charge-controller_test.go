@@ -369,33 +369,34 @@ func TestChargeControl_SolarCharging(t *testing.T) {
 	api.On("GetVehicleData", "token", mock.Anything).Return(vData, nil)
 
 	// on start, no surplus records, so vehicle is not charging
+	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(1 * time.Hour).Add(-1 * time.Duration(GlobalMockTime.CurTime.Minute()) * time.Minute)
 	cc.OnTick()
 	state := GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateNotCharging, state.Charging)
 
 	// record a surplus too low, still no charging
-	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(1 * time.Minute) // +1
+	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(5 * time.Minute) // +5
 	GetDB().RecordSurplus(v.ID, 500)
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateNotCharging, state.Charging)
 
 	// record a surplus large enough, should start charging
-	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(1 * time.Minute) // +2
+	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(5 * time.Minute) // +10
 	GetDB().RecordSurplus(v.ID, 2500)
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateChargingOnSolar, state.Charging)
 
 	// record a surplus not large enough anymore, but should keep on charging
-	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(10 * time.Minute) // +12
+	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(10 * time.Minute) // +20
 	GetDB().RecordSurplus(v.ID, 500)
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateChargingOnSolar, state.Charging)
 
 	// charging should end now
-	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(time.Duration(10+5-int(GlobalMockTime.CurTime.Minute()%5)) * time.Minute)
+	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(10 * time.Minute) // +30
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateNotCharging, state.Charging)
