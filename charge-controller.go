@@ -138,6 +138,7 @@ func (c *ChargeController) activateCharging(accessToken string, vehicle *Vehicle
 	GetDB().LogChargingEvent(vehicle.ID, LogEventSetScheduledCharging, fmt.Sprintf("disabled scheduled charging"))
 
 	GetDB().SetVehicleStateCharging(vehicle.ID, source)
+	GetDB().LogChargingEvent(vehicle.ID, LogEventChargeStart, "")
 
 	// charging should start now
 	return true
