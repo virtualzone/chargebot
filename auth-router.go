@@ -35,7 +35,7 @@ func (router *AuthRouter) getRedirectURI() string {
 }
 
 func (router *AuthRouter) initThirdParty(w http.ResponseWriter, r *http.Request) {
-	code := CreateAuthCode()
+	code := GetDB().CreateAuthCode()
 
 	scope := []string{
 		"openid",
@@ -59,11 +59,11 @@ func (router *AuthRouter) initThirdParty(w http.ResponseWriter, r *http.Request)
 
 func (router *AuthRouter) callback(w http.ResponseWriter, r *http.Request) {
 	state := r.URL.Query().Get("state")
-	if !IsValidAuthCode(state) {
+	if !GetDB().IsValidAuthCode(state) {
 		SendNotFound(w)
 		return
 	}
-	tokens, err := TeslaAPIGetTokens(r.URL.Query().Get("code"), router.getRedirectURI())
+	tokens, err := GetTeslaAPI().GetTokens(r.URL.Query().Get("code"), router.getRedirectURI())
 	if err != nil {
 		log.Println(err)
 		SendBadRequest(w)
@@ -80,7 +80,7 @@ func (router *AuthRouter) callback(w http.ResponseWriter, r *http.Request) {
 		ID:           sub,
 		RefreshToken: tokens.RefreshToken,
 	}
-	CreateUpdateUser(user)
+	GetDB().CreateUpdateUser(user)
 
 	loginResponse := LoginResponse{
 		AccessToken:  tokens.AccessToken,
@@ -97,7 +97,7 @@ func (router *AuthRouter) refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tokens, err := TeslaAPIRefreshToken(m.RefreshToken)
+	tokens, err := GetTeslaAPI().RefreshToken(m.RefreshToken)
 	if err != nil {
 		log.Println(err)
 		SendBadRequest(w)
@@ -114,7 +114,7 @@ func (router *AuthRouter) refresh(w http.ResponseWriter, r *http.Request) {
 		ID:           sub,
 		RefreshToken: tokens.RefreshToken,
 	}
-	CreateUpdateUser(user)
+	GetDB().CreateUpdateUser(user)
 
 	loginResponse := LoginResponse{
 		AccessToken:  tokens.AccessToken,

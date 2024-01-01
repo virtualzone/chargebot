@@ -130,7 +130,7 @@ func VerifyAuthMiddleware(next http.Handler) http.Handler {
 		if strings.Index(bearer, "Bearer ") == 0 {
 			h := strings.TrimPrefix(bearer, "Bearer ")
 			if h != "" {
-				if TeslaAPIIsKnownAccessToken(h) {
+				if GetTeslaAPI().IsKnownAccessToken(h) {
 					parsedToken, _ := jwt.Parse(h, nil)
 					if !(parsedToken == nil || parsedToken.Claims == nil) {
 						exp, err := parsedToken.Claims.GetExpirationTime()
