@@ -41,18 +41,18 @@ func (router *UserRouter) recordSurplus(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if !IsTokenPasswordValid(token, m.Password) {
+	if !GetDB().IsTokenPasswordValid(token, m.Password) {
 		SendUnauthorized(w)
 		return
 	}
 
-	vehicleID := GetAPITokenVehicleID(token)
+	vehicleID := GetDB().GetAPITokenVehicleID(token)
 	if vehicleID == 0 {
 		SendBadRequest(w)
 		return
 	}
 
-	vehicle := GetVehicleByID(vehicleID)
+	vehicle := GetDB().GetVehicleByID(vehicleID)
 	if vehicle == nil {
 		SendInternalServerError(w)
 		return
@@ -65,7 +65,7 @@ func (router *UserRouter) recordSurplus(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	RecordSurplus(vehicle.ID, surplus)
+	GetDB().RecordSurplus(vehicle.ID, surplus)
 	SendJSON(w, true)
 }
 
@@ -73,13 +73,13 @@ func (router *UserRouter) getLatestSurpluses(w http.ResponseWriter, r *http.Requ
 	vars := mux.Vars(r)
 	token := vars["token"]
 
-	vehicleID := GetAPITokenVehicleID(token)
+	vehicleID := GetDB().GetAPITokenVehicleID(token)
 	if vehicleID == 0 {
 		SendBadRequest(w)
 		return
 	}
 
-	res := GetLatestSurplusRecords(vehicleID, 50)
+	res := GetDB().GetLatestSurplusRecords(vehicleID, 50)
 	SendJSON(w, res)
 }
 
@@ -87,13 +87,13 @@ func (router *UserRouter) getLatestChargingEvents(w http.ResponseWriter, r *http
 	vars := mux.Vars(r)
 	token := vars["token"]
 
-	vehicleID := GetAPITokenVehicleID(token)
+	vehicleID := GetDB().GetAPITokenVehicleID(token)
 	if vehicleID == 0 {
 		SendBadRequest(w)
 		return
 	}
 
-	res := GetLatestChargingEvents(vehicleID, 50)
+	res := GetDB().GetLatestChargingEvents(vehicleID, 50)
 	SendJSON(w, res)
 }
 
@@ -107,27 +107,27 @@ func (router *UserRouter) updateVehiclePlugState(w http.ResponseWriter, r *http.
 		return
 	}
 
-	if !IsTokenPasswordValid(token, m.Password) {
+	if !GetDB().IsTokenPasswordValid(token, m.Password) {
 		SendUnauthorized(w)
 		return
 	}
 
-	vehicleID := GetAPITokenVehicleID(token)
+	vehicleID := GetDB().GetAPITokenVehicleID(token)
 	if vehicleID == 0 {
 		SendBadRequest(w)
 		return
 	}
 
-	vehicle := GetVehicleByID(vehicleID)
+	vehicle := GetDB().GetVehicleByID(vehicleID)
 
-	SetVehicleStatePluggedIn(vehicleID, pluggedIn)
+	GetDB().SetVehicleStatePluggedIn(vehicleID, pluggedIn)
 	if pluggedIn {
-		LogChargingEvent(vehicleID, LogEventVehiclePlugIn, "")
+		GetDB().LogChargingEvent(vehicleID, LogEventVehiclePlugIn, "")
 	} else {
-		LogChargingEvent(vehicleID, LogEventVehicleUnplug, "")
+		GetDB().LogChargingEvent(vehicleID, LogEventVehicleUnplug, "")
 	}
 
-	authToken := TeslaAPIGetOrRefreshAccessToken(vehicle.UserID)
+	authToken := GetTeslaAPI().GetOrRefreshAccessToken(vehicle.UserID)
 	if authToken != "" {
 		UpdateVehicleDataSaveSoC(authToken, vehicle)
 	} else {

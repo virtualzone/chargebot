@@ -33,7 +33,7 @@ func (router *TeslaRouter) SetupRoutes(s *mux.Router) {
 
 func (router *TeslaRouter) listVehicles(w http.ResponseWriter, r *http.Request) {
 	authToken := GetAuthTokenFromRequest(r)
-	list, err := TeslaAPIListVehicles(authToken)
+	list, err := GetTeslaAPI().ListVehicles(authToken)
 	if err != nil {
 		log.Println(err)
 		SendInternalServerError(w)
@@ -44,7 +44,7 @@ func (router *TeslaRouter) listVehicles(w http.ResponseWriter, r *http.Request) 
 
 func (router *TeslaRouter) myVehicles(w http.ResponseWriter, r *http.Request) {
 	userID := GetUserIDFromRequest(r)
-	list := GetVehicles(userID)
+	list := GetDB().GetVehicles(userID)
 	SendJSON(w, list)
 }
 
@@ -54,7 +54,7 @@ func (router *TeslaRouter) addVehicle(w http.ResponseWriter, r *http.Request) {
 	vehicleId, _ := strconv.Atoi(vars["id"])
 
 	// Check if vehicle belongs to request user
-	list, err := TeslaAPIListVehicles(authToken)
+	list, err := GetTeslaAPI().ListVehicles(authToken)
 	if err != nil {
 		log.Println(err)
 		SendInternalServerError(w)
@@ -87,7 +87,7 @@ func (router *TeslaRouter) addVehicle(w http.ResponseWriter, r *http.Request) {
 		MaxPrice:        20,
 		TibberToken:     "",
 	}
-	CreateUpdateVehicle(e)
+	GetDB().CreateUpdateVehicle(e)
 	SendJSON(w, true)
 }
 
@@ -97,7 +97,7 @@ func (router *TeslaRouter) updateVehicle(w http.ResponseWriter, r *http.Request)
 	vehicleId, _ := strconv.Atoi(vars["id"])
 
 	// Check if vehicle belongs to request user
-	list, err := TeslaAPIListVehicles(authToken)
+	list, err := GetTeslaAPI().ListVehicles(authToken)
 	if err != nil {
 		log.Println(err)
 		SendInternalServerError(w)
@@ -134,7 +134,7 @@ func (router *TeslaRouter) updateVehicle(w http.ResponseWriter, r *http.Request)
 		MaxPrice:        m.MaxPrice,
 		TibberToken:     m.TibberToken,
 	}
-	CreateUpdateVehicle(e)
+	GetDB().CreateUpdateVehicle(e)
 	SendJSON(w, true)
 }
 
@@ -144,7 +144,7 @@ func (router *TeslaRouter) deleteVehicle(w http.ResponseWriter, r *http.Request)
 	vehicleId, _ := strconv.Atoi(vars["id"])
 
 	// Check if vehicle belongs to request user
-	list, err := TeslaAPIListVehicles(authToken)
+	list, err := GetTeslaAPI().ListVehicles(authToken)
 	if err != nil {
 		log.Println(err)
 		SendInternalServerError(w)
@@ -162,7 +162,7 @@ func (router *TeslaRouter) deleteVehicle(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	DeleteVehicle(vehicle.VehicleID)
+	GetDB().DeleteVehicle(vehicle.VehicleID)
 	SendJSON(w, true)
 }
 
@@ -175,13 +175,13 @@ func (router *TeslaRouter) createAPIToken(w http.ResponseWriter, r *http.Request
 	}
 
 	userID := GetUserIDFromRequest(r)
-	if !IsUserOwnerOfVehicle(userID, m.VehicleID) {
+	if !GetDB().IsUserOwnerOfVehicle(userID, m.VehicleID) {
 		SendForbidden(w)
 		return
 	}
 
 	password := GeneratePassword(16, true, true)
-	token := CreateAPIToken(m.VehicleID, password)
+	token := GetDB().CreateAPIToken(m.VehicleID, password)
 
 	resp := GetAPITokenResponse{
 		Token:     token,
@@ -195,14 +195,14 @@ func (router *TeslaRouter) updateAPIToken(w http.ResponseWriter, r *http.Request
 	vars := mux.Vars(r)
 	token := vars["id"]
 	userID := GetUserIDFromRequest(r)
-	vehicleID := GetAPITokenVehicleID(token)
-	if !IsUserOwnerOfVehicle(userID, vehicleID) {
+	vehicleID := GetDB().GetAPITokenVehicleID(token)
+	if !GetDB().IsUserOwnerOfVehicle(userID, vehicleID) {
 		SendForbidden(w)
 		return
 	}
 
 	password := GeneratePassword(16, true, true)
-	UpdateAPITokenPassword(token, password)
+	GetDB().UpdateAPITokenPassword(token, password)
 
 	resp := GetAPITokenResponse{
 		Token:     token,

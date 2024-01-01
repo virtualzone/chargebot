@@ -1,12 +1,11 @@
 package main
 
 import (
-	"crypto/sha256"
 	"database/sql"
 	"fmt"
 	"log"
-	"math/rand"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -82,26 +81,41 @@ const (
 	LogEventSetScheduledCharging = 9
 )
 
-var DB_CONNECTION *sql.DB
+type DB struct {
+	Connection *sql.DB
+	Time       Time
+}
 
-func ConnectDB() {
+var _DBInstance *DB
+var _DBOnce sync.Once
+
+func GetDB() *DB {
+	_DBOnce.Do(func() {
+		_DBInstance = &DB{
+			Time: new(RealTime),
+		}
+	})
+	return _DBInstance
+}
+
+func (db *DB) Connect() {
 	log.Println("Connecting to database...")
-	db, err := sql.Open("sqlite", GetConfig().DBFile+"?_pragma=busy_timeout=10000&_pragma=journal_mode=WAL")
+	con, err := sql.Open("sqlite", GetConfig().DBFile+"?_pragma=busy_timeout=10000&_pragma=journal_mode=WAL")
 	if err != nil {
 		log.Panicln(err)
 	}
-	db.SetMaxOpenConns(10000)
-	db.SetMaxIdleConns(10000)
-	DB_CONNECTION = db
+	con.SetMaxOpenConns(10000)
+	con.SetMaxIdleConns(10000)
+	db.Connection = con
 }
 
-func GetDB() *sql.DB {
-	return DB_CONNECTION
+func (db *DB) GetConnection() *sql.DB {
+	return db.Connection
 }
 
-func ResetDBStructure() {
+func (db *DB) ResetDBStructure() {
 	log.Println("Resetting database...")
-	_, err := GetDB().Exec(`
+	_, err := db.GetConnection().Exec(`
 drop table if exists auth_codes;
 drop table if exists users;
 drop table if exists vehicles;
@@ -116,9 +130,9 @@ drop table if exists tibber_prices;
 	}
 }
 
-func InitDBStructure() {
+func (db *DB) InitDBStructure() {
 	log.Println("Initializing database structure...")
-	_, err := GetDB().Exec(`
+	_, err := db.GetConnection().Exec(`
 create table if not exists auth_codes(id text primary key, ts text);
 create table if not exists users(id text primary key, refresh_token text);
 create table if not exists vehicles(id int primary key, user_id text, vin text, display_name text, enabled int, target_soc int, max_amps int, surplus_charging int, min_surplus int, min_chargetime int, lowcost_charging int, max_price int, tibber_token text);
@@ -131,21 +145,25 @@ create table if not exists tibber_prices(vehicle_id int not null, hourstamp int 
 	if err != nil {
 		log.Panicln(err)
 	}
-	GetDB().Exec(`alter table vehicles add column num_phases int default 3;`)
-	GetDB().Exec(`alter table vehicle_states add column charge_amps int default 0;`)
+	if _, err = db.GetConnection().Exec(`alter table vehicles add column num_phases int default 3;`); err != nil {
+		log.Println(err)
+	}
+	if _, err = db.GetConnection().Exec(`alter table vehicle_states add column charge_amps int default 0;`); err != nil {
+		log.Println(err)
+	}
 }
 
-func CreateAuthCode() string {
+func (db *DB) CreateAuthCode() string {
 	id := uuid.New().String()
-	_, err := GetDB().Exec("insert into auth_codes values(?, datetime())", id)
+	_, err := db.GetConnection().Exec("insert into auth_codes values(?, ?)", id, db.formatSqliteDatetime(db.Time.UTCNow()))
 	if err != nil {
 		log.Panicln(err)
 	}
 	return id
 }
 
-func IsValidAuthCode(code string) bool {
-	row := GetDB().QueryRow("select count(*) from auth_codes where id = ?", code)
+func (db *DB) IsValidAuthCode(code string) bool {
+	row := db.GetConnection().QueryRow("select count(*) from auth_codes where id = ?", code)
 	var count int
 	if err := row.Scan(&count); err != nil {
 		log.Println(err)
@@ -154,30 +172,30 @@ func IsValidAuthCode(code string) bool {
 	return count == 1
 }
 
-func DeleteAuthCode(code string) {
-	_, err := GetDB().Exec("delete from auth_codes where id = ?", code)
+func (db *DB) DeleteAuthCode(code string) {
+	_, err := db.GetConnection().Exec("delete from auth_codes where id = ?", code)
 	if err != nil {
 		log.Panicln(err)
 	}
 }
 
-func DeleteExpiredAuthCodes() {
-	_, err := GetDB().Exec("delete from auth_codes where ts < date('now', '-15 minutes')")
+func (db *DB) DeleteExpiredAuthCodes() {
+	_, err := db.GetConnection().Exec("delete from auth_codes where ts < date('now', '-15 minutes')")
 	if err != nil {
 		log.Panicln(err)
 	}
 }
 
-func CreateUpdateUser(user *User) {
-	_, err := GetDB().Exec("replace into users values(?, ?)", user.ID, user.RefreshToken)
+func (db *DB) CreateUpdateUser(user *User) {
+	_, err := db.GetConnection().Exec("replace into users values(?, ?)", user.ID, user.RefreshToken)
 	if err != nil {
 		log.Panicln(err)
 	}
 }
 
-func GetUser(ID string) *User {
+func (db *DB) GetUser(ID string) *User {
 	e := &User{}
-	err := GetDB().QueryRow("select id, refresh_token from users where id = ?",
+	err := db.GetConnection().QueryRow("select id, refresh_token from users where id = ?",
 		ID).
 		Scan(&e.ID, &e.RefreshToken)
 	if err != nil {
@@ -187,8 +205,8 @@ func GetUser(ID string) *User {
 	return e
 }
 
-func CreateUpdateVehicle(e *Vehicle) {
-	_, err := GetDB().Exec("replace into vehicles values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+func (db *DB) CreateUpdateVehicle(e *Vehicle) {
+	_, err := db.GetConnection().Exec("replace into vehicles values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 		e.ID, e.UserID, e.VIN, e.DisplayName,
 		e.Enabled, e.TargetSoC, e.MaxAmps, e.SurplusCharging, e.MinSurplus, e.MinChargeTime, e.LowcostCharging, e.MaxPrice, e.TibberToken, e.NumPhases)
 	if err != nil {
@@ -196,9 +214,9 @@ func CreateUpdateVehicle(e *Vehicle) {
 	}
 }
 
-func GetVehicleByID(ID int) *Vehicle {
+func (db *DB) GetVehicleByID(ID int) *Vehicle {
 	e := &Vehicle{}
-	err := GetDB().QueryRow("select id, user_id, vin, display_name, ifnull(api_tokens.token, ''), "+
+	err := db.GetConnection().QueryRow("select id, user_id, vin, display_name, ifnull(api_tokens.token, ''), "+
 		"enabled, target_soc, max_amps, num_phases, surplus_charging, min_surplus, min_chargetime, lowcost_charging, max_price, tibber_token "+
 		"from vehicles "+
 		"left join api_tokens on api_tokens.vehicle_id = vehicles.id "+
@@ -212,9 +230,9 @@ func GetVehicleByID(ID int) *Vehicle {
 	return e
 }
 
-func GetVehicles(UserID string) []*Vehicle {
+func (db *DB) GetVehicles(UserID string) []*Vehicle {
 	result := []*Vehicle{}
-	rows, err := GetDB().Query("select id, user_id, vin, display_name, ifnull(api_tokens.token, ''), "+
+	rows, err := db.GetConnection().Query("select id, user_id, vin, display_name, ifnull(api_tokens.token, ''), "+
 		"enabled, target_soc, max_amps, num_phases, surplus_charging, min_surplus, min_chargetime, lowcost_charging, max_price, tibber_token "+
 		"from vehicles "+
 		"left join api_tokens on api_tokens.vehicle_id = vehicles.id "+
@@ -233,9 +251,9 @@ func GetVehicles(UserID string) []*Vehicle {
 	return result
 }
 
-func GetAllVehicles() []*Vehicle {
+func (db *DB) GetAllVehicles() []*Vehicle {
 	result := []*Vehicle{}
-	rows, err := GetDB().Query("select id, user_id, vin, display_name, ifnull(api_tokens.token, ''), " +
+	rows, err := db.GetConnection().Query("select id, user_id, vin, display_name, ifnull(api_tokens.token, ''), " +
 		"enabled, target_soc, max_amps, num_phases, surplus_charging, min_surplus, min_chargetime, lowcost_charging, max_price, tibber_token " +
 		"from vehicles " +
 		"left join api_tokens on api_tokens.vehicle_id = vehicles.id")
@@ -252,34 +270,34 @@ func GetAllVehicles() []*Vehicle {
 	return result
 }
 
-func DeleteVehicle(ID int) {
-	_, err := GetDB().Exec("delete from vehicles where id = ?", ID)
+func (db *DB) DeleteVehicle(ID int) {
+	_, err := db.GetConnection().Exec("delete from vehicles where id = ?", ID)
 	if err != nil {
 		log.Panicln(err)
 	}
 }
 
-func CreateAPIToken(VehicleID int, password string) string {
+func (db *DB) CreateAPIToken(VehicleID int, password string) string {
 	id := uuid.New().String()
 	passhash := GetSHA256Hash(password)
-	_, err := GetDB().Exec("insert into api_tokens values(?, ?, ?)", id, VehicleID, passhash)
+	_, err := db.GetConnection().Exec("insert into api_tokens values(?, ?, ?)", id, VehicleID, passhash)
 	if err != nil {
 		log.Panicln(err)
 	}
 	return id
 }
 
-func UpdateAPITokenPassword(token string, password string) {
+func (db *DB) UpdateAPITokenPassword(token string, password string) {
 	passhash := GetSHA256Hash(password)
-	_, err := GetDB().Exec("update api_tokens set passhash = ? where token = ?", passhash, token)
+	_, err := db.GetConnection().Exec("update api_tokens set passhash = ? where token = ?", passhash, token)
 	if err != nil {
 		log.Panicln(err)
 	}
 }
 
-func GetAPITokenVehicleID(token string) int {
+func (db *DB) GetAPITokenVehicleID(token string) int {
 	var vehicleID int
-	err := GetDB().QueryRow("select vehicle_id from api_tokens where token = ?",
+	err := db.GetConnection().QueryRow("select vehicle_id from api_tokens where token = ?",
 		token).
 		Scan(&vehicleID)
 	if err != nil {
@@ -289,9 +307,9 @@ func GetAPITokenVehicleID(token string) int {
 	return vehicleID
 }
 
-func GetVehicleState(vehicleID int) *VehicleState {
+func (db *DB) GetVehicleState(vehicleID int) *VehicleState {
 	e := &VehicleState{}
-	err := GetDB().QueryRow("select vehicle_id, plugged_in, charging, soc, charge_amps from vehicle_states where vehicle_id = ?",
+	err := db.GetConnection().QueryRow("select vehicle_id, plugged_in, charging, soc, charge_amps from vehicle_states where vehicle_id = ?",
 		vehicleID).
 		Scan(&e.VehicleID, &e.PluggedIn, &e.Charging, &e.SoC, &e.Amps)
 	if err != nil {
@@ -301,48 +319,52 @@ func GetVehicleState(vehicleID int) *VehicleState {
 	return e
 }
 
-func SetVehicleStatePluggedIn(vehicleID int, pluggedIn bool) {
-	_, err := GetDB().Exec("replace into vehicle_states (vehicle_id, plugged_in) values(?, ?)",
-		vehicleID, pluggedIn)
+func (db *DB) SetVehicleStatePluggedIn(vehicleID int, pluggedIn bool) {
+	_, err := db.GetConnection().Exec("insert into vehicle_states (vehicle_id, plugged_in) values(?, ?) "+
+		"on conflict(vehicle_id) do update set plugged_in = ?",
+		vehicleID, pluggedIn, pluggedIn)
 	if err != nil {
 		log.Fatalln(err)
 	}
 }
 
-func SetVehicleStateCharging(vehicleID int, charging ChargeState) {
-	_, err := GetDB().Exec("replace into vehicle_states (vehicle_id, charging) values(?, ?)",
-		vehicleID, charging)
+func (db *DB) SetVehicleStateCharging(vehicleID int, charging ChargeState) {
+	_, err := db.GetConnection().Exec("insert into vehicle_states (vehicle_id, charging) values(?, ?) "+
+		"on conflict(vehicle_id) do update set charging = ?",
+		vehicleID, charging, charging)
 	if err != nil {
 		log.Fatalln(err)
 	}
 }
 
-func SetVehicleStateSoC(vehicleID int, soc int) {
-	_, err := GetDB().Exec("replace into vehicle_states (vehicle_id, soc) values(?, ?)",
-		vehicleID, soc)
+func (db *DB) SetVehicleStateSoC(vehicleID int, soc int) {
+	_, err := db.GetConnection().Exec("insert into vehicle_states (vehicle_id, soc) values(?, ?) "+
+		"on conflict(vehicle_id) do update set soc = ?",
+		vehicleID, soc, soc)
 	if err != nil {
 		log.Fatalln(err)
 	}
 }
 
-func SetVehicleStateAmps(vehicleID int, amps int) {
-	_, err := GetDB().Exec("replace into vehicle_states (vehicle_id, charge_amps) values(?, ?)",
-		vehicleID, amps)
+func (db *DB) SetVehicleStateAmps(vehicleID int, amps int) {
+	_, err := db.GetConnection().Exec("insert into vehicle_states (vehicle_id, charge_amps) values(?, ?) "+
+		"on conflict(vehicle_id) do update set charge_amps = ?",
+		vehicleID, amps, amps)
 	if err != nil {
 		log.Fatalln(err)
 	}
 }
 
-func RecordSurplus(vehicleID int, surplus int) {
-	_, err := GetDB().Exec("insert into surpluses (vehicle_id, ts, surplus_watts) values (?, datetime(), ?)", vehicleID, surplus)
+func (db *DB) RecordSurplus(vehicleID int, surplus int) {
+	_, err := db.GetConnection().Exec("insert into surpluses (vehicle_id, ts, surplus_watts) values (?, ?, ?)", vehicleID, db.formatSqliteDatetime(db.Time.UTCNow()), surplus)
 	if err != nil {
 		log.Panicln(err)
 	}
 }
 
-func GetLatestSurplusRecords(vehicleID int, num int) []*SurplusRecord {
+func (db *DB) GetLatestSurplusRecords(vehicleID int, num int) []*SurplusRecord {
 	result := []*SurplusRecord{}
-	rows, err := GetDB().Query("select ts, surplus_watts "+
+	rows, err := db.GetConnection().Query("select ts, surplus_watts "+
 		"from surpluses where vehicle_id = ? order by ts desc limit ?",
 		vehicleID, num)
 	if err != nil {
@@ -364,24 +386,24 @@ func GetLatestSurplusRecords(vehicleID int, num int) []*SurplusRecord {
 	return result
 }
 
-func SetTibberPrice(vehicleID int, year int, month int, day int, hour int, price float32) {
+func (db *DB) SetTibberPrice(vehicleID int, year int, month int, day int, hour int, price float32) {
 	hourstamp, _ := strconv.Atoi(fmt.Sprintf("%4d%02d%02d%02d", year, month, day, hour))
-	_, err := GetDB().Exec("replace into tibber_prices (vehicle_id, hourstamp, price) values(?, ?, ?)",
+	_, err := db.GetConnection().Exec("replace into tibber_prices (vehicle_id, hourstamp, price) values(?, ?, ?)",
 		vehicleID, hourstamp, price)
 	if err != nil {
 		log.Fatalln(err)
 	}
 }
 
-func GetUpcomingTibberPrices(vehicleID int, sortByPriceAsc bool) []*TibberPrice {
-	now := time.Now().UTC()
+func (db *DB) GetUpcomingTibberPrices(vehicleID int, sortByPriceAsc bool) []*TibberPrice {
+	now := db.Time.UTCNow()
 	hourstampStart, _ := strconv.Atoi(fmt.Sprintf("%4d%02d%02d%02d", now.Year(), now.Month(), now.Day(), now.Hour()))
 	result := []*TibberPrice{}
 	order := "hourstamp asc"
 	if sortByPriceAsc {
 		order = "price asc"
 	}
-	rows, err := GetDB().Query("select hourstamp, price "+
+	rows, err := db.GetConnection().Query("select hourstamp, price "+
 		"from tibber_prices "+
 		"where vehicle_id = ? and hourstamp >= ?"+
 		"order by "+order,
@@ -412,10 +434,10 @@ func GetUpcomingTibberPrices(vehicleID int, sortByPriceAsc bool) []*TibberPrice 
 	return result
 }
 
-func GetVehicleIDsWithTibberTokenWithoutPricesForStarttime(startTime time.Time, limit int) []int {
+func (db *DB) GetVehicleIDsWithTibberTokenWithoutPricesForStarttime(startTime time.Time, limit int) []int {
 	hourstampStart, _ := strconv.Atoi(fmt.Sprintf("%4d%02d%02d%02d", startTime.Year(), startTime.Month(), startTime.Day(), 0))
 	result := []int{}
-	rows, err := GetDB().Query("select vehicles.id "+
+	rows, err := db.GetConnection().Query("select vehicles.id "+
 		"from vehicles "+
 		"where ifnull(vehicles.tibber_token, '') != '' and (select count(*) from tibber_prices where tibber_prices.vehicle_id = vehicles.id and hourstamp >= ?) = 0 "+
 		"limit ?",
@@ -433,18 +455,18 @@ func GetVehicleIDsWithTibberTokenWithoutPricesForStarttime(startTime time.Time, 
 	return result
 }
 
-func GetVehicleIDsWithTibberTokenWithoutPricesForTomorrow(limit int) []int {
-	startTime := time.Now().UTC().AddDate(0, 0, 1)
-	return GetVehicleIDsWithTibberTokenWithoutPricesForStarttime(startTime, limit)
+func (db *DB) GetVehicleIDsWithTibberTokenWithoutPricesForTomorrow(limit int) []int {
+	startTime := db.Time.UTCNow().AddDate(0, 0, 1)
+	return db.GetVehicleIDsWithTibberTokenWithoutPricesForStarttime(startTime, limit)
 }
 
-func GetVehicleIDsWithTibberTokenWithoutPricesForToday(limit int) []int {
-	startTime := time.Now().UTC()
-	return GetVehicleIDsWithTibberTokenWithoutPricesForStarttime(startTime, limit)
+func (db *DB) GetVehicleIDsWithTibberTokenWithoutPricesForToday(limit int) []int {
+	startTime := db.Time.UTCNow()
+	return db.GetVehicleIDsWithTibberTokenWithoutPricesForStarttime(startTime, limit)
 }
 
-func IsUserOwnerOfVehicle(userID string, vehicleID int) bool {
-	list := GetVehicles(userID)
+func (db *DB) IsUserOwnerOfVehicle(userID string, vehicleID int) bool {
+	list := db.GetVehicles(userID)
 	for _, e := range list {
 		if e.UserID == userID {
 			return true
@@ -453,9 +475,9 @@ func IsUserOwnerOfVehicle(userID string, vehicleID int) bool {
 	return false
 }
 
-func IsTokenPasswordValid(token string, password string) bool {
+func (db *DB) IsTokenPasswordValid(token string, password string) bool {
 	var passhash string
-	err := GetDB().QueryRow("select passhash "+
+	err := db.GetConnection().QueryRow("select passhash "+
 		"from api_tokens "+
 		"where token = ?",
 		token).Scan(&passhash)
@@ -466,19 +488,19 @@ func IsTokenPasswordValid(token string, password string) bool {
 	return IsValidHash(password, passhash)
 }
 
-func LogChargingEvent(vehicleID int, eventType int, text string) {
+func (db *DB) LogChargingEvent(vehicleID int, eventType int, text string) {
 	log.Printf("charging event %d for vehicle id %d with data: %s\n", eventType, vehicleID, text)
-	_, err := GetDB().Exec("insert into logs values(?, datetime(), ?, ?)", vehicleID, eventType, text)
+	_, err := db.GetConnection().Exec("insert into logs values(?, ?, ?, ?)", vehicleID, db.formatSqliteDatetime(db.Time.UTCNow()), eventType, text)
 	if err != nil {
 		log.Panicln(err)
 	}
 }
 
-func GetLatestChargingEvent(vehicleID int, eventType int) *ChargingEvent {
+func (db *DB) GetLatestChargingEvent(vehicleID int, eventType int) *ChargingEvent {
 	var ts string
 	var eventId int
 	var details string
-	err := GetDB().QueryRow("select ts, event_id, details "+
+	err := db.GetConnection().QueryRow("select ts, event_id, details "+
 		"from logs where vehicle_id = ? and event_id = ? order by ts desc limit 1",
 		vehicleID, eventType).
 		Scan(&ts, &eventId, &details)
@@ -495,9 +517,9 @@ func GetLatestChargingEvent(vehicleID int, eventType int) *ChargingEvent {
 	return e
 }
 
-func GetLatestChargingEvents(vehicleID int, num int) []*ChargingEvent {
+func (db *DB) GetLatestChargingEvents(vehicleID int, num int) []*ChargingEvent {
 	result := []*ChargingEvent{}
-	rows, err := GetDB().Query("select ts, event_id, details "+
+	rows, err := db.GetConnection().Query("select ts, event_id, details "+
 		"from logs where vehicle_id = ? order by ts desc limit ?",
 		vehicleID, num)
 	if err != nil {
@@ -521,33 +543,11 @@ func GetLatestChargingEvents(vehicleID int, num int) []*ChargingEvent {
 	return result
 }
 
-func GeneratePassword(length int, includeNumber bool, includeSpecial bool) string {
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	var password []byte
-	var charSource string
-
-	if includeNumber {
-		charSource += "0123456789"
-	}
-	if includeSpecial {
-		charSource += "!@#$%^&*()_+=-"
-	}
-	charSource += charset
-
-	for i := 0; i < length; i++ {
-		randNum := rand.Intn(len(charSource))
-		password = append(password, charSource[randNum])
-	}
-	return string(password)
+func (db *DB) formatSqliteDatetime(ts time.Time) string {
+	return ts.Format(SQLITE_DATETIME_LAYOUT)
 }
 
-func GetSHA256Hash(s string) string {
-	h := sha256.New()
-	h.Write([]byte(s))
-	return fmt.Sprintf("%x", h.Sum(nil))
-}
-
-func IsValidHash(plain string, hash string) bool {
-	s := GetSHA256Hash(plain)
-	return s == hash
+func (db *DB) parseSqliteDatetime(ts string) *time.Time {
+	parsedTime, _ := time.Parse(SQLITE_DATETIME_LAYOUT, ts)
+	return &parsedTime
 }

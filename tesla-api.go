@@ -65,10 +65,29 @@ type TeslaAPIVehicleDataResponse struct {
 	Response TeslaAPIVehicleData `json:"response"`
 }
 
-var TeslaAPITokenCache *bigcache.BigCache = nil
-var TeslaAPIUserIDToTokenCache *bigcache.BigCache = nil
+type TeslaAPI interface {
+	InitTokenCache()
+	IsKnownAccessToken(token string) bool
+	GetTokens(code string, redirectURI string) (*TeslaAPITokenReponse, error)
+	RefreshToken(refreshToken string) (*TeslaAPITokenReponse, error)
+	GetOrRefreshAccessToken(userID string) string
+	GetCachedAccessToken(userID string) string
+	ListVehicles(authToken string) ([]TeslaAPIVehicleEntity, error)
+	ChargeStart(authToken string, vehicle *Vehicle) (bool, error)
+	ChargeStop(authToken string, vehicle *Vehicle) (bool, error)
+	SetChargeLimit(authToken string, vehicle *Vehicle, limitPercent int) (bool, error)
+	SetChargeAmps(authToken string, vehicle *Vehicle, amps int) (bool, error)
+	GetVehicleData(authToken string, vehicle *Vehicle) (*TeslaAPIVehicleData, error)
+	WakeUpVehicle(authToken string, vehicle *Vehicle) error
+	SetScheduledCharging(authToken string, vehicle *Vehicle, enable bool, minutesAfterMidnight int) (bool, error)
+}
 
-func TeslaAPIInitTokenCache() {
+type TeslaAPIImpl struct {
+	TokenCache         *bigcache.BigCache
+	UserIDToTokenCache *bigcache.BigCache
+}
+
+func (a *TeslaAPIImpl) InitTokenCache() {
 	config := bigcache.DefaultConfig(8 * time.Hour)
 	config.CleanWindow = 1 * time.Minute
 	config.HardMaxCacheSize = 1024
@@ -77,21 +96,21 @@ func TeslaAPIInitTokenCache() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	TeslaAPITokenCache = cache
+	a.TokenCache = cache
 
 	cache2, err := bigcache.New(context.Background(), config)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	TeslaAPIUserIDToTokenCache = cache2
+	a.UserIDToTokenCache = cache2
 }
 
-func TeslaAPIIsKnownAccessToken(token string) bool {
-	v, err := TeslaAPITokenCache.Get(token)
+func (a *TeslaAPIImpl) IsKnownAccessToken(token string) bool {
+	v, err := a.TokenCache.Get(token)
 	return err == nil && v != nil
 }
 
-func TeslaAPIGetTokens(code string, redirectURI string) (*TeslaAPITokenReponse, error) {
+func (a *TeslaAPIImpl) GetTokens(code string, redirectURI string) (*TeslaAPITokenReponse, error) {
 	target := "https://auth.tesla.com/oauth2/v3/token"
 	data := url.Values{}
 	data.Set("grant_type", "authorization_code")
@@ -123,13 +142,13 @@ func TeslaAPIGetTokens(code string, redirectURI string) (*TeslaAPITokenReponse, 
 	sub, _ := parsedToken.Claims.GetSubject()
 
 	// Cache token
-	TeslaAPITokenCache.Set(m.AccessToken, []byte("1"))
-	TeslaAPIUserIDToTokenCache.Set(sub, []byte(m.AccessToken))
+	a.TokenCache.Set(m.AccessToken, []byte("1"))
+	a.UserIDToTokenCache.Set(sub, []byte(m.AccessToken))
 
 	return &m, nil
 }
 
-func TeslaAPIRefreshToken(refreshToken string) (*TeslaAPITokenReponse, error) {
+func (a *TeslaAPIImpl) RefreshToken(refreshToken string) (*TeslaAPITokenReponse, error) {
 	target := "https://auth.tesla.com/oauth2/v3/token"
 	data := url.Values{}
 	data.Set("grant_type", "refresh_token")
@@ -158,37 +177,37 @@ func TeslaAPIRefreshToken(refreshToken string) (*TeslaAPITokenReponse, error) {
 	sub, _ := parsedToken.Claims.GetSubject()
 
 	// Cache token
-	TeslaAPITokenCache.Set(m.AccessToken, []byte("1"))
-	TeslaAPIUserIDToTokenCache.Set(sub, []byte(m.AccessToken))
+	a.TokenCache.Set(m.AccessToken, []byte("1"))
+	a.UserIDToTokenCache.Set(sub, []byte(m.AccessToken))
 
 	return &m, nil
 }
 
-func TeslaAPIGetOrRefreshAccessToken(userID string) string {
-	accessToken := TeslaAPIGetCachedAccessToken(userID)
+func (a *TeslaAPIImpl) GetOrRefreshAccessToken(userID string) string {
+	accessToken := a.GetCachedAccessToken(userID)
 	if accessToken == "" {
-		user := GetUser(userID)
-		token, err := TeslaAPIRefreshToken(user.RefreshToken)
+		user := GetDB().GetUser(userID)
+		token, err := a.RefreshToken(user.RefreshToken)
 		if err != nil {
 			log.Println(err)
 			return ""
 		}
 		user.RefreshToken = token.RefreshToken
-		CreateUpdateUser(user)
+		GetDB().CreateUpdateUser(user)
 		accessToken = token.AccessToken
 	}
 	return accessToken
 }
 
-func TeslaAPIGetCachedAccessToken(userID string) string {
-	token, err := TeslaAPIUserIDToTokenCache.Get(userID)
+func (a *TeslaAPIImpl) GetCachedAccessToken(userID string) string {
+	token, err := a.UserIDToTokenCache.Get(userID)
 	if err != nil {
 		return ""
 	}
 	return string(token)
 }
 
-func TeslaAPIListVehicles(authToken string) ([]TeslaAPIVehicleEntity, error) {
+func (a *TeslaAPIImpl) ListVehicles(authToken string) ([]TeslaAPIVehicleEntity, error) {
 	r, _ := http.NewRequest("GET", _configInstance.Audience+"/api/1/vehicles", nil)
 	r.Header.Add("Content-Type", "application/json")
 	r.Header.Add("Authorization", "Bearer "+authToken)
@@ -212,7 +231,7 @@ func TeslaAPIListVehicles(authToken string) ([]TeslaAPIVehicleEntity, error) {
 	return m.Response, nil
 }
 
-func TeslaAPIBoolRequest(authToken string, vehicle *Vehicle, cmd string, data string) (bool, error) {
+func (a *TeslaAPIImpl) boolRequest(authToken string, vehicle *Vehicle, cmd string, data string) (bool, error) {
 	target := GetConfig().Audience + "/api/1/vehicles/" + vehicle.VIN + "/command/" + cmd
 	r, _ := http.NewRequest("POST", target, strings.NewReader(data))
 	r.Header.Add("Content-Type", "application/json")
@@ -237,25 +256,25 @@ func TeslaAPIBoolRequest(authToken string, vehicle *Vehicle, cmd string, data st
 	return m.Response.Result, nil
 }
 
-func TeslaAPIChargeStart(authToken string, vehicle *Vehicle) (bool, error) {
-	return TeslaAPIBoolRequest(authToken, vehicle, "charge_start", `{}`)
+func (a *TeslaAPIImpl) ChargeStart(authToken string, vehicle *Vehicle) (bool, error) {
+	return a.boolRequest(authToken, vehicle, "charge_start", `{}`)
 }
 
-func TeslaAPIChargeStop(authToken string, vehicle *Vehicle) (bool, error) {
-	return TeslaAPIBoolRequest(authToken, vehicle, "charge_stop", `{}`)
+func (a *TeslaAPIImpl) ChargeStop(authToken string, vehicle *Vehicle) (bool, error) {
+	return a.boolRequest(authToken, vehicle, "charge_stop", `{}`)
 }
 
-func TeslaAPISetChargeLimit(authToken string, vehicle *Vehicle, limitPercent int) (bool, error) {
+func (a *TeslaAPIImpl) SetChargeLimit(authToken string, vehicle *Vehicle, limitPercent int) (bool, error) {
 	data := `{"percent": "` + strconv.Itoa(limitPercent) + `"}`
-	return TeslaAPIBoolRequest(authToken, vehicle, "set_charge_limit", data)
+	return a.boolRequest(authToken, vehicle, "set_charge_limit", data)
 }
 
-func TeslaAPISetChargeAmps(authToken string, vehicle *Vehicle, amps int) (bool, error) {
+func (a *TeslaAPIImpl) SetChargeAmps(authToken string, vehicle *Vehicle, amps int) (bool, error) {
 	data := `{"charging_amps": "` + strconv.Itoa(amps) + `"}`
-	return TeslaAPIBoolRequest(authToken, vehicle, "set_charging_amps", data)
+	return a.boolRequest(authToken, vehicle, "set_charging_amps", data)
 }
 
-func TeslaAPIGetVehicleData(authToken string, vehicle *Vehicle) (*TeslaAPIVehicleData, error) {
+func (a *TeslaAPIImpl) GetVehicleData(authToken string, vehicle *Vehicle) (*TeslaAPIVehicleData, error) {
 	target := GetConfig().Audience + "/api/1/vehicles/" + vehicle.VIN + "/vehicle_data"
 	r, _ := http.NewRequest("GET", target, nil)
 	r.Header.Add("Content-Type", "application/json")
@@ -280,7 +299,7 @@ func TeslaAPIGetVehicleData(authToken string, vehicle *Vehicle) (*TeslaAPIVehicl
 	return &m.Response, nil
 }
 
-func TeslaAPIWakeUpVehicle(authToken string, vehicle *Vehicle) error {
+func (a *TeslaAPIImpl) WakeUpVehicle(authToken string, vehicle *Vehicle) error {
 	target := GetConfig().Audience + "/api/1/vehicles/" + vehicle.VIN + "/wake_up"
 	r, _ := http.NewRequest("POST", target, strings.NewReader("{}"))
 	r.Header.Add("Content-Type", "application/json")
@@ -305,7 +324,7 @@ func TeslaAPIWakeUpVehicle(authToken string, vehicle *Vehicle) error {
 	return nil
 }
 
-func TeslaAPISetScheduledCharging(authToken string, vehicle *Vehicle, enable bool, minutesAfterMidnight int) (bool, error) {
+func (a *TeslaAPIImpl) SetScheduledCharging(authToken string, vehicle *Vehicle, enable bool, minutesAfterMidnight int) (bool, error) {
 	payload := `{"enable": ` + strconv.FormatBool(enable) + `, "time": ` + strconv.Itoa(minutesAfterMidnight) + `}`
-	return TeslaAPIBoolRequest(authToken, vehicle, "set_scheduled_charging", payload)
+	return a.boolRequest(authToken, vehicle, "set_scheduled_charging", payload)
 }

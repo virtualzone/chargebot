@@ -2,35 +2,42 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"math"
 	"time"
 )
 
-var Ticker *time.Ticker = nil
-
 const MaxVehicleDataUpdateIntervalMinutes int = 15
 
-func InitPeriodicChargeControl() {
-	Ticker = time.NewTicker(time.Minute * 1)
+type ChargeController struct {
+	Ticker *time.Ticker
+	Time   Time
+}
+
+func NewChargeController() *ChargeController {
+	return &ChargeController{
+		Time: new(RealTime),
+	}
+}
+
+func (c *ChargeController) Init() {
+	c.Ticker = time.NewTicker(time.Minute * 1)
 	go func() {
 		for {
-			<-Ticker.C
-			PeriodicChargeControl()
+			<-c.Ticker.C
+			c.OnTick()
 		}
 	}()
 }
 
-func PeriodicChargeControl() {
-	log.Println("control...")
-	vehicles := GetAllVehicles()
+func (c *ChargeController) OnTick() {
+	vehicles := GetDB().GetAllVehicles()
 	for _, vehicle := range vehicles {
-		PeriodicChargeControlProcessVehicle(vehicle)
+		c.processVehicle(vehicle)
 	}
 }
 
-func PeriodicChargeControlProcessVehicle(vehicle *Vehicle) {
-	state := GetVehicleState(vehicle.ID)
+func (c *ChargeController) processVehicle(vehicle *Vehicle) {
+	state := GetDB().GetVehicleState(vehicle.ID)
 	if state == nil {
 		// no state yet, so nothing to do
 		return
@@ -46,40 +53,41 @@ func PeriodicChargeControlProcessVehicle(vehicle *Vehicle) {
 		return
 	}
 
-	accessToken := TeslaAPIGetOrRefreshAccessToken(vehicle.UserID)
+	accessToken := GetTeslaAPI().GetOrRefreshAccessToken(vehicle.UserID)
+
 	if accessToken == "" {
 		return
 	}
 
 	if !vehicle.Enabled && state.Charging != ChargeStateNotCharging {
 		// Stop charging if vehicle is still charging but not enabled anymore
-		ChargeControlStopCharging(accessToken, vehicle)
+		c.stopCharging(accessToken, vehicle)
 	} else if vehicle.Enabled && state.Charging == ChargeStateNotCharging {
 		// Check if we need to start charging
-		ChargeControlCheckStartCharging(accessToken, vehicle, state)
+		c.checkStartCharging(accessToken, vehicle, state)
 	} else if vehicle.Enabled && state.Charging != ChargeStateNotCharging {
 		// This car is currently charging - check the process
 		// only check every 5 minutes to avoid over-adjusting
-		if time.Now().Minute()%5 == 0 {
-			ChargeControlCheckChargeProcess(accessToken, vehicle, state)
+		if c.Time.UTCNow().Minute()%5 == 0 {
+			c.checkChargeProcess(accessToken, vehicle, state)
 		}
 	}
 }
 
-func ChargeControlStopCharging(accessToken string, vehicle *Vehicle) {
-	TeslaAPIChargeStop(accessToken, vehicle)
-	SetVehicleStateCharging(vehicle.ID, ChargeStateNotCharging)
-	SetVehicleStateAmps(vehicle.ID, 0)
-	LogChargingEvent(vehicle.ID, LogEventChargeStop, "smart charging is disabled")
+func (c *ChargeController) stopCharging(accessToken string, vehicle *Vehicle) {
+	GetTeslaAPI().ChargeStop(accessToken, vehicle)
+	GetDB().SetVehicleStateCharging(vehicle.ID, ChargeStateNotCharging)
+	GetDB().SetVehicleStateAmps(vehicle.ID, 0)
+	GetDB().LogChargingEvent(vehicle.ID, LogEventChargeStop, "smart charging is disabled")
 }
 
-func ChargeControlCheckTargetState(vehicle *Vehicle, state *VehicleState) (ChargeState, int) {
+func (c *ChargeController) checkTargetState(vehicle *Vehicle, state *VehicleState) (ChargeState, int) {
 	targetState := ChargeStateNotCharging
-	startCharging, amps := ChargeControlCheckStartOnSolar(vehicle)
+	startCharging, amps := c.checkStartOnSolar(vehicle)
 	if startCharging {
 		targetState = ChargeStateChargingOnSolar
 	} else {
-		startCharging, amps = ChargeControlCheckStartOnTibber(vehicle, state)
+		startCharging, amps = c.checkStartOnTibber(vehicle, state)
 		if startCharging {
 			targetState = ChargeStateChargingOnGrid
 		}
@@ -87,67 +95,67 @@ func ChargeControlCheckTargetState(vehicle *Vehicle, state *VehicleState) (Charg
 	return targetState, amps
 }
 
-func ChargeControlCheckStartCharging(accessToken string, vehicle *Vehicle, state *VehicleState) {
+func (c *ChargeController) checkStartCharging(accessToken string, vehicle *Vehicle, state *VehicleState) {
 	if state.SoC >= vehicle.TargetSoC {
 		// nothing to do if target SoC is already reached
 		return
 	}
 
 	// check if there is a solar surplus
-	targetState, amps := ChargeControlCheckTargetState(vehicle, state)
+	targetState, amps := c.checkTargetState(vehicle, state)
 	if targetState != ChargeStateNotCharging {
-		ChargeControlActivateCharging(accessToken, vehicle, state, amps, targetState)
+		c.activateCharging(accessToken, vehicle, state, amps, targetState)
 	}
 }
 
-func ChargeControlActivateCharging(accessToken string, vehicle *Vehicle, state *VehicleState, amps int, source ChargeState) bool {
+func (c *ChargeController) activateCharging(accessToken string, vehicle *Vehicle, state *VehicleState, amps int, source ChargeState) bool {
 	// minimum surplus available, start charging by first waking up the car
-	if err := TeslaAPIWakeUpVehicle(accessToken, vehicle); err != nil {
-		LogChargingEvent(vehicle.ID, LogEventWakeVehicle, "could not wake vehicle: "+err.Error())
+	if err := GetTeslaAPI().WakeUpVehicle(accessToken, vehicle); err != nil {
+		GetDB().LogChargingEvent(vehicle.ID, LogEventWakeVehicle, "could not wake vehicle: "+err.Error())
 		return false
 	}
-	LogChargingEvent(vehicle.ID, LogEventWakeVehicle, "")
+	GetDB().LogChargingEvent(vehicle.ID, LogEventWakeVehicle, "")
 
 	// set the charge limit
-	if _, err := TeslaAPISetChargeLimit(accessToken, vehicle, vehicle.TargetSoC); err != nil {
-		LogChargingEvent(vehicle.ID, LogEventSetTargetSoC, "could not set target SoC: "+err.Error())
+	if _, err := GetTeslaAPI().SetChargeLimit(accessToken, vehicle, vehicle.TargetSoC); err != nil {
+		GetDB().LogChargingEvent(vehicle.ID, LogEventSetTargetSoC, "could not set target SoC: "+err.Error())
 		return false
 	}
-	LogChargingEvent(vehicle.ID, LogEventSetTargetSoC, fmt.Sprintf("target SoC set to %d", vehicle.TargetSoC))
+	GetDB().LogChargingEvent(vehicle.ID, LogEventSetTargetSoC, fmt.Sprintf("target SoC set to %d", vehicle.TargetSoC))
 
 	// set amps to charge
-	if _, err := TeslaAPISetChargeAmps(accessToken, vehicle, amps); err != nil {
-		LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, "could not set charge amps: "+err.Error())
+	if _, err := GetTeslaAPI().SetChargeAmps(accessToken, vehicle, amps); err != nil {
+		GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, "could not set charge amps: "+err.Error())
 		return false
 	}
-	LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, fmt.Sprintf("charge amps set to %d", amps))
+	GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, fmt.Sprintf("charge amps set to %d", amps))
 
 	// disable scheduled charging
-	if _, err := TeslaAPISetScheduledCharging(accessToken, vehicle, false, 0); err != nil {
-		LogChargingEvent(vehicle.ID, LogEventSetScheduledCharging, "could not disable scheduled charging: "+err.Error())
+	if _, err := GetTeslaAPI().SetScheduledCharging(accessToken, vehicle, false, 0); err != nil {
+		GetDB().LogChargingEvent(vehicle.ID, LogEventSetScheduledCharging, "could not disable scheduled charging: "+err.Error())
 		return false
 	}
-	LogChargingEvent(vehicle.ID, LogEventSetScheduledCharging, fmt.Sprintf("disabled scheduled charging"))
+	GetDB().LogChargingEvent(vehicle.ID, LogEventSetScheduledCharging, fmt.Sprintf("disabled scheduled charging"))
 
-	SetVehicleStateCharging(vehicle.ID, source)
+	GetDB().SetVehicleStateCharging(vehicle.ID, source)
 
 	// charging should start now
 	return true
 }
 
-func ChargeControlCheckStartOnSolar(vehicle *Vehicle) (bool, int) {
+func (c *ChargeController) checkStartOnSolar(vehicle *Vehicle) (bool, int) {
 	if !vehicle.SurplusCharging {
 		return false, 0
 	}
 
-	surpluses := GetLatestSurplusRecords(vehicle.ID, 1)
+	surpluses := GetDB().GetLatestSurplusRecords(vehicle.ID, 1)
 	if len(surpluses) == 0 {
 		return false, 0
 	}
 
 	surplus := surpluses[0]
 	// check if this is a recent recording
-	now := time.Now().UTC()
+	now := c.Time.UTCNow()
 	if surplus.Timestamp.Before(now.Add(-10 * time.Minute)) {
 		return false, 0
 	}
@@ -174,7 +182,7 @@ func ChargeControlCheckStartOnSolar(vehicle *Vehicle) (bool, int) {
 	return true, amps
 }
 
-func ChargeControlGetEstimatedChargeDurationMinutes(vehicle *Vehicle, state *VehicleState) int {
+func (c *ChargeController) getEstimatedChargeDurationMinutes(vehicle *Vehicle, state *VehicleState) int {
 	percentToCharge := vehicle.TargetSoC - state.SoC
 	wattsPerHour := vehicle.MaxAmps * vehicle.NumPhases * 230
 	batteryCapacitykWh := 100 // assume large battery for now
@@ -186,13 +194,13 @@ func ChargeControlGetEstimatedChargeDurationMinutes(vehicle *Vehicle, state *Veh
 	return res
 }
 
-func ChargeControlCheckStartOnTibber(vehicle *Vehicle, state *VehicleState) (bool, int) {
+func (c *ChargeController) checkStartOnTibber(vehicle *Vehicle, state *VehicleState) (bool, int) {
 	if !vehicle.LowcostCharging {
 		return false, 0
 	}
 
 	// get upcoming tibber prices sorted by ascending price
-	prices := GetUpcomingTibberPrices(vehicle.ID, true)
+	prices := GetDB().GetUpcomingTibberPrices(vehicle.ID, true)
 	if len(prices) == 0 {
 		return false, 0
 	}
@@ -203,7 +211,10 @@ func ChargeControlCheckStartOnTibber(vehicle *Vehicle, state *VehicleState) (boo
 	}
 
 	// check if "now" is below the user-defined maximum
-	currentPrice := ChargeControlGetCurrentTibberPrice(prices)
+	currentPrice := c.getCurrentTibberPrice(prices)
+	if currentPrice == nil {
+		return false, 0
+	}
 	if currentPrice.Total*100 > float32(vehicle.MaxPrice) {
 		return false, 0
 	}
@@ -214,11 +225,12 @@ func ChargeControlCheckStartOnTibber(vehicle *Vehicle, state *VehicleState) (boo
 	}
 
 	// if not, the current hour may nevertheless be necessary for reach the required charging time
-	estimatedChargingTime := ChargeControlGetEstimatedChargeDurationMinutes(vehicle, state)
+	estimatedChargingTime := c.getEstimatedChargeDurationMinutes(vehicle, state)
 	requiredHourBlocks := int(math.Ceil(float64(estimatedChargingTime) / 60))
 	for i, price := range prices {
 		if i+1 <= requiredHourBlocks {
-			if IsCurrentHourUTC(&price.StartsAt) {
+			now := c.Time.UTCNow()
+			if IsCurrentHourUTC(&now, &price.StartsAt) {
 				return true, vehicle.MaxAmps
 			}
 		}
@@ -227,62 +239,63 @@ func ChargeControlCheckStartOnTibber(vehicle *Vehicle, state *VehicleState) (boo
 	return false, 0
 }
 
-func ChargeControlGetCurrentTibberPrice(prices []*TibberPrice) *TibberPrice {
+func (c *ChargeController) getCurrentTibberPrice(prices []*TibberPrice) *TibberPrice {
+	now := c.Time.UTCNow()
 	for _, price := range prices {
-		if IsCurrentHourUTC(&price.StartsAt) {
+		if IsCurrentHourUTC(&now, &price.StartsAt) {
 			return price
 		}
 	}
 	return nil
 }
 
-func ChargeControlCanUpdateVehicleData(vehicleID int) bool {
-	event := GetLatestChargingEvent(vehicleID, LogEventVehicleUpdateData)
+func (c *ChargeController) canUpdateVehicleData(vehicleID int) bool {
+	event := GetDB().GetLatestChargingEvent(vehicleID, LogEventVehicleUpdateData)
 	if event == nil {
 		return true
 	}
-	limit := time.Now().UTC().Add(time.Minute * time.Duration(MaxVehicleDataUpdateIntervalMinutes) * -1)
+	limit := c.Time.UTCNow().Add(time.Minute * time.Duration(MaxVehicleDataUpdateIntervalMinutes) * -1)
 	return event.Timestamp.Before(limit)
 }
 
-func ChargeControlMinimumChargeTimeReached(vehicle *Vehicle) bool {
-	event := GetLatestChargingEvent(vehicle.ID, LogEventChargeStart)
+func (c *ChargeController) minimumChargeTimeReached(vehicle *Vehicle) bool {
+	event := GetDB().GetLatestChargingEvent(vehicle.ID, LogEventChargeStart)
 	if event == nil {
 		return true
 	}
-	limit := time.Now().UTC().Add(time.Minute * time.Duration(vehicle.MinChargeTime) * -1)
+	limit := c.Time.UTCNow().Add(time.Minute * time.Duration(vehicle.MinChargeTime) * -1)
 	return event.Timestamp.Before(limit)
 }
 
-func ChargeControlCheckChargeProcess(accessToken string, vehicle *Vehicle, state *VehicleState) {
+func (c *ChargeController) checkChargeProcess(accessToken string, vehicle *Vehicle, state *VehicleState) {
 	// check when vehicle data was last updated
-	if ChargeControlCanUpdateVehicleData(vehicle.ID) {
+	if c.canUpdateVehicleData(vehicle.ID) {
 		state.SoC = UpdateVehicleDataSaveSoC(accessToken, vehicle)
 	}
 
 	// if target SoC is reached: stop charging
 	if state.SoC >= vehicle.TargetSoC {
-		ChargeControlStopCharging(accessToken, vehicle)
+		c.stopCharging(accessToken, vehicle)
 		return
 	}
 
 	// check how the new charging state should be
-	targetState, targetAmps := ChargeControlCheckTargetState(vehicle, state)
+	targetState, targetAmps := c.checkTargetState(vehicle, state)
 
 	// if minimum charge time is not reached, do nothing
-	if !ChargeControlMinimumChargeTimeReached(vehicle) {
+	if !c.minimumChargeTimeReached(vehicle) {
 		// ...except when vehicle is charging on solar and amps need to be adjusted
 		if state.Charging == ChargeStateChargingOnSolar && targetAmps > 0 && targetAmps != state.Amps {
-			if _, err := TeslaAPISetChargeAmps(accessToken, vehicle, targetAmps); err != nil {
-				LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, "could not set charge amps: "+err.Error())
+			if _, err := GetTeslaAPI().SetChargeAmps(accessToken, vehicle, targetAmps); err != nil {
+				GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, "could not set charge amps: "+err.Error())
 			}
-			LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, fmt.Sprintf("charge amps set to %d", targetAmps))
+			GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, fmt.Sprintf("charge amps set to %d", targetAmps))
 		}
 		return
 	}
 
 	// else, check if charging needs to be stopped
 	if targetState == ChargeStateNotCharging {
-		ChargeControlStopCharging(accessToken, vehicle)
+		c.stopCharging(accessToken, vehicle)
 	}
 }

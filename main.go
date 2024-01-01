@@ -5,16 +5,25 @@ import (
 	"os"
 )
 
+var TeslaAPIInstance TeslaAPI
+
+func GetTeslaAPI() TeslaAPI {
+	return TeslaAPIInstance
+}
+
 func main() {
 	log.Println("Starting Tesla Green Charge...")
 	GetConfig().ReadConfig()
-	ConnectDB()
+	GetDB().Connect()
 	if GetConfig().Reset {
-		ResetDBStructure()
+		GetDB().ResetDBStructure()
 	}
-	InitDBStructure()
-	TeslaAPIInitTokenCache()
-	InitPeriodicChargeControl()
+	GetDB().InitDBStructure()
+
+	TeslaAPIInstance = &TeslaAPIImpl{}
+	TeslaAPIInstance.InitTokenCache()
+
+	NewChargeController().Init()
 	InitPeriodicPriceUpdateControl()
 	ServeHTTP()
 	os.Exit(0)
