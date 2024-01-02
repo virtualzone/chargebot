@@ -118,6 +118,10 @@ func (router *TeslaRouter) updateVehicle(w http.ResponseWriter, r *http.Request)
 	var m *Vehicle
 	UnmarshalValidateBody(r.Body, &m)
 
+	log.Println("-----------DEBUG-----------")
+	log.Println(m)
+	log.Println("---------------------------")
+
 	e := &Vehicle{
 		ID:              vehicle.VehicleID,
 		UserID:          GetUserIDFromRequest(r),
