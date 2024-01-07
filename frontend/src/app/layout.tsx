@@ -17,7 +17,8 @@ export default function RootLayout({
         <meta name="charset" content="utf-8" />
       </head>
       <body>
-        <div className="container my-5">
+        <div className="container my-5 max-w-150">
+          <h1>Tesla Green Charge</h1>
           {children}
         </div>
       </body>

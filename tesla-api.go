@@ -122,8 +122,7 @@ func (a *TeslaAPIImpl) GetTokens(code string, redirectURI string) (*TeslaAPIToke
 	r, _ := http.NewRequest("POST", target, strings.NewReader(data.Encode()))
 	r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
-	client := &http.Client{}
-	resp, err := client.Do(r)
+	resp, err := RetryHTTPRequest(r)
 	if err != nil {
 		// TODO
 		log.Println(err)
@@ -157,8 +156,7 @@ func (a *TeslaAPIImpl) RefreshToken(refreshToken string) (*TeslaAPITokenReponse,
 	r, _ := http.NewRequest("POST", target, strings.NewReader(data.Encode()))
 	r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
-	client := &http.Client{}
-	resp, err := client.Do(r)
+	resp, err := RetryHTTPRequest(r)
 	if err != nil {
 		// TODO
 		log.Println(err)
@@ -209,11 +207,8 @@ func (a *TeslaAPIImpl) GetCachedAccessToken(userID string) string {
 
 func (a *TeslaAPIImpl) ListVehicles(authToken string) ([]TeslaAPIVehicleEntity, error) {
 	r, _ := http.NewRequest("GET", _configInstance.Audience+"/api/1/vehicles", nil)
-	r.Header.Add("Content-Type", "application/json")
-	r.Header.Add("Authorization", "Bearer "+authToken)
 
-	client := &http.Client{}
-	resp, err := client.Do(r)
+	resp, err := RetryHTTPJSONRequest(r, authToken)
 	if err != nil {
 		log.Println(err)
 		return nil, err
@@ -225,7 +220,7 @@ func (a *TeslaAPIImpl) ListVehicles(authToken string) ([]TeslaAPIVehicleEntity, 
 	}
 
 	if m.Error != "" {
-		return nil, fmt.Errorf("api response error: %s (%s)", m.Error, m.ErrorDescription)
+		return nil, fmt.Errorf("api response error: %s (%s), http status %d", m.Error, m.ErrorDescription, resp.StatusCode)
 	}
 
 	return m.Response, nil
@@ -234,11 +229,8 @@ func (a *TeslaAPIImpl) ListVehicles(authToken string) ([]TeslaAPIVehicleEntity, 
 func (a *TeslaAPIImpl) boolRequest(authToken string, vehicle *Vehicle, cmd string, data string) (bool, error) {
 	target := GetConfig().Audience + "/api/1/vehicles/" + vehicle.VIN + "/command/" + cmd
 	r, _ := http.NewRequest("POST", target, strings.NewReader(data))
-	r.Header.Add("Content-Type", "application/json")
-	r.Header.Add("Authorization", "Bearer "+authToken)
 
-	client := &http.Client{}
-	resp, err := client.Do(r)
+	resp, err := RetryHTTPJSONRequest(r, authToken)
 	if err != nil {
 		log.Println(err)
 		return false, err
@@ -250,7 +242,7 @@ func (a *TeslaAPIImpl) boolRequest(authToken string, vehicle *Vehicle, cmd strin
 	}
 
 	if m.Error != "" {
-		return false, fmt.Errorf("api response error: %s (%s)", m.Error, m.ErrorDescription)
+		return false, fmt.Errorf("api response error: %s (%s), http status %d", m.Error, m.ErrorDescription, resp.StatusCode)
 	}
 
 	return m.Response.Result, nil
@@ -277,11 +269,8 @@ func (a *TeslaAPIImpl) SetChargeAmps(authToken string, vehicle *Vehicle, amps in
 func (a *TeslaAPIImpl) GetVehicleData(authToken string, vehicle *Vehicle) (*TeslaAPIVehicleData, error) {
 	target := GetConfig().Audience + "/api/1/vehicles/" + vehicle.VIN + "/vehicle_data"
 	r, _ := http.NewRequest("GET", target, nil)
-	r.Header.Add("Content-Type", "application/json")
-	r.Header.Add("Authorization", "Bearer "+authToken)
 
-	client := &http.Client{}
-	resp, err := client.Do(r)
+	resp, err := RetryHTTPJSONRequest(r, authToken)
 	if err != nil {
 		log.Println(err)
 		return nil, err
@@ -293,7 +282,7 @@ func (a *TeslaAPIImpl) GetVehicleData(authToken string, vehicle *Vehicle) (*Tesl
 	}
 
 	if m.Error != "" {
-		return nil, fmt.Errorf("api response error: %s (%s)", m.Error, m.ErrorDescription)
+		return nil, fmt.Errorf("api response error: %s (%s), http status %d", m.Error, m.ErrorDescription, resp.StatusCode)
 	}
 
 	return &m.Response, nil
@@ -302,11 +291,8 @@ func (a *TeslaAPIImpl) GetVehicleData(authToken string, vehicle *Vehicle) (*Tesl
 func (a *TeslaAPIImpl) WakeUpVehicle(authToken string, vehicle *Vehicle) error {
 	target := GetConfig().Audience + "/api/1/vehicles/" + vehicle.VIN + "/wake_up"
 	r, _ := http.NewRequest("POST", target, strings.NewReader("{}"))
-	r.Header.Add("Content-Type", "application/json")
-	r.Header.Add("Authorization", "Bearer "+authToken)
 
-	client := &http.Client{}
-	resp, err := client.Do(r)
+	resp, err := RetryHTTPJSONRequest(r, authToken)
 	if err != nil {
 		log.Println(err)
 		return err
@@ -318,7 +304,7 @@ func (a *TeslaAPIImpl) WakeUpVehicle(authToken string, vehicle *Vehicle) error {
 	}
 
 	if m.Error != "" {
-		return fmt.Errorf("api response error: %s (%s)", m.Error, m.ErrorDescription)
+		return fmt.Errorf("api response error: %s (%s), http status %d", m.Error, m.ErrorDescription, resp.StatusCode)
 	}
 
 	return nil
