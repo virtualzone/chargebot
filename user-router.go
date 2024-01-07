@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/mux"
 )
@@ -128,10 +129,14 @@ func (router *UserRouter) updateVehiclePlugState(w http.ResponseWriter, r *http.
 	}
 
 	authToken := GetTeslaAPI().GetOrRefreshAccessToken(vehicle.UserID)
-	if authToken != "" {
-		UpdateVehicleDataSaveSoC(authToken, vehicle)
-	} else {
+	if authToken == "" {
 		log.Printf("could not get access token to update vehicle data on plug in/out for vehicle id %d\n", vehicleID)
+	} else {
+		go func() {
+			// wait a few moments to ensure vehicle is online
+			time.Sleep(10 * time.Second)
+			UpdateVehicleDataSaveSoC(authToken, vehicle)
+		}()
 	}
 }
 

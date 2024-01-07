@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"net/http"
+	"slices"
 	"time"
 )
 
@@ -60,4 +62,32 @@ func GeneratePassword(length int, includeNumber bool, includeSpecial bool) strin
 		password = append(password, charSource[randNum])
 	}
 	return string(password)
+}
+
+func RetryHTTPJSONRequest(req *http.Request, authToken string) (*http.Response, error) {
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("Authorization", "Bearer "+authToken)
+	return RetryHTTPRequest(req)
+}
+
+func RetryHTTPRequest(req *http.Request) (*http.Response, error) {
+	isRetryCode := func(code int) bool {
+		retryCodes := []int{405, 408, 412}
+		return slices.Contains(retryCodes, code)
+	}
+
+	client := &http.Client{}
+	retryCounter := 1
+	var resp *http.Response
+	var err error
+	for retryCounter <= 3 {
+		resp, err = client.Do(req)
+		if err != nil || (resp != nil && isRetryCode(resp.StatusCode)) {
+			time.Sleep(2 * time.Second)
+			retryCounter++
+		} else {
+			retryCounter = 999
+		}
+	}
+	return resp, err
 }
