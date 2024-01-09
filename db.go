@@ -56,11 +56,11 @@ const (
 )
 
 type VehicleState struct {
-	VehicleID int
-	PluggedIn bool
-	Charging  ChargeState
-	SoC       int
-	Amps      int
+	VehicleID int         `json:"vehicle_id"`
+	PluggedIn bool        `json:"pluggedIn"`
+	Charging  ChargeState `json:"chargingState"`
+	SoC       int         `json:"soc"`
+	Amps      int         `json:"amps"`
 }
 
 type ChargingEvent struct {
