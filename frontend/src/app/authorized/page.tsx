@@ -21,6 +21,7 @@ export default function Authorized() {
   const [maxPrice, setMaxPrice] = useState(new Map<number, number>())
   const [tibberToken, setTibberToken] = useState(new Map<number, string>())
   const [showTokenHelp, setShowTokenHelp] = useState(new Map<number, boolean>())
+  const [vehicleState, setVehicleState] = useState(new Map<number, any>())
   const [surpluses, setSurpluses] = useState(new Map<number, any>())
   const [chargingEvents, setChargingEvents] = useState(new Map<number, any>())
 
@@ -90,6 +91,18 @@ export default function Authorized() {
     setShowTokenHelp(res);
   }
 
+  const loadVehicleState = async (id: number, token: string) => {
+    if (!token) {
+      return
+    }
+    const json = await getAPI("/api/1/user/" + token + "/state");
+    if (json) {
+      let res = new Map(vehicleState);
+      res.set(id, json);
+      setVehicleState(res);
+    }
+  }
+
   const loadLatestSurpluses = async (id: number, token: string) => {
     if (!token) {
       return
@@ -125,6 +138,7 @@ export default function Authorized() {
       updateMaxPrice(e.id, e.max_price);
       updateTibberToken(e.id, e.tibber_token);
       updateShowTokenHelp(e.id, false);
+      loadVehicleState(e.id, e.api_token);
       loadLatestSurpluses(e.id, e.api_token);
       loadLatestChargingEvents(e.id, e.api_token);
     });
@@ -234,7 +248,7 @@ export default function Authorized() {
     }
     let p = i * phases * 230;
     if (p > 1000) {
-      return Math.round(p/1000) + " kW";
+      return Math.round(p / 1000) + " kW";
     }
     return p + " W";
   }
@@ -383,14 +397,14 @@ export default function Authorized() {
               </InputGroup>
               <Form.Select
                 aria-label="Number of Phases"
-                  required={chargingEnabled.get(v.id)}
-                  disabled={!chargingEnabled.get(v.id)}
-                  value={numPhases.get(v.id)}
-                  onChange={e => updateNumPhases(v.id, Number(e.target.value))}>
+                required={chargingEnabled.get(v.id)}
+                disabled={!chargingEnabled.get(v.id)}
+                value={numPhases.get(v.id)}
+                onChange={e => updateNumPhases(v.id, Number(e.target.value))}>
                 <option value="1">uniphase</option>
                 <option value="3">three-phase</option>
               </Form.Select>
-              <Form.Control plaintext={true} readOnly={true} defaultValue={'Up to '+getMaxChargingPower(v.id)} />
+              <Form.Control plaintext={true} readOnly={true} defaultValue={'Up to ' + getMaxChargingPower(v.id)} />
               <Form.Check // prettier-ignore
                 type="switch"
                 label="Charge on surplus of solar energy"
@@ -462,14 +476,72 @@ export default function Authorized() {
               <Button type="submit" variant="primary">Save</Button>
             </Form>
           );
+          let accordionSurpluses = <></>;
+          if (v.api_token) {
+            accordionSurpluses = (
+              <Accordion.Item eventKey="3">
+                <Accordion.Header>Latest recorded surpluses</Accordion.Header>
+                <Accordion.Body>
+                  {surplusTable}
+                </Accordion.Body>
+              </Accordion.Item>
+            );
+          }
+          let accordionChargingEvents = <></>;
+          if (v.api_token) {
+            accordionChargingEvents = (
+              <Accordion.Item eventKey="4">
+                <Accordion.Header>Latest charging events</Accordion.Header>
+                <Accordion.Body>
+                  {eventsTable}
+                </Accordion.Body>
+              </Accordion.Item>
+            );
+          }
+          let accordionState = <></>;
+          if ((v.api_token) && (vehicleState.get(v.id))) {
+            accordionState = (
+              <Accordion.Item eventKey="2">
+                <Accordion.Header>Vehicle State</Accordion.Header>
+                <Accordion.Body>
+                  <Table>
+                    <tbody>
+                      <tr>
+                        <td>Plugged In</td>
+                        <td>{vehicleState.get(v.id).pluggedIn}</td>
+                      </tr>
+                      <tr>
+                        <td>Charging State</td>
+                        <td>{vehicleState.get(v.id).chargingState}</td>
+                      </tr>
+                      <tr>
+                        <td>SoC</td>
+                        <td>{vehicleState.get(v.id).soc} %</td>
+                      </tr>
+                      <tr>
+                        <td>Amps</td>
+                        <td>{vehicleState.get(v.id).amps} A</td>
+                      </tr>
+                    </tbody>
+                  </Table>
+                </Accordion.Body>
+              </Accordion.Item>
+            );
+          }
           return (
             <ListGroup.Item key={v.id}>
               <strong>{v.display_name}</strong>
               <Button variant="danger" size="sm" onClick={e => deleteVehicle(v.id)}>Delete</Button>
               <br />
               {v.vin}
-              <Accordion defaultActiveKey="-1">
+              <Accordion defaultActiveKey="0">
                 <Accordion.Item eventKey="0">
+                  <Accordion.Header>Charging Preferences</Accordion.Header>
+                  <Accordion.Body>
+                    {chargePrefs}
+                  </Accordion.Body>
+                </Accordion.Item>
+                <Accordion.Item eventKey="1">
                   <Accordion.Header>API Token</Accordion.Header>
                   <Accordion.Body>
                     {token}
@@ -479,24 +551,9 @@ export default function Authorized() {
                     </div>
                   </Accordion.Body>
                 </Accordion.Item>
-                <Accordion.Item eventKey="1">
-                  <Accordion.Header>Charging Preferences</Accordion.Header>
-                  <Accordion.Body>
-                    {chargePrefs}
-                  </Accordion.Body>
-                </Accordion.Item>
-                <Accordion.Item eventKey="2">
-                  <Accordion.Header>Latest recorded surpluses</Accordion.Header>
-                  <Accordion.Body>
-                    {surplusTable}
-                  </Accordion.Body>
-                </Accordion.Item>
-                <Accordion.Item eventKey="3">
-                  <Accordion.Header>Latest charging events</Accordion.Header>
-                  <Accordion.Body>
-                    {eventsTable}
-                  </Accordion.Body>
-                </Accordion.Item>
+                {accordionState}
+                {accordionSurpluses}
+                {accordionChargingEvents}
               </Accordion>
             </ListGroup.Item>
           )

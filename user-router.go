@@ -25,11 +25,30 @@ type PlugInOutRequest struct {
 }
 
 func (router *UserRouter) SetupRoutes(s *mux.Router) {
+	s.HandleFunc("/{token}/state", router.getVehicleState).Methods("GET")
 	s.HandleFunc("/{token}/surplus", router.recordSurplus).Methods("POST")
 	s.HandleFunc("/{token}/surplus", router.getLatestSurpluses).Methods("GET")
 	s.HandleFunc("/{token}/plugged_in", router.vehiclePluggedIn).Methods("POST")
 	s.HandleFunc("/{token}/unplugged", router.vehicleUnplugged).Methods("POST")
 	s.HandleFunc("/{token}/events", router.getLatestChargingEvents).Methods("GET")
+}
+
+func (router *UserRouter) getVehicleState(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	token := vars["token"]
+
+	vehicleID := GetDB().GetAPITokenVehicleID(token)
+	if vehicleID == 0 {
+		SendBadRequest(w)
+		return
+	}
+
+	state := GetDB().GetVehicleState(vehicleID)
+	if state == nil {
+		SendNotFound(w)
+		return
+	}
+	SendJSON(w, state)
 }
 
 func (router *UserRouter) recordSurplus(w http.ResponseWriter, r *http.Request) {
