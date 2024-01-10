@@ -151,11 +151,11 @@ func (router *UserRouter) updateVehiclePlugState(w http.ResponseWriter, r *http.
 	if authToken == "" {
 		log.Printf("could not get access token to update vehicle data on plug in/out for vehicle id %d\n", vehicleID)
 	} else {
-		go func() {
-			// wait a few moments to ensure vehicle is online
-			time.Sleep(10 * time.Second)
-			UpdateVehicleDataSaveSoC(authToken, vehicle)
-			if pluggedIn && vehicle.Enabled {
+		if pluggedIn && vehicle.Enabled {
+			go func() {
+				// wait a few moments to ensure vehicle is online
+				time.Sleep(10 * time.Second)
+				UpdateVehicleDataSaveSoC(authToken, vehicle)
 				if _, err := GetTeslaAPI().SetChargeLimit(authToken, vehicle, 20); err != nil {
 					log.Printf("could not set charge limit for vehicle %d on plug in: %s\n", vehicleID, err.Error())
 				}
@@ -163,8 +163,8 @@ func (router *UserRouter) updateVehiclePlugState(w http.ResponseWriter, r *http.
 				if _, err := GetTeslaAPI().ChargeStop(authToken, vehicle); err != nil {
 					log.Printf("could not stop charging for vehicle %d on plug in: %s\n", vehicleID, err.Error())
 				}
-			}
-		}()
+			}()
+		}
 	}
 }
 
