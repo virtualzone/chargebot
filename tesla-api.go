@@ -228,6 +228,7 @@ func (a *TeslaAPIImpl) ListVehicles(authToken string) ([]TeslaAPIVehicleEntity, 
 
 func (a *TeslaAPIImpl) boolRequest(authToken string, vehicle *Vehicle, cmd string, data string) (bool, error) {
 	target := GetConfig().Audience + "/api/1/vehicles/" + vehicle.VIN + "/command/" + cmd
+	log.Printf("Sending request to %s: %s\n", target, data)
 	r, _ := http.NewRequest("POST", target, strings.NewReader(data))
 
 	resp, err := RetryHTTPJSONRequest(r, authToken)
