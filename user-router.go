@@ -155,6 +155,11 @@ func (router *UserRouter) updateVehiclePlugState(w http.ResponseWriter, r *http.
 			// wait a few moments to ensure vehicle is online
 			time.Sleep(10 * time.Second)
 			UpdateVehicleDataSaveSoC(authToken, vehicle)
+			if vehicle.Enabled {
+				GetTeslaAPI().SetChargeLimit(authToken, vehicle, 20)
+				time.Sleep(5 * time.Second)
+				GetTeslaAPI().ChargeStop(authToken, vehicle)
+			}
 		}()
 	}
 }
