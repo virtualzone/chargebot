@@ -224,6 +224,13 @@ export default function Authorized() {
     fetchData();
   }
 
+  function getChargeStateText(id: number) {
+    if (id === 0) return 'Not charging';
+    if (id === 1) return 'Charging on solar';
+    if (id === 2) return 'Charging on grid';
+    return 'Unknown';
+  }
+
   function getChargingEventText(id: number) {
     if (id === 1) return 'Charging started';
     if (id === 2) return 'Charging stopped';
@@ -508,11 +515,11 @@ export default function Authorized() {
                     <tbody>
                       <tr>
                         <td>Plugged In</td>
-                        <td>{vehicleState.get(v.id).pluggedIn}</td>
+                        <td>{vehicleState.get(v.id).pluggedIn ? 'Yes' : 'No'}</td>
                       </tr>
                       <tr>
                         <td>Charging State</td>
-                        <td>{vehicleState.get(v.id).chargingState}</td>
+                        <td>{getChargeStateText(vehicleState.get(v.id).chargingState)}</td>
                       </tr>
                       <tr>
                         <td>SoC</td>
