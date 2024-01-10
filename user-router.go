@@ -156,7 +156,7 @@ func (router *UserRouter) updateVehiclePlugState(w http.ResponseWriter, r *http.
 				// wait a few moments to ensure vehicle is online
 				time.Sleep(10 * time.Second)
 				UpdateVehicleDataSaveSoC(authToken, vehicle)
-				if _, err := GetTeslaAPI().SetChargeLimit(authToken, vehicle, 20); err != nil {
+				if _, err := GetTeslaAPI().SetChargeLimit(authToken, vehicle, 50); err != nil {
 					log.Printf("could not set charge limit for vehicle %d on plug in: %s\n", vehicleID, err.Error())
 				}
 				time.Sleep(5 * time.Second)
