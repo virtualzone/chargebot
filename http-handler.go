@@ -80,17 +80,16 @@ func UnmarshalBody(r io.ReadCloser, o interface{}) error {
 	return nil
 }
 
-func DebugPrintResponseBody(r io.ReadCloser) error {
+func DebugGetResponseBody(r io.ReadCloser) (string, error) {
 	if r == nil {
-		return errors.New("body is NIL")
+		return "", errors.New("body is NIL")
 	}
 	defer r.Close()
 	body, err := io.ReadAll(r)
 	if err != nil {
-		return err
+		return "", err
 	}
-	log.Println(string(body))
-	return nil
+	return string(body), nil
 }
 
 func GetAuthTokenFromRequest(r *http.Request) string {
@@ -178,6 +177,9 @@ func ServeHTTP() {
 	routers["/api/1/auth/"] = &AuthRouter{}
 	routers["/api/1/tesla/"] = &TeslaRouter{}
 	routers["/api/1/user/"] = &UserRouter{}
+	if GetConfig().ManualControl {
+		routers["/api/1/ctrl/"] = &ManualControlRouter{}
+	}
 
 	for prefix, route := range routers {
 		subRouter := router.PathPrefix(prefix).Subrouter()

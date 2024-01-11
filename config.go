@@ -8,13 +8,14 @@ import (
 )
 
 type Config struct {
-	ClientID     string
-	ClientSecret string
-	Audience     string
-	DBFile       string
-	Hostname     string
-	DevProxy     bool
-	Reset        bool
+	ClientID      string
+	ClientSecret  string
+	Audience      string
+	DBFile        string
+	Hostname      string
+	DevProxy      bool
+	Reset         bool
+	ManualControl bool
 }
 
 var _configInstance *Config
@@ -36,6 +37,7 @@ func (c *Config) ReadConfig() {
 	c.Hostname = c.getEnv("DOMAIN", "tgc.virtualzone.de")
 	c.DevProxy = (c.getEnv("DEV_PROXY", "0") == "1")
 	c.Reset = (c.getEnv("RESET", "0") == "1")
+	c.ManualControl = (c.getEnv("MANUAL_CONTROL", "0") == "1")
 }
 
 func (c *Config) Print() {

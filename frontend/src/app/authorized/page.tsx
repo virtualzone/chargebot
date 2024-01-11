@@ -4,7 +4,7 @@ import Link from "next/link";
 import { checkAuth, deleteAPI, getAPI, getAccessToken, getBaseUrl, postAPI, putAPI } from "../util";
 import { useEffect, useState } from "react";
 import Loading from "../loading";
-import { Accordion, Button, Form, InputGroup, ListGroup, Modal, Table } from "react-bootstrap";
+import { Accordion, Button, ButtonGroup, Form, InputGroup, ListGroup, Modal, Table } from "react-bootstrap";
 import { CopyBlock } from "react-code-blocks";
 
 export default function Authorized() {
@@ -24,6 +24,10 @@ export default function Authorized() {
   const [vehicleState, setVehicleState] = useState(new Map<number, any>())
   const [surpluses, setSurpluses] = useState(new Map<number, any>())
   const [chargingEvents, setChargingEvents] = useState(new Map<number, any>())
+  const [manCtrlLimit, setManCtrlLimit] = useState(50)
+  const [manCtrlAmps, setManCtrlAmps] = useState(16)
+  const [manCtrlEnabled, setManCtrlEnabled] = useState(0)
+  const [manCtrlMins, setManCtrlMins] = useState(0)
 
   function updateChargingEnabled(id: number, value: boolean) {
     let res = new Map(chargingEnabled);
@@ -258,6 +262,19 @@ export default function Authorized() {
       return Math.round(p / 1000) + " kW";
     }
     return p + " W";
+  }
+
+  function manualControl(id: number, api: string, i1: number, i2: number) {
+    let s = "";
+    if (i1 >= 0) {
+      s = "/" + i1;
+    }
+    if (i2 >= 0) {
+      s += "/" + i2;
+    }
+    postAPI("/api/1/ctrl/" + id + "/" + api + s, null).then(res => {
+      window.alert(JSON.stringify(res));
+    })
   }
 
   if (isLoading) {
@@ -535,6 +552,37 @@ export default function Authorized() {
               </Accordion.Item>
             );
           }
+          let accordionManualControl = (
+            <Accordion.Item eventKey="5">
+              <Accordion.Header>Manual Control</Accordion.Header>
+              <Accordion.Body>
+                <p>
+                  <Button variant="secondary" onClick={() => manualControl(v.id, "wakeUp", -1, -1)}>Wake Up</Button>
+                </p>
+                <p>
+                  <Button variant="secondary" onClick={() => manualControl(v.id, "chargeStart", -1, -1)}>Start Charging</Button>
+                </p>
+                <p>
+                  <Button variant="secondary" onClick={() => manualControl(v.id, "chargeStop", -1, -1)}>Stop Charging</Button>
+                </p>
+                <p>
+                  Percent:
+                  <input type="number" value={manCtrlLimit} onChange={e => setManCtrlLimit(Number(e.target.value))} min={1} max={100} />
+                  <Button variant="secondary" onClick={() => manualControl(v.id, "chargeLimit", manCtrlLimit, -1)}>Set Charge Limit</Button>
+                </p>
+                <p>
+                  Amps:
+                  <input type="number" value={manCtrlAmps} onChange={e => setManCtrlAmps(Number(e.target.value))} min={0} max={16} />
+                  <Button variant="secondary" onClick={() => manualControl(v.id, "chargeAmps", manCtrlAmps, -1)}>Set Charge Amps</Button>
+                </p>
+                <p>
+                  <input type="checkbox" checked={manCtrlEnabled === 1} onChange={e => setManCtrlEnabled(e.target.checked ? 1 : 0)} /> Enabled, mins after midnight:
+                  <input type="number" value={manCtrlMins} onChange={e => setManCtrlMins(Number(e.target.value))} min={0} max={1440} />
+                  <Button variant="secondary" onClick={() => manualControl(v.id, "scheduledCharging", manCtrlEnabled, manCtrlMins)}>Set Scheduled Charging</Button>
+                </p>
+              </Accordion.Body>
+            </Accordion.Item>
+          );
           return (
             <ListGroup.Item key={v.id}>
               <strong>{v.display_name}</strong>
@@ -561,6 +609,7 @@ export default function Authorized() {
                 {accordionState}
                 {accordionSurpluses}
                 {accordionChargingEvents}
+                {accordionManualControl}
               </Accordion>
             </ListGroup.Item>
           )
