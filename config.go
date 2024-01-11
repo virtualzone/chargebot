@@ -5,6 +5,8 @@ import (
 	"log"
 	"os"
 	"sync"
+
+	"github.com/teslamotors/vehicle-command/pkg/protocol"
 )
 
 type Config struct {
@@ -16,6 +18,7 @@ type Config struct {
 	DevProxy      bool
 	Reset         bool
 	ManualControl bool
+	PrivateKey    protocol.ECDHPrivateKey
 }
 
 var _configInstance *Config
@@ -38,6 +41,12 @@ func (c *Config) ReadConfig() {
 	c.DevProxy = (c.getEnv("DEV_PROXY", "0") == "1")
 	c.Reset = (c.getEnv("RESET", "0") == "1")
 	c.ManualControl = (c.getEnv("MANUAL_CONTROL", "0") == "1")
+	privateKeyFile := c.getEnv("PRIVATE_KEY", "./private.key")
+	privateKey, err := protocol.LoadPrivateKey(privateKeyFile)
+	if err != nil {
+		log.Panicf("could not load private key: %s\n", err.Error())
+	}
+	c.PrivateKey = privateKey
 }
 
 func (c *Config) Print() {
