@@ -75,7 +75,15 @@ func (c *ChargeController) processVehicle(vehicle *Vehicle) {
 }
 
 func (c *ChargeController) stopCharging(accessToken string, vehicle *Vehicle) {
-	GetTeslaAPI().ChargeStop(accessToken, vehicle)
+	car, err := GetTeslaAPI().InitSession(accessToken, vehicle)
+	if err != nil {
+		GetDB().LogChargingEvent(vehicle.ID, LogEventChargeStop, fmt.Sprintf("could not init session with car: %s", err.Error()))
+		return
+	}
+	if err := GetTeslaAPI().ChargeStop(car); err != nil {
+		GetDB().LogChargingEvent(vehicle.ID, LogEventChargeStop, fmt.Sprintf("could not stop charging: %s", err.Error()))
+		return
+	}
 	GetDB().SetVehicleStateCharging(vehicle.ID, ChargeStateNotCharging)
 	GetDB().SetVehicleStateAmps(vehicle.ID, 0)
 	GetDB().LogChargingEvent(vehicle.ID, LogEventChargeStop, "smart charging is disabled")
@@ -109,35 +117,35 @@ func (c *ChargeController) checkStartCharging(accessToken string, vehicle *Vehic
 }
 
 func (c *ChargeController) activateCharging(accessToken string, vehicle *Vehicle, state *VehicleState, amps int, source ChargeState) bool {
-	// minimum surplus available, start charging by first waking up the car
-	if err := GetTeslaAPI().WakeUpVehicle(accessToken, vehicle); err != nil {
+	car, err := GetTeslaAPI().InitSession(accessToken, vehicle)
+	if err != nil {
 		GetDB().LogChargingEvent(vehicle.ID, LogEventWakeVehicle, "could not wake vehicle: "+err.Error())
 		return false
 	}
 	GetDB().LogChargingEvent(vehicle.ID, LogEventWakeVehicle, "")
 
 	// set the charge limit
-	if _, err := GetTeslaAPI().SetChargeLimit(accessToken, vehicle, vehicle.TargetSoC); err != nil {
+	if err := GetTeslaAPI().SetChargeLimit(car, vehicle.TargetSoC); err != nil {
 		GetDB().LogChargingEvent(vehicle.ID, LogEventSetTargetSoC, "could not set target SoC: "+err.Error())
 		return false
 	}
 	GetDB().LogChargingEvent(vehicle.ID, LogEventSetTargetSoC, fmt.Sprintf("target SoC set to %d", vehicle.TargetSoC))
 
 	// set amps to charge
-	if _, err := GetTeslaAPI().SetChargeAmps(accessToken, vehicle, amps); err != nil {
+	if err := GetTeslaAPI().SetChargeAmps(car, amps); err != nil {
 		GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, "could not set charge amps: "+err.Error())
 		return false
 	}
 	GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, fmt.Sprintf("charge amps set to %d", amps))
 
 	// disable scheduled charging
-	if _, err := GetTeslaAPI().SetScheduledCharging(accessToken, vehicle, false, 0); err != nil {
+	if err := GetTeslaAPI().SetScheduledCharging(car, false, 0); err != nil {
 		GetDB().LogChargingEvent(vehicle.ID, LogEventSetScheduledCharging, "could not disable scheduled charging: "+err.Error())
 		return false
 	}
 	GetDB().LogChargingEvent(vehicle.ID, LogEventSetScheduledCharging, fmt.Sprintf("disabled scheduled charging"))
 
-	GetTeslaAPI().ChargeStart(accessToken, vehicle)
+	GetTeslaAPI().ChargeStart(car)
 	GetDB().SetVehicleStateCharging(vehicle.ID, source)
 	GetDB().LogChargingEvent(vehicle.ID, LogEventChargeStart, "")
 
@@ -288,10 +296,15 @@ func (c *ChargeController) checkChargeProcess(accessToken string, vehicle *Vehic
 	if !c.minimumChargeTimeReached(vehicle) {
 		// ...except when vehicle is charging on solar and amps need to be adjusted
 		if state.Charging == ChargeStateChargingOnSolar && targetAmps > 0 && targetAmps != state.Amps {
-			if _, err := GetTeslaAPI().SetChargeAmps(accessToken, vehicle, targetAmps); err != nil {
-				GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, "could not set charge amps: "+err.Error())
+			car, err := GetTeslaAPI().InitSession(accessToken, vehicle)
+			if err != nil {
+				GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, fmt.Sprintf("could not init session with car: %s", err.Error()))
+			} else {
+				if err := GetTeslaAPI().SetChargeAmps(car, targetAmps); err != nil {
+					GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, "could not set charge amps: "+err.Error())
+				}
+				GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, fmt.Sprintf("charge amps set to %d", targetAmps))
 			}
-			GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, fmt.Sprintf("charge amps set to %d", targetAmps))
 		}
 		return
 	}

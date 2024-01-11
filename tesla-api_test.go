@@ -1,9 +1,8 @@
 package main
 
 import (
-	"testing"
-
 	"github.com/stretchr/testify/mock"
+	"github.com/teslamotors/vehicle-command/pkg/vehicle"
 )
 
 type TeslaAPIMock struct {
@@ -47,6 +46,15 @@ func (a *TeslaAPIMock) GetCachedAccessToken(userID string) string {
 	return args.String(0)
 }
 
+func (a *TeslaAPIMock) InitSession(authToken string, v *Vehicle) (*vehicle.Vehicle, error) {
+	args := a.Called(authToken, v)
+	if resp, ok := args.Get(0).(*vehicle.Vehicle); !ok {
+		panic("assert: arguments wasn't correct type")
+	} else {
+		return resp, args.Error(1)
+	}
+}
+
 func (a *TeslaAPIMock) ListVehicles(authToken string) ([]TeslaAPIVehicleEntity, error) {
 	args := a.Called(authToken)
 	if resp, ok := args.Get(0).([]TeslaAPIVehicleEntity); !ok {
@@ -56,24 +64,24 @@ func (a *TeslaAPIMock) ListVehicles(authToken string) ([]TeslaAPIVehicleEntity, 
 	}
 }
 
-func (a *TeslaAPIMock) ChargeStart(authToken string, vehicle *Vehicle) (bool, error) {
-	args := a.Called(authToken, vehicle)
-	return args.Bool(0), args.Error(1)
+func (a *TeslaAPIMock) ChargeStart(car *vehicle.Vehicle) error {
+	args := a.Called(car)
+	return args.Error(0)
 }
 
-func (a *TeslaAPIMock) ChargeStop(authToken string, vehicle *Vehicle) (bool, error) {
-	args := a.Called(authToken, vehicle)
-	return args.Bool(0), args.Error(1)
+func (a *TeslaAPIMock) ChargeStop(car *vehicle.Vehicle) error {
+	args := a.Called(car)
+	return args.Error(0)
 }
 
-func (a *TeslaAPIMock) SetChargeLimit(authToken string, vehicle *Vehicle, limitPercent int) (bool, error) {
-	args := a.Called(authToken, vehicle, limitPercent)
-	return args.Bool(0), args.Error(1)
+func (a *TeslaAPIMock) SetChargeLimit(car *vehicle.Vehicle, limitPercent int) error {
+	args := a.Called(car, limitPercent)
+	return args.Error(0)
 }
 
-func (a *TeslaAPIMock) SetChargeAmps(authToken string, vehicle *Vehicle, amps int) (bool, error) {
-	args := a.Called(authToken, vehicle, amps)
-	return args.Bool(0), args.Error(1)
+func (a *TeslaAPIMock) SetChargeAmps(car *vehicle.Vehicle, amps int) error {
+	args := a.Called(car, amps)
+	return args.Error(0)
 }
 
 func (a *TeslaAPIMock) GetVehicleData(authToken string, vehicle *Vehicle) (*TeslaAPIVehicleData, error) {
@@ -85,25 +93,7 @@ func (a *TeslaAPIMock) GetVehicleData(authToken string, vehicle *Vehicle) (*Tesl
 	}
 }
 
-func (a *TeslaAPIMock) WakeUpVehicle(authToken string, vehicle *Vehicle) error {
-	args := a.Called(authToken, vehicle)
+func (a *TeslaAPIMock) SetScheduledCharging(car *vehicle.Vehicle, enable bool, minutesAfterMidnight int) error {
+	args := a.Called(car, enable, minutesAfterMidnight)
 	return args.Error(0)
-}
-
-func (a *TeslaAPIMock) SetScheduledCharging(authToken string, vehicle *Vehicle, enable bool, minutesAfterMidnight int) (bool, error) {
-	args := a.Called(authToken, vehicle, enable, minutesAfterMidnight)
-	return args.Bool(0), args.Error(1)
-}
-
-func TestBlah(t *testing.T) {
-	teslaAPI := new(TeslaAPIMock)
-	//teslaAPI.On("SetChargeAmps", "test", nil, 16) //.Return(true, nil)
-	teslaAPI.On("GetCachedAccessToken", "test").Return("ok")
-	//teslaAPI.On("SetChargeAmps", mock.Anything, mock.Anything, 32).Return(false, errors.New("geht net!"))
-
-	teslaAPI.GetCachedAccessToken("test")
-
-	//teslaAPI.SetChargeAmps("", nil, 32)
-
-	//teslaAPI.AssertExpectations(t)
 }

@@ -7,12 +7,13 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/allegro/bigcache/v3"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/teslamotors/vehicle-command/pkg/account"
+	"github.com/teslamotors/vehicle-command/pkg/vehicle"
 )
 
 type TeslaAPIErrorResponse struct {
@@ -72,20 +73,19 @@ type TeslaAPI interface {
 	RefreshToken(refreshToken string) (*TeslaAPITokenReponse, error)
 	GetOrRefreshAccessToken(userID string) string
 	GetCachedAccessToken(userID string) string
+	InitSession(authToken string, vehicle *Vehicle) (*vehicle.Vehicle, error)
 	ListVehicles(authToken string) ([]TeslaAPIVehicleEntity, error)
-	ChargeStart(authToken string, vehicle *Vehicle) (bool, error)
-	ChargeStop(authToken string, vehicle *Vehicle) (bool, error)
-	SetChargeLimit(authToken string, vehicle *Vehicle, limitPercent int) (bool, error)
-	SetChargeAmps(authToken string, vehicle *Vehicle, amps int) (bool, error)
+	ChargeStart(car *vehicle.Vehicle) error
+	ChargeStop(car *vehicle.Vehicle) error
+	SetChargeLimit(car *vehicle.Vehicle, limitPercent int) error
+	SetChargeAmps(car *vehicle.Vehicle, amps int) error
 	GetVehicleData(authToken string, vehicle *Vehicle) (*TeslaAPIVehicleData, error)
-	WakeUpVehicle(authToken string, vehicle *Vehicle) error
-	SetScheduledCharging(authToken string, vehicle *Vehicle, enable bool, minutesAfterMidnight int) (bool, error)
+	SetScheduledCharging(car *vehicle.Vehicle, enable bool, minutesAfterMidnight int) error
 }
 
 type TeslaAPIImpl struct {
 	TokenCache         *bigcache.BigCache
 	UserIDToTokenCache *bigcache.BigCache
-	ReturnPlainInError bool
 }
 
 func (a *TeslaAPIImpl) InitTokenCache() {
@@ -104,7 +104,6 @@ func (a *TeslaAPIImpl) InitTokenCache() {
 		log.Fatalln(err)
 	}
 	a.UserIDToTokenCache = cache2
-	// a.ReturnPlainInError = true // TODO
 }
 
 func (a *TeslaAPIImpl) IsKnownAccessToken(token string) bool {
@@ -207,6 +206,26 @@ func (a *TeslaAPIImpl) GetCachedAccessToken(userID string) string {
 	return string(token)
 }
 
+func (a *TeslaAPIImpl) InitSession(authToken string, vehicle *Vehicle) (*vehicle.Vehicle, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	acct, err := account.New(authToken, "tesla-green-charge/0.0.1")
+	if err != nil {
+		return nil, err
+	}
+	car, err := acct.GetVehicle(ctx, vehicle.VIN, GetConfig().PrivateKey, nil)
+	if err != nil {
+		return nil, err
+	}
+	if err := car.Connect(ctx); err != nil {
+		return nil, fmt.Errorf("failed to connect to vehicle: %s", err.Error())
+	}
+	if err := car.StartSession(ctx, nil); err != nil {
+		return nil, fmt.Errorf("failed to perform handshake with vehicle: %s", err.Error())
+	}
+	return car, nil
+}
+
 func (a *TeslaAPIImpl) ListVehicles(authToken string) ([]TeslaAPIVehicleEntity, error) {
 	r, _ := http.NewRequest("GET", _configInstance.Audience+"/api/1/vehicles", nil)
 
@@ -228,50 +247,28 @@ func (a *TeslaAPIImpl) ListVehicles(authToken string) ([]TeslaAPIVehicleEntity, 
 	return m.Response, nil
 }
 
-func (a *TeslaAPIImpl) boolRequest(authToken string, vehicle *Vehicle, cmd string, data string) (bool, error) {
-	target := GetConfig().Audience + "/api/1/vehicles/" + vehicle.VIN + "/command/" + cmd
-	log.Printf("Sending request to %s: %s\n", target, data)
-	r, _ := http.NewRequest("POST", target, strings.NewReader(data))
-
-	resp, err := RetryHTTPJSONRequest(r, authToken)
-	if err != nil {
-		log.Println(err)
-		return false, err
-	}
-
-	if a.ReturnPlainInError {
-		body, _ := DebugGetResponseBody(r.Body)
-		return false, errors.New(fmt.Sprintf("http status %d, body: %s", resp.StatusCode, body))
-	}
-
-	var m TeslaAPIBoolResponse
-	if err := UnmarshalValidateBody(resp.Body, &m); err != nil {
-		return false, err
-	}
-
-	if m.Error != "" {
-		return false, fmt.Errorf("api response error: %s (%s), http status %d", m.Error, m.ErrorDescription, resp.StatusCode)
-	}
-
-	return m.Response.Result, nil
+func (a *TeslaAPIImpl) ChargeStart(car *vehicle.Vehicle) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	return car.ChargeStart(ctx)
 }
 
-func (a *TeslaAPIImpl) ChargeStart(authToken string, vehicle *Vehicle) (bool, error) {
-	return a.boolRequest(authToken, vehicle, "charge_start", `{}`)
+func (a *TeslaAPIImpl) ChargeStop(car *vehicle.Vehicle) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	return car.ChargeStop(ctx)
 }
 
-func (a *TeslaAPIImpl) ChargeStop(authToken string, vehicle *Vehicle) (bool, error) {
-	return a.boolRequest(authToken, vehicle, "charge_stop", `{}`)
+func (a *TeslaAPIImpl) SetChargeLimit(car *vehicle.Vehicle, limitPercent int) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	return car.ChangeChargeLimit(ctx, int32(limitPercent))
 }
 
-func (a *TeslaAPIImpl) SetChargeLimit(authToken string, vehicle *Vehicle, limitPercent int) (bool, error) {
-	data := `{"percent": "` + strconv.Itoa(limitPercent) + `"}`
-	return a.boolRequest(authToken, vehicle, "set_charge_limit", data)
-}
-
-func (a *TeslaAPIImpl) SetChargeAmps(authToken string, vehicle *Vehicle, amps int) (bool, error) {
-	data := `{"charging_amps": ` + strconv.Itoa(amps) + `}`
-	return a.boolRequest(authToken, vehicle, "set_charging_amps", data)
+func (a *TeslaAPIImpl) SetChargeAmps(car *vehicle.Vehicle, amps int) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	return car.SetChargingAmps(ctx, int32(amps))
 }
 
 func (a *TeslaAPIImpl) GetVehicleData(authToken string, vehicle *Vehicle) (*TeslaAPIVehicleData, error) {
@@ -296,34 +293,8 @@ func (a *TeslaAPIImpl) GetVehicleData(authToken string, vehicle *Vehicle) (*Tesl
 	return &m.Response, nil
 }
 
-func (a *TeslaAPIImpl) WakeUpVehicle(authToken string, vehicle *Vehicle) error {
-	target := GetConfig().Audience + "/api/1/vehicles/" + vehicle.VIN + "/wake_up"
-	r, _ := http.NewRequest("POST", target, strings.NewReader("{}"))
-
-	resp, err := RetryHTTPJSONRequest(r, authToken)
-	if err != nil {
-		log.Println(err)
-		return err
-	}
-
-	if a.ReturnPlainInError {
-		body, _ := DebugGetResponseBody(r.Body)
-		return errors.New(fmt.Sprintf("http status %d, body: %s", resp.StatusCode, body))
-	}
-
-	var m TeslaAPIErrorResponse
-	if err := UnmarshalValidateBody(resp.Body, &m); err != nil {
-		return err
-	}
-
-	if m.Error != "" {
-		return fmt.Errorf("api response error: %s (%s), http status %d", m.Error, m.ErrorDescription, resp.StatusCode)
-	}
-
-	return nil
-}
-
-func (a *TeslaAPIImpl) SetScheduledCharging(authToken string, vehicle *Vehicle, enable bool, minutesAfterMidnight int) (bool, error) {
-	payload := `{"enable": ` + strconv.FormatBool(enable) + `, "time": ` + strconv.Itoa(minutesAfterMidnight) + `}`
-	return a.boolRequest(authToken, vehicle, "set_scheduled_charging", payload)
+func (a *TeslaAPIImpl) SetScheduledCharging(car *vehicle.Vehicle, enable bool, minutesAfterMidnight int) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	return car.ScheduleCharging(ctx, enable, time.Duration(minutesAfterMidnight*int(time.Minute)))
 }

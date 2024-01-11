@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/teslamotors/vehicle-command/pkg/vehicle"
 )
 
 func TestChargeControlGetEstimatedChargeDurationMinutes(t *testing.T) {
@@ -354,12 +355,12 @@ func TestChargeControl_SolarCharging(t *testing.T) {
 
 	api, _ := TeslaAPIInstance.(*TeslaAPIMock)
 	api.On("GetOrRefreshAccessToken", v.UserID).Return("token")
-	api.On("WakeUpVehicle", "token", mock.Anything).Return(nil)
-	api.On("SetChargeLimit", "token", mock.Anything, mock.Anything).Return(true, nil)
-	api.On("SetChargeAmps", "token", mock.Anything, mock.Anything).Return(true, nil)
-	api.On("ChargeStart", "token", mock.Anything).Return(true, nil)
-	api.On("ChargeStop", "token", mock.Anything).Return(true, nil)
-	api.On("SetScheduledCharging", "token", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+	api.On("InitSession", "token", mock.Anything).Return(&vehicle.Vehicle{}, nil)
+	api.On("SetChargeLimit", mock.Anything, mock.Anything).Return(nil)
+	api.On("SetChargeAmps", mock.Anything, mock.Anything).Return(nil)
+	api.On("ChargeStart", mock.Anything).Return(nil)
+	api.On("ChargeStop", mock.Anything).Return(nil)
+	api.On("SetScheduledCharging", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	vData := &TeslaAPIVehicleData{
 		VehicleID: 123,
 		ChargeState: TeslaAPIChargeState{
@@ -425,12 +426,12 @@ func TestChargeControl_TibberCharging(t *testing.T) {
 
 	api, _ := TeslaAPIInstance.(*TeslaAPIMock)
 	api.On("GetOrRefreshAccessToken", v.UserID).Return("token")
-	api.On("WakeUpVehicle", "token", mock.Anything).Return(nil)
-	api.On("SetChargeLimit", "token", mock.Anything, mock.Anything).Return(true, nil)
-	api.On("SetChargeAmps", "token", mock.Anything, mock.Anything).Return(true, nil)
-	api.On("ChargeStart", "token", mock.Anything).Return(true, nil)
-	api.On("ChargeStop", "token", mock.Anything).Return(true, nil)
-	api.On("SetScheduledCharging", "token", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+	api.On("InitSession", "token", mock.Anything).Return(&vehicle.Vehicle{}, nil)
+	api.On("SetChargeLimit", mock.Anything, mock.Anything).Return(nil)
+	api.On("SetChargeAmps", mock.Anything, mock.Anything).Return(nil)
+	api.On("ChargeStart", mock.Anything).Return(nil)
+	api.On("ChargeStop", mock.Anything).Return(nil)
+	api.On("SetScheduledCharging", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	vData := &TeslaAPIVehicleData{
 		VehicleID: 123,
 		ChargeState: TeslaAPIChargeState{
