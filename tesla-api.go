@@ -85,6 +85,7 @@ type TeslaAPI interface {
 type TeslaAPIImpl struct {
 	TokenCache         *bigcache.BigCache
 	UserIDToTokenCache *bigcache.BigCache
+	ReturnPlainInError bool
 }
 
 func (a *TeslaAPIImpl) InitTokenCache() {
@@ -103,6 +104,7 @@ func (a *TeslaAPIImpl) InitTokenCache() {
 		log.Fatalln(err)
 	}
 	a.UserIDToTokenCache = cache2
+	// a.ReturnPlainInError = true // TODO
 }
 
 func (a *TeslaAPIImpl) IsKnownAccessToken(token string) bool {
@@ -237,6 +239,11 @@ func (a *TeslaAPIImpl) boolRequest(authToken string, vehicle *Vehicle, cmd strin
 		return false, err
 	}
 
+	if a.ReturnPlainInError {
+		body, _ := DebugGetResponseBody(r.Body)
+		return false, errors.New(fmt.Sprintf("http status %d, body: %s", resp.StatusCode, body))
+	}
+
 	var m TeslaAPIBoolResponse
 	if err := UnmarshalValidateBody(resp.Body, &m); err != nil {
 		return false, err
@@ -263,7 +270,7 @@ func (a *TeslaAPIImpl) SetChargeLimit(authToken string, vehicle *Vehicle, limitP
 }
 
 func (a *TeslaAPIImpl) SetChargeAmps(authToken string, vehicle *Vehicle, amps int) (bool, error) {
-	data := `{"charging_amps": "` + strconv.Itoa(amps) + `"}`
+	data := `{"charging_amps": ` + strconv.Itoa(amps) + `}`
 	return a.boolRequest(authToken, vehicle, "set_charging_amps", data)
 }
 
@@ -297,6 +304,11 @@ func (a *TeslaAPIImpl) WakeUpVehicle(authToken string, vehicle *Vehicle) error {
 	if err != nil {
 		log.Println(err)
 		return err
+	}
+
+	if a.ReturnPlainInError {
+		body, _ := DebugGetResponseBody(r.Body)
+		return errors.New(fmt.Sprintf("http status %d, body: %s", resp.StatusCode, body))
 	}
 
 	var m TeslaAPIErrorResponse
