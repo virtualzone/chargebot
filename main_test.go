@@ -18,6 +18,7 @@ var GlobalMockTime *MockTime
 
 func TestMain(m *testing.M) {
 	os.Setenv("DB_FILE", ":memory:")
+	os.Setenv("PRIVATE_KEY", ":none:")
 	GetConfig().ReadConfig()
 	GlobalMockTime = &MockTime{
 		CurTime: time.Now().UTC(),
