@@ -42,11 +42,13 @@ func (c *Config) ReadConfig() {
 	c.Reset = (c.getEnv("RESET", "0") == "1")
 	c.ManualControl = (c.getEnv("MANUAL_CONTROL", "0") == "1")
 	privateKeyFile := c.getEnv("PRIVATE_KEY", "./private.key")
-	privateKey, err := protocol.LoadPrivateKey(privateKeyFile)
-	if err != nil {
-		log.Panicf("could not load private key: %s\n", err.Error())
+	if privateKeyFile != ":none:" {
+		privateKey, err := protocol.LoadPrivateKey(privateKeyFile)
+		if err != nil {
+			log.Panicf("could not load private key: %s\n", err.Error())
+		}
+		c.PrivateKey = privateKey
 	}
-	c.PrivateKey = privateKey
 }
 
 func (c *Config) Print() {
