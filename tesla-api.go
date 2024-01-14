@@ -220,6 +220,9 @@ func (a *TeslaAPIImpl) InitSession(authToken string, vehicle *Vehicle) (*vehicle
 	if err := car.Connect(ctx); err != nil {
 		return nil, fmt.Errorf("failed to connect to vehicle: %s", err.Error())
 	}
+	if err := car.Wakeup(ctx); err != nil {
+		return nil, fmt.Errorf("failed to wake up vehicle: %s", err.Error())
+	}
 	if err := car.StartSession(ctx, nil); err != nil {
 		return nil, fmt.Errorf("failed to perform handshake with vehicle: %s", err.Error())
 	}
@@ -250,25 +253,41 @@ func (a *TeslaAPIImpl) ListVehicles(authToken string) ([]TeslaAPIVehicleEntity, 
 func (a *TeslaAPIImpl) ChargeStart(car *vehicle.Vehicle) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	return car.ChargeStart(ctx)
+	err := car.ChargeStart(ctx)
+	if err != nil && strings.Contains(err.Error(), "already_started") {
+		return nil
+	}
+	return err
 }
 
 func (a *TeslaAPIImpl) ChargeStop(car *vehicle.Vehicle) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	return car.ChargeStop(ctx)
+	err := car.ChargeStop(ctx)
+	if err != nil && strings.Contains(err.Error(), "not_charging") {
+		return nil
+	}
+	return err
 }
 
 func (a *TeslaAPIImpl) SetChargeLimit(car *vehicle.Vehicle, limitPercent int) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	return car.ChangeChargeLimit(ctx, int32(limitPercent))
+	err := car.ChangeChargeLimit(ctx, int32(limitPercent))
+	if err != nil && strings.Contains(err.Error(), "already_set") {
+		return nil
+	}
+	return err
 }
 
 func (a *TeslaAPIImpl) SetChargeAmps(car *vehicle.Vehicle, amps int) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	return car.SetChargingAmps(ctx, int32(amps))
+	err := car.SetChargingAmps(ctx, int32(amps))
+	if err != nil && strings.Contains(err.Error(), "already_set") {
+		return nil
+	}
+	return err
 }
 
 func (a *TeslaAPIImpl) GetVehicleData(authToken string, vehicle *Vehicle) (*TeslaAPIVehicleData, error) {
@@ -296,5 +315,9 @@ func (a *TeslaAPIImpl) GetVehicleData(authToken string, vehicle *Vehicle) (*Tesl
 func (a *TeslaAPIImpl) SetScheduledCharging(car *vehicle.Vehicle, enable bool, minutesAfterMidnight int) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	return car.ScheduleCharging(ctx, enable, time.Duration(minutesAfterMidnight*int(time.Minute)))
+	err := car.ScheduleCharging(ctx, enable, time.Duration(minutesAfterMidnight*int(time.Minute)))
+	if err != nil && strings.Contains(err.Error(), "already_set") {
+		return nil
+	}
+	return err
 }
