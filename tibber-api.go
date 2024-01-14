@@ -43,11 +43,8 @@ func TibberAPIGetPrices(token string) (*TibberPriceInfo, error) {
 	target := "https://api.tibber.com/v1-beta/gql"
 	data := `{ "query": "{viewer {homes {currentSubscription {priceInfo {current {total startsAt} today {total startsAt} tomorrow {total startsAt} } }}}}" }`
 	r, _ := http.NewRequest("POST", target, strings.NewReader(data))
-	r.Header.Add("Content-Type", "application/json")
-	r.Header.Add("Authorization", "Bearer "+token)
 
-	client := &http.Client{}
-	resp, err := client.Do(r)
+	resp, err := RetryHTTPJSONRequest(r, token)
 	if err != nil {
 		log.Println(err)
 		return nil, err
