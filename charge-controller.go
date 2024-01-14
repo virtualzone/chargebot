@@ -103,8 +103,12 @@ func (c *ChargeController) checkTargetState(vehicle *Vehicle, state *VehicleStat
 	return targetState, amps
 }
 
+func (c *ChargeController) isChargingRequired(currentSoC int, targetSoC int) bool {
+	return currentSoC < (targetSoC - 1)
+}
+
 func (c *ChargeController) checkStartCharging(accessToken string, vehicle *Vehicle, state *VehicleState) {
-	if state.SoC >= vehicle.TargetSoC {
+	if !c.isChargingRequired(state.SoC, vehicle.TargetSoC) {
 		// nothing to do if target SoC is already reached
 		return
 	}
@@ -123,6 +127,13 @@ func (c *ChargeController) activateCharging(accessToken string, vehicle *Vehicle
 		return false
 	}
 	GetDB().LogChargingEvent(vehicle.ID, LogEventWakeVehicle, "")
+
+	// ensure current SoC has not changed in the meantime
+	currentSoC := UpdateVehicleDataSaveSoC(accessToken, vehicle)
+	if !c.isChargingRequired(currentSoC, vehicle.TargetSoC) {
+		GetDB().LogChargingEvent(vehicle.ID, LogEventChargeStart, "charging skipped, target SoC is already reached")
+		return false
+	}
 
 	// set the charge limit
 	if err := GetTeslaAPI().SetChargeLimit(car, vehicle.TargetSoC); err != nil {
