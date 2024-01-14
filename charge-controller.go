@@ -129,8 +129,8 @@ func (c *ChargeController) activateCharging(accessToken string, vehicle *Vehicle
 	GetDB().LogChargingEvent(vehicle.ID, LogEventWakeVehicle, "")
 
 	// ensure current SoC has not changed in the meantime
-	currentSoC := UpdateVehicleDataSaveSoC(accessToken, vehicle)
-	if !c.isChargingRequired(currentSoC, vehicle.TargetSoC) {
+	state.SoC = UpdateVehicleDataSaveSoC(accessToken, vehicle)
+	if !c.isChargingRequired(state.SoC, vehicle.TargetSoC) {
 		GetDB().LogChargingEvent(vehicle.ID, LogEventChargeStart, "charging skipped, target SoC is already reached")
 		return false
 	}
