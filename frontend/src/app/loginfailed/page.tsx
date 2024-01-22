@@ -1,14 +1,14 @@
 'use client'
 
 import Link from "next/link"
+import { Container } from "react-bootstrap"
 
 export default function Authorized() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <div className="relative flex place-items-center">
-        <p>Login failed.</p>
-        <p><Link href="/">Back to start page</Link></p>
-      </div>
-    </main>
+    <Container fluid="sm" className="vh-100 pt-5">
+      <h2 className="pb-3">Login failed</h2>
+      <p>Login failed.</p>
+      <p><Link href="/">Back to start page</Link></p>
+    </Container>
   )
 }

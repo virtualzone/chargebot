@@ -12,7 +12,7 @@ func GetTeslaAPI() TeslaAPI {
 }
 
 func main() {
-	log.Println("Starting Tesla Green Charge...")
+	log.Println("Starting chargebot.io backend...")
 	GetConfig().ReadConfig()
 	GetDB().Connect()
 	if GetConfig().Reset {
