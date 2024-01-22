@@ -37,7 +37,7 @@ func (c *Config) ReadConfig() {
 	c.ClientSecret = c.getEnv("CLIENT_SECRET", "")
 	c.Audience = c.getEnv("AUDIENCE", "https://fleet-api.prd.eu.vn.cloud.tesla.com")
 	c.DBFile = c.getEnv("DB_FILE", "/tmp/tgc.db")
-	c.Hostname = c.getEnv("DOMAIN", "tgc.virtualzone.de")
+	c.Hostname = c.getEnv("DOMAIN", "chargebot.io")
 	c.DevProxy = (c.getEnv("DEV_PROXY", "0") == "1")
 	c.Reset = (c.getEnv("RESET", "0") == "1")
 	c.ManualControl = (c.getEnv("MANUAL_CONTROL", "0") == "1")

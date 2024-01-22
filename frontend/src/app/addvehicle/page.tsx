@@ -6,7 +6,7 @@ import Loading from "../loading";
 import NoData from "../nodata";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ListGroup } from "react-bootstrap";
+import { Container, ListGroup } from "react-bootstrap";
 
 export default function Authorized() {
   const [vehicles, setVehicles] = useState([] as any[])
@@ -50,15 +50,21 @@ export default function Authorized() {
     return <Loading />
   }
 
-  if (!vehicles) {
-    return <NoData />
+  if ((!vehicles) || (vehicles.length === 0)) {
+    return (
+      <Container fluid="sm" className="pt-5 container-max-width min-height">
+        <h2 className="pb-3">Add vehicle</h2>
+        <p>No vehicles found in your Tesla account which can be added to chargebot.io.</p>
+        <Link href="/authorized" className="btn btn-link">&lt; Back</Link>
+      </Container>
+    );
   }
 
   return (
-    <main>
-      <Link href="/authorized" className="btn btn-primary">&lt; Back</Link>
-      <p className="text-lg font-medium">Select the Tesla you want to charge with green power:</p>
-      <ListGroup>
+    <Container fluid="sm" className="pt-5 container-max-width min-height">
+      <h2 className="pb-3">Add vehicle</h2>
+      <p>Select the Tesla you want to manage with chargebot.io:</p>
+      <ListGroup className="mb-5">
         {(vehicles as any[]).map(e => {
           return (
             <ListGroup.Item action={true} onClick={() => selectVehicle(e.vehicle_id)} key={e.vehicle_id}>
@@ -69,6 +75,7 @@ export default function Authorized() {
           )
         })}
       </ListGroup>
-    </main>
+      <Link href="/authorized" className="btn btn-link">&lt; Back</Link>
+    </Container>
   )
 }

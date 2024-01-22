@@ -1,7 +1,5 @@
 'use client'
 
-import { NextRouter } from "next/router";
-
 export function getBaseUrl() {
   if (typeof window !== "undefined") {
     const currentLocation = window.location;
