@@ -24,6 +24,16 @@ export default function RootLayout({
     <html lang="en" data-bs-theme="auto">
       <head>
         <meta name="charset" content="utf-8" />
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+        <link rel="icon" type="image/png" href="/favicon.png" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="theme-color" content="#212529" />
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <link rel="shortcut icon" href="/favicon-192.png" />
+        <link rel="apple-touch-icon" href="/favicon-192.png" />
+        <link rel="apple-touch-startup-image" href="/favicon-1024.png" />
         <title>chargebot.io</title>
         <Script type='text/javascript' id='script-auto-dark'>{`
           ;(function () {
