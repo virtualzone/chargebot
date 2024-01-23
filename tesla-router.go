@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gorilla/mux"
 )
@@ -118,6 +119,8 @@ func (router *TeslaRouter) updateVehicle(w http.ResponseWriter, r *http.Request)
 	var m *Vehicle
 	UnmarshalValidateBody(r.Body, &m)
 
+	eOld := GetDB().GetVehicleByID(vehicle.VehicleID)
+
 	e := &Vehicle{
 		ID:              vehicle.VehicleID,
 		UserID:          GetUserIDFromRequest(r),
@@ -135,6 +138,26 @@ func (router *TeslaRouter) updateVehicle(w http.ResponseWriter, r *http.Request)
 		TibberToken:     m.TibberToken,
 	}
 	GetDB().CreateUpdateVehicle(e)
+
+	// If vehicle was not enabled, but is enabled now, update current SoC
+	if (eOld != nil) && (e.Enabled) && (!eOld.Enabled) {
+		go func() {
+			car, err := GetTeslaAPI().InitSession(authToken, e)
+			if err != nil {
+				log.Printf("could not init session for vehicle %d on plug in: %s\n", e.ID, err.Error())
+				return
+			}
+			UpdateVehicleDataSaveSoC(authToken, e)
+			if err := GetTeslaAPI().SetChargeLimit(car, 50); err != nil {
+				log.Printf("could not set charge limit for vehicle %d on plug in: %s\n", e.ID, err.Error())
+			}
+			time.Sleep(5 * time.Second)
+			if err := GetTeslaAPI().ChargeStop(car); err != nil {
+				log.Printf("could not stop charging for vehicle %d on plug in: %s\n", e.ID, err.Error())
+			}
+		}()
+	}
+
 	SendJSON(w, true)
 }
 
