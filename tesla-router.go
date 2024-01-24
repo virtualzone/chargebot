@@ -86,6 +86,10 @@ func (router *TeslaRouter) addVehicle(w http.ResponseWriter, r *http.Request) {
 		MinSurplus:      2000,
 		LowcostCharging: false,
 		MaxPrice:        20,
+		GridProvider:    "tibber",
+		GridStrategy:    1,
+		DepartDays:      "12345",
+		DepartTime:      "07:00",
 		TibberToken:     "",
 	}
 	GetDB().CreateUpdateVehicle(e)
@@ -135,6 +139,10 @@ func (router *TeslaRouter) updateVehicle(w http.ResponseWriter, r *http.Request)
 		MinSurplus:      m.MinSurplus,
 		LowcostCharging: m.LowcostCharging,
 		MaxPrice:        m.MaxPrice,
+		GridProvider:    m.GridProvider,
+		GridStrategy:    m.GridStrategy,
+		DepartDays:      m.DepartDays,
+		DepartTime:      m.DepartTime,
 		TibberToken:     m.TibberToken,
 	}
 	GetDB().CreateUpdateVehicle(e)

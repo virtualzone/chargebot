@@ -21,7 +21,11 @@ export default function Authorized() {
   const [minSurplus, setMinSurplus] = useState(0)
   const [minChargetime, setMinChargetime] = useState(0)
   const [chargeOnTibber, setChargeOnTibber] = useState(false)
+  const [gridProvider, setGridProvider] = useState('tibber')
+  const [gridStrategy, setGridStrategy] = useState(1)
   const [maxPrice, setMaxPrice] = useState(0)
+  const [departDays, setDepartDays] = useState([1, 2, 3, 4, 5])
+  const [departTime, setDepartTime] = useState('07:00')
   const [tibberToken, setTibberToken] = useState('')
   const [showTokenHelp, setShowTokenHelp] = useState(false)
   const [vehicleState, setVehicleState] = useState({} as any)
@@ -87,6 +91,10 @@ export default function Authorized() {
         setMinChargetime(e.min_chargetime);
         setChargeOnTibber(e.lowcost_charging);
         setMaxPrice(e.max_price);
+        setGridProvider(e.gridProvider);
+        setGridStrategy(e.gridStrategy);
+        setDepartDays([...e.departDays].map(i => Number(i)));
+        setDepartTime(e.departTime);
         setTibberToken(e.tibber_token);
         setShowTokenHelp(false);
         loadVehicleState(e.api_token);
@@ -133,6 +141,10 @@ export default function Authorized() {
         "min_surplus": minSurplus,
         "min_chargetime": minChargetime,
         "lowcost_charging": chargeOnTibber,
+        "gridProvider": gridProvider,
+        "gridStrategy": gridStrategy,
+        "departDays": departDays.join(''),
+        "departTime": departTime,
         "max_price": maxPrice,
         "tibber_token": tibberToken
       };
@@ -335,15 +347,17 @@ export default function Authorized() {
         />
         <InputGroup.Text id="maxamps-addon1">A</InputGroup.Text>
       </InputGroup>
-      <Form.Select
-        aria-label="Number of Phases"
-        required={chargingEnabled}
-        disabled={!chargingEnabled}
-        value={numPhases}
-        onChange={e => setNumPhases(Number(e.target.value))}>
-        <option value="1">uniphase</option>
-        <option value="3">three-phase</option>
-      </Form.Select>
+      <InputGroup className="mb-3">
+        <Form.Select
+          aria-label="Number of Phases"
+          required={chargingEnabled}
+          disabled={!chargingEnabled}
+          value={numPhases}
+          onChange={e => setNumPhases(Number(e.target.value))}>
+          <option value="1">uniphase</option>
+          <option value="3">three-phase</option>
+        </Form.Select>
+      </InputGroup>
       <Form.Control plaintext={true} readOnly={true} defaultValue={'Up to ' + getMaxChargingPower()} />
       <Form.Check // prettier-ignore
         type="switch"
@@ -383,14 +397,36 @@ export default function Authorized() {
       </InputGroup>
       <Form.Check // prettier-ignore
         type="switch"
-        label="Charge on low Tibber price"
+        label="Charge on low grid price"
         checked={chargeOnTibber}
         onChange={e => setChargeOnTibber(e.target.checked)}
       />
       <InputGroup className="mb-3">
+        <Form.Select
+          aria-label="Provider"
+          required={chargeOnTibber}
+          disabled={!chargeOnTibber}
+          value={gridProvider}
+          onChange={e => setGridProvider(e.target.value)}>
+          <option value="tibber">Tibber</option>
+        </Form.Select>
+      </InputGroup>
+      <InputGroup className="mb-3">
+        <Form.Select
+          aria-label="Strategy"
+          required={chargeOnTibber}
+          disabled={!chargeOnTibber}
+          value={gridStrategy}
+          onChange={e => setGridStrategy(Number(e.target.value))}>
+          <option value="1">min. price, but at least below x</option>
+          <option value="2">price below x, possibly charged at departure</option>
+          <option value="3">min. price, certainly charged at departure</option>
+        </Form.Select>
+      </InputGroup>
+      <InputGroup className="mb-3" hidden={gridStrategy === 3}>
         <Form.Control
-          placeholder="Maximum Tibber Price"
-          aria-label="Maximum Tibber Price"
+          placeholder="Maximum Grid Price"
+          aria-label="Maximum Grid Price"
           aria-describedby="tibber-price-addon1"
           type="number"
           min={1}
@@ -402,7 +438,27 @@ export default function Authorized() {
         />
         <InputGroup.Text id="tibber-price-addon1">Cents</InputGroup.Text>
       </InputGroup>
-      <InputGroup className="mb-3">
+      <InputGroup className="mb-3" hidden={gridStrategy === 1}>
+        <Form.Check inline={true} label="Mo" type="checkbox" disabled={!chargeOnTibber} checked={departDays.indexOf(1) > -1} onChange={e => setDepartDays(e.target.checked ? [...departDays, 1] : [...departDays].toSpliced(departDays.indexOf(1), 1))} />
+        <Form.Check inline={true} label="Tu" type="checkbox" disabled={!chargeOnTibber} checked={departDays.indexOf(2) > -1} onChange={e => setDepartDays(e.target.checked ? [...departDays, 2] : [...departDays].toSpliced(departDays.indexOf(2), 1))} />
+        <Form.Check inline={true} label="We" type="checkbox" disabled={!chargeOnTibber} checked={departDays.indexOf(3) > -1} onChange={e => setDepartDays(e.target.checked ? [...departDays, 3] : [...departDays].toSpliced(departDays.indexOf(3), 1))} />
+        <Form.Check inline={true} label="Th" type="checkbox" disabled={!chargeOnTibber} checked={departDays.indexOf(4) > -1} onChange={e => setDepartDays(e.target.checked ? [...departDays, 4] : [...departDays].toSpliced(departDays.indexOf(4), 1))} />
+        <Form.Check inline={true} label="Fr" type="checkbox" disabled={!chargeOnTibber} checked={departDays.indexOf(5) > -1} onChange={e => setDepartDays(e.target.checked ? [...departDays, 5] : [...departDays].toSpliced(departDays.indexOf(5), 1))} />
+        <Form.Check inline={true} label="Sa" type="checkbox" disabled={!chargeOnTibber} checked={departDays.indexOf(6) > -1} onChange={e => setDepartDays(e.target.checked ? [...departDays, 6] : [...departDays].toSpliced(departDays.indexOf(6), 1))} />
+        <Form.Check inline={true} label="Su" type="checkbox" disabled={!chargeOnTibber} checked={departDays.indexOf(7) > -1} onChange={e => setDepartDays(e.target.checked ? [...departDays, 7] : [...departDays].toSpliced(departDays.indexOf(7), 1))} />
+      </InputGroup>
+      <InputGroup className="mb-3" hidden={gridStrategy === 1}>
+        <Form.Control
+          type="time"
+          min="00:00"
+          max="23:59"
+          required={chargeOnTibber}
+          disabled={!chargeOnTibber}
+          value={departTime}
+          onChange={e => setDepartTime(e.target.value)}
+        />
+      </InputGroup>
+      <InputGroup className="mb-3" hidden={gridProvider !== 'tibber'}>
         <Form.Control
           placeholder="Tibber Token"
           aria-label="Tibber Token"
