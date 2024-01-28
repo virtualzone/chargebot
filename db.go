@@ -252,7 +252,8 @@ func (db *DB) GetVehicles(UserID string) []*Vehicle {
 		"enabled, target_soc, max_amps, num_phases, surplus_charging, min_surplus, min_chargetime, lowcost_charging, grid_provider, grid_strategy, depart_days, depart_time, max_price, tibber_token "+
 		"from vehicles "+
 		"left join api_tokens on api_tokens.vehicle_id = vehicles.id "+
-		"where user_id = ?",
+		"where user_id = ? "+
+		"order by display_name",
 		UserID)
 	if err != nil {
 		log.Println(err)
@@ -484,7 +485,7 @@ func (db *DB) GetVehicleIDsWithTibberTokenWithoutPricesForToday(limit int) []int
 func (db *DB) IsUserOwnerOfVehicle(userID string, vehicleID int) bool {
 	list := db.GetVehicles(userID)
 	for _, e := range list {
-		if e.UserID == userID {
+		if e.ID == vehicleID {
 			return true
 		}
 	}
