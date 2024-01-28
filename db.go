@@ -34,7 +34,7 @@ type Vehicle struct {
 	MinChargeTime   int          `json:"min_chargetime"`
 	LowcostCharging bool         `json:"lowcost_charging"`
 	MaxPrice        int          `json:"max_price"`
-	GridProvider    string       `json:"gridProvider"`
+	GridProvider    GridProvider `json:"gridProvider"`
 	GridStrategy    GridStrategy `json:"gridStrategy"`
 	DepartDays      string       `json:"departDays"`
 	DepartTime      string       `json:"departTime"`
@@ -65,6 +65,12 @@ const (
 	GridStrategyNoDeparturePriceLimit   GridStrategy = 1
 	GridStrategyDepartureWithPriceLimit GridStrategy = 2
 	GridStrategyDepartureNoPriceLimit   GridStrategy = 3
+)
+
+type GridProvider string
+
+const (
+	GridProviderTibber GridProvider = "tibber"
 )
 
 type VehicleState struct {
