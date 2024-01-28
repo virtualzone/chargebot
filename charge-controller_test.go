@@ -486,3 +486,51 @@ func TestChargeControl_TibberChargingNoDeparturePriceLimit(t *testing.T) {
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateNotCharging, state.Charging)
 }
+
+func TestChargeControl_TibberChargingDepartureNoPriceLimit(t *testing.T) {
+	t.Cleanup(ResetTestDB)
+
+	v := &Vehicle{
+		ID:              123,
+		VIN:             "123",
+		UserID:          "999",
+		Enabled:         true,
+		TargetSoC:       70,
+		MaxAmps:         16,
+		NumPhases:       3,
+		SurplusCharging: false,
+		LowcostCharging: true,
+		MaxPrice:        20,
+		GridProvider:    GridProviderTibber,
+		GridStrategy:    GridStrategyDepartureNoPriceLimit,
+		DepartDays:      "135",
+		DepartTime:      "07:00:00",
+	}
+	GetDB().CreateUpdateVehicle(v)
+
+	// TODO
+}
+
+func TestChargeControl_TibberChargingDepartureWithPriceLimit(t *testing.T) {
+	t.Cleanup(ResetTestDB)
+
+	v := &Vehicle{
+		ID:              123,
+		VIN:             "123",
+		UserID:          "999",
+		Enabled:         true,
+		TargetSoC:       70,
+		MaxAmps:         16,
+		NumPhases:       3,
+		SurplusCharging: false,
+		LowcostCharging: true,
+		MaxPrice:        20,
+		GridProvider:    GridProviderTibber,
+		GridStrategy:    GridStrategyDepartureWithPriceLimit,
+		DepartDays:      "135",
+		DepartTime:      "07:00:00",
+	}
+	GetDB().CreateUpdateVehicle(v)
+
+	// TODO
+}
