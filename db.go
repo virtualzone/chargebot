@@ -20,25 +20,25 @@ type User struct {
 }
 
 type Vehicle struct {
-	ID              int    `json:"id"`
-	UserID          string `json:"user_id"`
-	VIN             string `json:"vin"`
-	DisplayName     string `json:"display_name"`
-	APIToken        string `json:"api_token"`
-	Enabled         bool   `json:"enabled"`
-	TargetSoC       int    `json:"target_soc"`
-	MaxAmps         int    `json:"max_amps"`
-	NumPhases       int    `json:"num_phases"`
-	SurplusCharging bool   `json:"surplus_charging"`
-	MinSurplus      int    `json:"min_surplus"`
-	MinChargeTime   int    `json:"min_chargetime"`
-	LowcostCharging bool   `json:"lowcost_charging"`
-	MaxPrice        int    `json:"max_price"`
-	GridProvider    string `json:"gridProvider"`
-	GridStrategy    int    `json:"gridStrategy"`
-	DepartDays      string `json:"departDays"`
-	DepartTime      string `json:"departTime"`
-	TibberToken     string `json:"tibber_token"`
+	ID              int          `json:"id"`
+	UserID          string       `json:"user_id"`
+	VIN             string       `json:"vin"`
+	DisplayName     string       `json:"display_name"`
+	APIToken        string       `json:"api_token"`
+	Enabled         bool         `json:"enabled"`
+	TargetSoC       int          `json:"target_soc"`
+	MaxAmps         int          `json:"max_amps"`
+	NumPhases       int          `json:"num_phases"`
+	SurplusCharging bool         `json:"surplus_charging"`
+	MinSurplus      int          `json:"min_surplus"`
+	MinChargeTime   int          `json:"min_chargetime"`
+	LowcostCharging bool         `json:"lowcost_charging"`
+	MaxPrice        int          `json:"max_price"`
+	GridProvider    string       `json:"gridProvider"`
+	GridStrategy    GridStrategy `json:"gridStrategy"`
+	DepartDays      string       `json:"departDays"`
+	DepartTime      string       `json:"departTime"`
+	TibberToken     string       `json:"tibber_token"`
 }
 
 type APIToken struct {
@@ -57,6 +57,14 @@ const (
 	ChargeStateNotCharging     ChargeState = 0
 	ChargeStateChargingOnSolar ChargeState = 1
 	ChargeStateChargingOnGrid  ChargeState = 2
+)
+
+type GridStrategy int
+
+const (
+	GridStrategyNoDeparturePriceLimit   GridStrategy = 1
+	GridStrategyDepartureWithPriceLimit GridStrategy = 2
+	GridStrategyDepartureNoPriceLimit   GridStrategy = 3
 )
 
 type VehicleState struct {

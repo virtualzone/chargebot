@@ -150,7 +150,7 @@ func (router *TeslaRouter) updateVehicle(w http.ResponseWriter, r *http.Request)
 	// If vehicle was not enabled, but is enabled now, update current SoC
 	if (eOld != nil) && (e.Enabled) && (!eOld.Enabled) {
 		go func() {
-			car, err := GetTeslaAPI().InitSession(authToken, e)
+			car, err := GetTeslaAPI().InitSession(authToken, e, true)
 			if err != nil {
 				log.Printf("could not init session for vehicle %d on plug in: %s\n", e.ID, err.Error())
 				return

@@ -155,7 +155,7 @@ func (router *UserRouter) updateVehiclePlugState(w http.ResponseWriter, r *http.
 			go func() {
 				// wait a few moments to ensure vehicle is online
 				time.Sleep(10 * time.Second)
-				car, err := GetTeslaAPI().InitSession(authToken, vehicle)
+				car, err := GetTeslaAPI().InitSession(authToken, vehicle, false)
 				if err != nil {
 					log.Printf("could not init session for vehicle %d on plug in: %s\n", vehicleID, err.Error())
 					return

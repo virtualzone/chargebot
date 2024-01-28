@@ -73,7 +73,7 @@ type TeslaAPI interface {
 	RefreshToken(refreshToken string) (*TeslaAPITokenReponse, error)
 	GetOrRefreshAccessToken(userID string) string
 	GetCachedAccessToken(userID string) string
-	InitSession(authToken string, vehicle *Vehicle) (*vehicle.Vehicle, error)
+	InitSession(authToken string, vehicle *Vehicle, wakeUp bool) (*vehicle.Vehicle, error)
 	ListVehicles(authToken string) ([]TeslaAPIVehicleEntity, error)
 	ChargeStart(car *vehicle.Vehicle) error
 	ChargeStop(car *vehicle.Vehicle) error
@@ -206,8 +206,8 @@ func (a *TeslaAPIImpl) GetCachedAccessToken(userID string) string {
 	return string(token)
 }
 
-func (a *TeslaAPIImpl) InitSession(authToken string, vehicle *Vehicle) (*vehicle.Vehicle, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+func (a *TeslaAPIImpl) InitSession(authToken string, vehicle *Vehicle, wakeUp bool) (*vehicle.Vehicle, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	acct, err := account.New(authToken, "tesla-green-charge/0.0.1")
 	if err != nil {
@@ -220,8 +220,24 @@ func (a *TeslaAPIImpl) InitSession(authToken string, vehicle *Vehicle) (*vehicle
 	if err := car.Connect(ctx); err != nil {
 		return nil, fmt.Errorf("failed to connect to vehicle: %s", err.Error())
 	}
-	if err := car.Wakeup(ctx); err != nil {
-		return nil, fmt.Errorf("failed to wake up vehicle: %s", err.Error())
+	if wakeUp {
+		if err := car.Wakeup(ctx); err != nil {
+			return nil, fmt.Errorf("failed to wake up vehicle: %s", err.Error())
+		}
+		retries := 0
+		isOnline := false
+		for (retries < 3) && !isOnline {
+			time.Sleep(10 * time.Second)
+			err := car.Ping(ctx)
+			if err != nil {
+				retries++
+			} else {
+				isOnline = true
+			}
+		}
+		if !isOnline {
+			return nil, fmt.Errorf("vehicle did not respond to ping after wake up")
+		}
 	}
 	if err := car.StartSession(ctx, nil); err != nil {
 		return nil, fmt.Errorf("failed to perform handshake with vehicle: %s", err.Error())

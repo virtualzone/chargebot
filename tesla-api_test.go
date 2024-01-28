@@ -46,8 +46,8 @@ func (a *TeslaAPIMock) GetCachedAccessToken(userID string) string {
 	return args.String(0)
 }
 
-func (a *TeslaAPIMock) InitSession(authToken string, v *Vehicle) (*vehicle.Vehicle, error) {
-	args := a.Called(authToken, v)
+func (a *TeslaAPIMock) InitSession(authToken string, v *Vehicle, wakeUp bool) (*vehicle.Vehicle, error) {
+	args := a.Called(authToken, v, wakeUp)
 	if resp, ok := args.Get(0).(*vehicle.Vehicle); !ok {
 		panic("assert: arguments wasn't correct type")
 	} else {
