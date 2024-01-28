@@ -31,7 +31,7 @@ func (router *ManualControlRouter) wakeUp(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	_, err := GetTeslaAPI().InitSession(authToken, vehicle)
+	_, err := GetTeslaAPI().InitSession(authToken, vehicle, true)
 	router.sendResponse(w, err)
 }
 
@@ -43,7 +43,7 @@ func (router *ManualControlRouter) chargeStart(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	car, err := GetTeslaAPI().InitSession(authToken, vehicle)
+	car, err := GetTeslaAPI().InitSession(authToken, vehicle, false)
 	if err != nil {
 		router.sendResponse(w, err)
 		return
@@ -60,7 +60,7 @@ func (router *ManualControlRouter) chargeStop(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	car, err := GetTeslaAPI().InitSession(authToken, vehicle)
+	car, err := GetTeslaAPI().InitSession(authToken, vehicle, false)
 	if err != nil {
 		router.sendResponse(w, err)
 		return
@@ -78,7 +78,7 @@ func (router *ManualControlRouter) chargeLimit(w http.ResponseWriter, r *http.Re
 	}
 
 	limit, _ := strconv.Atoi(mux.Vars(r)["limit"])
-	car, err := GetTeslaAPI().InitSession(authToken, vehicle)
+	car, err := GetTeslaAPI().InitSession(authToken, vehicle, false)
 	if err != nil {
 		router.sendResponse(w, err)
 		return
@@ -96,7 +96,7 @@ func (router *ManualControlRouter) chargeAmps(w http.ResponseWriter, r *http.Req
 	}
 
 	amps, _ := strconv.Atoi(mux.Vars(r)["amps"])
-	car, err := GetTeslaAPI().InitSession(authToken, vehicle)
+	car, err := GetTeslaAPI().InitSession(authToken, vehicle, false)
 	if err != nil {
 		router.sendResponse(w, err)
 		return
@@ -115,7 +115,7 @@ func (router *ManualControlRouter) scheduledCharging(w http.ResponseWriter, r *h
 
 	enabled, _ := mux.Vars(r)["enabled"]
 	mins, _ := strconv.Atoi(mux.Vars(r)["mins"])
-	car, err := GetTeslaAPI().InitSession(authToken, vehicle)
+	car, err := GetTeslaAPI().InitSession(authToken, vehicle, false)
 	if err != nil {
 		router.sendResponse(w, err)
 		return
