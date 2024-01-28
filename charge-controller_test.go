@@ -403,7 +403,7 @@ func TestChargeControl_SolarCharging(t *testing.T) {
 	assert.Equal(t, ChargeStateNotCharging, state.Charging)
 }
 
-func TestChargeControl_TibberCharging(t *testing.T) {
+func TestChargeControl_TibberChargingNoDeparturePriceLimit(t *testing.T) {
 	t.Cleanup(ResetTestDB)
 
 	v := &Vehicle{
@@ -417,6 +417,8 @@ func TestChargeControl_TibberCharging(t *testing.T) {
 		SurplusCharging: false,
 		LowcostCharging: true,
 		MaxPrice:        20,
+		GridProvider:    GridProviderTibber,
+		GridStrategy:    GridStrategyNoDeparturePriceLimit,
 	}
 	GetDB().CreateUpdateVehicle(v)
 	GetDB().SetVehicleStateSoC(v.ID, 50)
