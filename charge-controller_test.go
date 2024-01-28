@@ -355,7 +355,7 @@ func TestChargeControl_SolarCharging(t *testing.T) {
 
 	api, _ := TeslaAPIInstance.(*TeslaAPIMock)
 	api.On("GetOrRefreshAccessToken", v.UserID).Return("token")
-	api.On("InitSession", "token", mock.Anything).Return(&vehicle.Vehicle{}, nil)
+	api.On("InitSession", "token", mock.Anything, mock.Anything).Return(&vehicle.Vehicle{}, nil)
 	api.On("SetChargeLimit", mock.Anything, mock.Anything).Return(nil)
 	api.On("SetChargeAmps", mock.Anything, mock.Anything).Return(nil)
 	api.On("ChargeStart", mock.Anything).Return(nil)
@@ -426,7 +426,7 @@ func TestChargeControl_TibberCharging(t *testing.T) {
 
 	api, _ := TeslaAPIInstance.(*TeslaAPIMock)
 	api.On("GetOrRefreshAccessToken", v.UserID).Return("token")
-	api.On("InitSession", "token", mock.Anything).Return(&vehicle.Vehicle{}, nil)
+	api.On("InitSession", "token", mock.Anything, mock.Anything).Return(&vehicle.Vehicle{}, nil)
 	api.On("SetChargeLimit", mock.Anything, mock.Anything).Return(nil)
 	api.On("SetChargeAmps", mock.Anything, mock.Anything).Return(nil)
 	api.On("ChargeStart", mock.Anything).Return(nil)
