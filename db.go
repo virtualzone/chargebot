@@ -426,10 +426,10 @@ func (db *DB) SetTibberPrice(vehicleID int, year int, month int, day int, hour i
 	}
 }
 
-func (db *DB) GetUpcomingTibberPrices(vehicleID int, sortByPriceAsc bool) []*TibberPrice {
+func (db *DB) GetUpcomingTibberPrices(vehicleID int, sortByPriceAsc bool) []*GridPrice {
 	now := db.Time.UTCNow()
 	hourstampStart, _ := strconv.Atoi(fmt.Sprintf("%4d%02d%02d%02d", now.Year(), now.Month(), now.Day(), now.Hour()))
-	result := []*TibberPrice{}
+	result := []*GridPrice{}
 	order := "hourstamp asc"
 	if sortByPriceAsc {
 		order = "price asc"
@@ -456,7 +456,7 @@ func (db *DB) GetUpcomingTibberPrices(vehicleID int, sortByPriceAsc bool) []*Tib
 
 		ts := time.Date(year, time.Month(month), day, hour, 0, 0, 0, now.Location())
 
-		e := &TibberPrice{
+		e := &GridPrice{
 			Total:    price,
 			StartsAt: ts,
 		}

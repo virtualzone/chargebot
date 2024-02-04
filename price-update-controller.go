@@ -53,7 +53,7 @@ func PeriodicPriceUpdateControlProcessVehicle(vehicle *Vehicle) {
 	}
 }
 
-func PeriodicPriceUpdateControlProcessPriceInfo(vehicle *Vehicle, price *TibberPrice) {
+func PeriodicPriceUpdateControlProcessPriceInfo(vehicle *Vehicle, price *GridPrice) {
 	ts := price.StartsAt.UTC()
 	GetDB().SetTibberPrice(vehicle.ID, ts.Year(), int(ts.Month()), ts.Day(), ts.Hour(), price.Total)
 }

@@ -47,3 +47,14 @@ func NewTestChargeController() *ChargeController {
 func SetTibberTestPrice(vehicleID int, ts time.Time, price float32) {
 	GetDB().SetTibberPrice(vehicleID, ts.Year(), int(ts.Month()), ts.Day(), ts.Hour(), price)
 }
+
+func GetNextMondayMidnight() time.Time {
+	now := time.Now().UTC()
+	curWeekday := now.Weekday()
+	if curWeekday == time.Sunday {
+		curWeekday = 7
+	}
+	now = now.AddDate(0, 0, 8-int(curWeekday))
+	now = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	return now
+}

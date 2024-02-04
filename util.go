@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"net/http"
 	"slices"
+	"strconv"
 	"time"
 )
 
@@ -90,4 +91,16 @@ func RetryHTTPRequest(req *http.Request) (*http.Response, error) {
 		}
 	}
 	return resp, err
+}
+
+func AtoiArray(arr []string) ([]int, error) {
+	res := []int{}
+	for _, s := range arr {
+		i, err := strconv.Atoi(s)
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, i)
+	}
+	return res, nil
 }
