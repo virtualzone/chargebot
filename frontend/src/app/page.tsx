@@ -9,7 +9,7 @@ export default function Home() {
       <div className='d-flex justify-content-center align-items-center' style={{ "marginTop": "-54px", "height": "90vh" }}>
         <div className='text-center' data-bs-theme="auto">
           <h1 className='mb-5 display-3'>Charge Your Tesla with Green Energy</h1>
-          <h2 className='mb-5'>Maximum Solar Power, low Tibber prices.</h2>
+          <h2 className='mb-5'>Maximum Solar Power, Low Grid Prices.</h2>
           <a className='btn btn-danger btn-lg text-white' href='/api/1/auth/init3rdparty' role='button'>
             <Image src="/tesla-icon.svg" width={24} height={24} alt="" className="me-2" />
             Sign in with Tesla
@@ -32,9 +32,9 @@ export default function Home() {
           <Col lg={true} className="pb-3">
             <Card className="w-100 h-100" bg='secondary' text='white'>
               <Card.Body>
-                <Card.Title>Utilize low Tibber Prices</Card.Title>
+                <Card.Title>Utilize low Grid Prices</Card.Title>
                 <Card.Text>
-                  You're using Tibber with Pulse in order to benefit from dynamic prices? Let your Tesla charge automaticcy when Tibber's prices are especially low. Charging stops as soon as your defined maximum price is exceeded.
+                  You're using a grid provider with a dynamic tariff - such as Tibber? Let your Tesla charge automatically when your grid provider's prices are especially low. Choose between different charging strategies: from using very low prices only to ensuring a fully charged car on departure, it's your decision.
                 </Card.Text>
               </Card.Body>
             </Card>
@@ -44,7 +44,7 @@ export default function Home() {
               <Card.Body>
                 <Card.Title>Charging simplified</Card.Title>
                 <Card.Text>
-                  Just plug in your Tesla and let chargebot.io handle the charging smartly. It works with any wallbox and with any solar power inverter. Works with solar power, Tibber, or both.
+                  Just plug in your Tesla and let chargebot.io handle the charging smartly. It works with any wallbox and with any solar power inverter. Works with solar power, dynamic grid prices, or both.
                 </Card.Text>
               </Card.Body>
             </Card>

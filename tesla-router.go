@@ -81,6 +81,7 @@ func (router *TeslaRouter) addVehicle(w http.ResponseWriter, r *http.Request) {
 		Enabled:         false,
 		TargetSoC:       70,
 		MaxAmps:         16,
+		NumPhases:       3,
 		SurplusCharging: true,
 		MinChargeTime:   15,
 		MinSurplus:      2000,

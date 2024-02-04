@@ -7,6 +7,7 @@ import Script from 'next/script';
 import Link from 'next/link';
 import { getAccessToken } from './util';
 import { useEffect, useState } from 'react';
+import { BatteryCharging } from 'react-feather';
 
 export default function RootLayout({
   children,
@@ -63,7 +64,7 @@ export default function RootLayout({
       <body>
         <Navbar expand="lg" className="bg-body-tertiary" sticky='top' style={{ 'height': '59px' }}>
           <Container>
-            <Navbar.Brand href="/">chargebot.io</Navbar.Brand>
+            <Navbar.Brand href="/"><BatteryCharging /> chargebot.io</Navbar.Brand>
             <Navbar.Text className="justify-content-end">
               <Button variant='link' href='/api/1/auth/init3rdparty' hidden={isAuthenticated}>Sign In</Button>
               <Button variant='link' href='/authorized/' hidden={!isAuthenticated}>My vehicles</Button>

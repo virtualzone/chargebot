@@ -302,8 +302,19 @@ func (db *DB) GetAllVehicles() []*Vehicle {
 }
 
 func (db *DB) DeleteVehicle(ID int) {
-	_, err := db.GetConnection().Exec("delete from vehicles where id = ?", ID)
-	if err != nil {
+	if _, err := db.GetConnection().Exec("delete from vehicles where id = ?", ID); err != nil {
+		log.Panicln(err)
+	}
+	if _, err := db.GetConnection().Exec("delete from api_tokens where vehicle_id = ?", ID); err != nil {
+		log.Panicln(err)
+	}
+	if _, err := db.GetConnection().Exec("delete from surpluses where vehicle_id = ?", ID); err != nil {
+		log.Panicln(err)
+	}
+	if _, err := db.GetConnection().Exec("delete from logs where vehicle_id = ?", ID); err != nil {
+		log.Panicln(err)
+	}
+	if _, err := db.GetConnection().Exec("delete from vehicle_states where vehicle_id = ?", ID); err != nil {
 		log.Panicln(err)
 	}
 }

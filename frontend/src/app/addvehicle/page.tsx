@@ -41,7 +41,7 @@ export default function Authorized() {
       setLoading(true);
       await postAPI("/api/1/tesla/vehicle_add/" + id, {});
       setLoading(false);
-      router.push("/authorized")
+      router.push("/authorized/?added=1")
     };
     fetchData();
   }
