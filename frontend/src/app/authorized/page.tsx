@@ -4,12 +4,14 @@ import Link from "next/link";
 import { checkAuth, deleteAPI, getAPI } from "../util";
 import { useEffect, useState } from "react";
 import Loading from "../loading";
-import { Button, Container, ListGroup } from "react-bootstrap";
+import { Alert, Button, Container, ListGroup } from "react-bootstrap";
 import { useRouter } from "next/navigation";
 
 export default function Authorized() {
   const [vehicles, setVehicles] = useState([] as any[])
   const [isLoading, setLoading] = useState(true)
+  const [showAlertAdded, setShowAlertAdded] = useState(false)
+  const [showAlertRemoved, setShowAlertRemoved] = useState(false)
   const router = useRouter();
 
   const loadVehicles = async () => {
@@ -18,6 +20,13 @@ export default function Authorized() {
   }
 
   useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    if (searchParams.get("added") === '1') {
+      setShowAlertAdded(true);
+    }
+    if (searchParams.get("removed") === '1') {
+      setShowAlertRemoved(true);
+    }
     const fetchData = async () => {
       await checkAuth();
       await loadVehicles();
@@ -78,6 +87,8 @@ export default function Authorized() {
   return (
     <Container fluid="sm" className="pt-5 container-max-width min-height">
       <h2 className="pb-3">My vehicles</h2>
+      <Alert variant='success' dismissible={true} hidden={!showAlertAdded}>Vehicle successfully added to your account.</Alert>
+      <Alert variant='success' dismissible={true} hidden={!showAlertRemoved}>Vehicle successfully removed from your account.</Alert>
       {vehicleList}
     </Container>
   )

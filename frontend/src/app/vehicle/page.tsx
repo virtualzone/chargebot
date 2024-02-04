@@ -6,6 +6,7 @@ import Loading from "../loading";
 import { Accordion, Button, Container, Form, InputGroup, Modal, Table } from "react-bootstrap";
 import { CopyBlock } from "react-code-blocks";
 import { useRouter } from "next/navigation";
+import { Loader as IconLoad } from 'react-feather';
 import Link from "next/link";
 
 export default function Authorized() {
@@ -13,6 +14,8 @@ export default function Authorized() {
   const router = useRouter()
   const [vehicle, setVehicle] = useState({} as any)
   const [isLoading, setLoading] = useState(true)
+  const [savingVehicle, setSavingVehicle] = useState(false)
+  const [savingApiToken, setSavingApiToken] = useState(false)
   const [chargingEnabled, setChargingEnabled] = useState(false)
   const [targetSoC, setTargetSoC] = useState(0)
   const [maxAmps, setMaxAmps] = useState(0)
@@ -107,31 +110,41 @@ export default function Authorized() {
 
   function generateAPIToken() {
     const fetchData = async () => {
+      setSavingApiToken(true);
       const json = await postAPI("/api/1/tesla/api_token_create", { vehicle_id: vehicle.id });
       if (vehicle) {
-        vehicle.api_token = json.token;
-        vehicle.api_password = json.password;
+        let vehicleNew = {
+          ...vehicle,
+          api_token: json.token,
+          api_password: json.password,
+        };
+        setVehicle(vehicleNew);
       }
-      setVehicle(vehicle);
+      setSavingApiToken(false);
     }
     fetchData();
   }
 
   function updateAPITokenPassword(id: string) {
     const fetchData = async () => {
+      setSavingApiToken(true);
       const json = await postAPI("/api/1/tesla/api_token_update/" + id, {});
       if (vehicle) {
-        vehicle.api_token = json.token;
-        vehicle.api_password = json.password;
+        let vehicleNew = {
+          ...vehicle,
+          api_token: json.token,
+          api_password: json.password,
+        };
+        setVehicle(vehicleNew);
       }
-      setVehicle(vehicle);
+      setSavingApiToken(false);
     }
     fetchData();
   }
 
   function saveVehicle() {
     const fetchData = async () => {
-      setLoading(true);
+      setSavingVehicle(true);
       let payload = {
         "enabled": chargingEnabled,
         "target_soc": targetSoC,
@@ -150,7 +163,7 @@ export default function Authorized() {
       };
       await putAPI("/api/1/tesla/vehicle_update/" + vehicle.id, payload);
       await loadVehicle();
-      setLoading(false);
+      setSavingVehicle(false);
     }
     fetchData();
   }
@@ -162,7 +175,7 @@ export default function Authorized() {
     const fetchData = async () => {
       setLoading(true);
       await deleteAPI("/api/1/tesla/vehicle_delete/" + vehicle.id);
-      router.push('/authorized');
+      router.push('/authorized/?removed=1');
     }
     fetchData();
   }
@@ -185,6 +198,14 @@ export default function Authorized() {
     if (id === 8) return 'Set charge amps';
     if (id === 9) return 'Set scheduled charging';
     return 'Unknown';
+  }
+
+  async function copyToClipboard(s: string) {
+    try {
+      await navigator.clipboard.writeText(s);
+    } catch (err) {
+      console.error('Failed to copy: ', err);
+    }
   }
 
   function getMaxChargingPower() {
@@ -297,16 +318,29 @@ export default function Authorized() {
     </Table>
   );
 
-  let token = <Button variant="link" onClick={() => generateAPIToken()}>Generate API Token</Button>
+  let token = <Button variant="primary" onClick={() => generateAPIToken()} disabled={savingApiToken}>{savingApiToken ? <><IconLoad className="feather-button loader" /> Creating token...</> : 'Create API Token'}</Button>
   if (vehicle.api_token) {
     token = <>
-      API Token: {vehicle.api_token}
+      <strong>API Token:</strong>
+      <Button variant="link" onClick={() => copyToClipboard(vehicle.api_token)}>Copy</Button>
       <br />
-      Password: ****************
-      <Button variant="link" onClick={() => updateAPITokenPassword(vehicle.api_token)}>Update</Button>
+      <pre>{vehicle.api_token}</pre>
+      <strong>Password:</strong>
+      <Button variant="link" onClick={() => updateAPITokenPassword(vehicle.api_token)} disabled={savingApiToken}>{savingApiToken ? <><IconLoad className="feather-button loader" /> Updating...</> : 'Update'}</Button>
+      <br />
+      <pre>****************</pre>
     </>
     if (vehicle.api_password) {
-      token = <>API Token: {vehicle.api_token}<br /> Password: {vehicle.api_password}</>
+      token = <>
+        <strong>API Token:</strong>
+        <Button variant="link" onClick={() => copyToClipboard(vehicle.api_token)}>Copy</Button>
+        <br />
+        <pre>{vehicle.api_token}</pre>
+        <strong>Password:</strong>
+        <Button variant="link" onClick={() => copyToClipboard(vehicle.api_password)}>Copy</Button>
+        <br />
+        <pre>{vehicle.api_password}</pre>
+      </>
     }
   }
   let chargePrefs = (
@@ -358,12 +392,15 @@ export default function Authorized() {
           <option value="3">three-phase</option>
         </Form.Select>
       </InputGroup>
-      <Form.Control plaintext={true} readOnly={true} defaultValue={'Up to ' + getMaxChargingPower()} />
+      <InputGroup className="mb-3">
+        <Form.Control plaintext={true} readOnly={true} defaultValue={'Up to ' + getMaxChargingPower()} />
+      </InputGroup>
       <Form.Check // prettier-ignore
         type="switch"
         label="Charge on surplus of solar energy"
         checked={chargeOnSurplus}
         onChange={e => setChargeOnSurplus(e.target.checked)}
+        style={{ 'marginTop': '25px' }}
       />
       <InputGroup className="mb-3">
         <Form.Control
@@ -400,6 +437,7 @@ export default function Authorized() {
         label="Charge on low grid price"
         checked={chargeOnTibber}
         onChange={e => setChargeOnTibber(e.target.checked)}
+        style={{ 'marginTop': '25px' }}
       />
       <InputGroup className="mb-3">
         <Form.Select
@@ -469,7 +507,8 @@ export default function Authorized() {
           onChange={e => setTibberToken(e.target.value)}
         />
       </InputGroup>
-      <Button type="submit" variant="primary">Save</Button>
+      <p><a href="https://developer.tibber.com/settings/accesstoken" target="_blank">Get your Tibber Access Token</a></p>
+      <Button type="submit" variant="primary" disabled={savingVehicle}>{savingVehicle ? <><IconLoad className="feather-button loader" /> Saving...</> : 'Save'}</Button>
     </Form>
   );
   let accordionSurpluses = <></>;
@@ -572,8 +611,9 @@ export default function Authorized() {
         <Accordion.Item eventKey="1">
           <Accordion.Header>API Token</Accordion.Header>
           <Accordion.Body>
-            {token}
-            <div>
+            <p>An individual API token is required to send your solar surplus and plug in events to chargebot.io.</p>
+            <p>{token}</p>
+            <div hidden={vehicle.api_token === ''}>
               {tokenHelp}
               <Button variant="primary" onClick={e => setShowTokenHelp(true)}>How to use</Button>
             </div>
