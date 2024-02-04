@@ -2,7 +2,10 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"math"
+	"sort"
+	"strings"
 	"time"
 )
 
@@ -95,7 +98,7 @@ func (c *ChargeController) checkTargetState(vehicle *Vehicle, state *VehicleStat
 	if startCharging {
 		targetState = ChargeStateChargingOnSolar
 	} else {
-		startCharging, amps = c.checkStartOnTibber(vehicle, state)
+		startCharging, amps = c.checkStartOnGrid(vehicle, state)
 		if startCharging {
 			targetState = ChargeStateChargingOnGrid
 		}
@@ -215,34 +218,32 @@ func (c *ChargeController) getEstimatedChargeDurationMinutes(vehicle *Vehicle, s
 	return res
 }
 
-func (c *ChargeController) checkStartOnTibber(vehicle *Vehicle, state *VehicleState) (bool, int) {
-	if !vehicle.LowcostCharging {
-		return false, 0
+func (c *ChargeController) getUpcomingGridPrices(vehicle *Vehicle) []*GridPrice {
+	if vehicle.GridProvider == GridProviderTibber {
+		prices := GetDB().GetUpcomingTibberPrices(vehicle.ID, true)
+		return prices
 	}
+	return []*GridPrice{}
+}
 
-	// get upcoming tibber prices sorted by ascending price
-	prices := GetDB().GetUpcomingTibberPrices(vehicle.ID, true)
-	if len(prices) == 0 {
-		return false, 0
-	}
-
+func (c *ChargeController) checkStartOnGrid_NoDeparturePriceLimit(vehicle *Vehicle, state *VehicleState, prices []*GridPrice) bool {
 	// check if lowest price is above user-defined maximum
 	if prices[0].Total*100 > float32(vehicle.MaxPrice) {
-		return false, 0
+		return false
 	}
 
 	// check if "now" is below the user-defined maximum
-	currentPrice := c.getCurrentTibberPrice(prices)
+	currentPrice := c.getCurrentGridPrice(prices)
 	if currentPrice == nil {
-		return false, 0
+		return false
 	}
 	if currentPrice.Total*100 > float32(vehicle.MaxPrice) {
-		return false, 0
+		return false
 	}
 
 	// check if current price is lowest of all known prices
 	if currentPrice.Total == prices[0].Total {
-		return true, vehicle.MaxAmps
+		return true
 	}
 
 	// if not, the current hour may nevertheless be necessary for reach the required charging time
@@ -252,15 +253,173 @@ func (c *ChargeController) checkStartOnTibber(vehicle *Vehicle, state *VehicleSt
 		if i+1 <= requiredHourBlocks {
 			now := c.Time.UTCNow()
 			if IsCurrentHourUTC(&now, &price.StartsAt) {
-				return true, vehicle.MaxAmps
+				if price.Total*100 <= float32(vehicle.MaxPrice) {
+					return true
+				}
 			}
 		}
+	}
+
+	return false
+}
+
+func (c *ChargeController) getNextDeparture(vehicle *Vehicle) (*time.Time, error) {
+	now := c.Time.UTCNow()
+	curWeekday := now.Weekday()
+	if curWeekday == time.Sunday {
+		curWeekday = 7
+	}
+	timeTokens, err := AtoiArray(strings.Split(vehicle.DepartTime, ":"))
+	if err != nil {
+		return nil, err
+	}
+	dayTokens, err := AtoiArray(strings.Split(vehicle.DepartDays, ""))
+	if err != nil {
+		return nil, err
+	}
+	sort.Ints(dayTokens)
+	// check if current day is next departure
+	for _, day := range dayTokens {
+		if day == int(curWeekday) {
+			if timeTokens[0] > now.Hour() {
+				res := time.Date(now.Year(), now.Month(), now.Day(), timeTokens[0], timeTokens[1], 0, 0, now.Location())
+				return &res, nil
+			}
+		}
+	}
+	// else, use next day
+	for _, day := range dayTokens {
+		if day > int(curWeekday) {
+			res := time.Date(now.Year(), now.Month(), now.Day(), timeTokens[0], timeTokens[1], 0, 0, now.Location())
+			res = res.AddDate(0, 0, day-int(curWeekday))
+			return &res, nil
+		}
+	}
+	// else, use first day in list
+	day := dayTokens[0]
+	res := time.Date(now.Year(), now.Month(), now.Day(), timeTokens[0], timeTokens[1], 0, 0, now.Location())
+	res = res.AddDate(0, 0, 7-int(curWeekday)+day)
+	return &res, nil
+}
+
+func (c *ChargeController) checkStartOnGrid_DepartureNoPriceLimit(vehicle *Vehicle, state *VehicleState, prices []*GridPrice) bool {
+	departure, err := c.getNextDeparture(vehicle)
+	if err != nil {
+		log.Printf("could not get next departure date for vehicle %d: %s\n", vehicle.ID, err.Error())
+		return false
+	}
+	pricesFiltered := c.getGridPricesBefore(prices, *departure)
+
+	//timeUntilDeparture := departure.Sub(c.Time.UTCNow())
+	estimatedChargingTime := c.getEstimatedChargeDurationMinutes(vehicle, state)
+	requiredHourBlocks := int(math.Ceil(float64(estimatedChargingTime) / 60))
+
+	for i, price := range pricesFiltered {
+		if i+1 <= requiredHourBlocks {
+			now := c.Time.UTCNow()
+			if IsCurrentHourUTC(&now, &price.StartsAt) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func (c *ChargeController) checkStartOnGrid_DepartureWithPriceLimit(vehicle *Vehicle, state *VehicleState, prices []*GridPrice) bool {
+	departure, err := c.getNextDeparture(vehicle)
+	if err != nil {
+		log.Printf("could not get next departure date for vehicle %d: %s\n", vehicle.ID, err.Error())
+		return false
+	}
+	pricesFiltered := c.getGridPricesBefore(prices, *departure)
+
+	// check if lowest price is above user-defined maximum
+	if pricesFiltered[0].Total*100 > float32(vehicle.MaxPrice) {
+		return false
+	}
+
+	// check if "now" is below the user-defined maximum
+	currentPrice := c.getCurrentGridPrice(pricesFiltered)
+	if currentPrice == nil {
+		return false
+	}
+	if currentPrice.Total*100 > float32(vehicle.MaxPrice) {
+		return false
+	}
+
+	// check if current price is lowest of all known prices
+	if currentPrice.Total == pricesFiltered[0].Total {
+		return true
+	}
+
+	// if not, the current hour may nevertheless be necessary for reach the required charging time
+	//timeUntilDeparture := departure.Sub(c.Time.UTCNow())
+	estimatedChargingTime := c.getEstimatedChargeDurationMinutes(vehicle, state)
+	requiredHourBlocks := int(math.Ceil(float64(estimatedChargingTime) / 60))
+	for i, price := range pricesFiltered {
+		if i+1 <= requiredHourBlocks {
+			now := c.Time.UTCNow()
+			if IsCurrentHourUTC(&now, &price.StartsAt) {
+				if price.Total*100 <= float32(vehicle.MaxPrice) {
+					return true
+				}
+			}
+		}
+	}
+
+	for i, price := range pricesFiltered {
+		if i+1 <= requiredHourBlocks {
+			now := c.Time.UTCNow()
+			if IsCurrentHourUTC(&now, &price.StartsAt) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func (c *ChargeController) checkStartOnGrid(vehicle *Vehicle, state *VehicleState) (bool, int) {
+	if !vehicle.LowcostCharging {
+		return false, 0
+	}
+
+	// get upcoming grid prices sorted by ascending price
+	prices := c.getUpcomingGridPrices(vehicle)
+	if len(prices) == 0 {
+		return false, 0
+	}
+
+	// check whether to start charging depending on grid strategy
+	res := false
+	switch vehicle.GridStrategy {
+	case GridStrategyNoDeparturePriceLimit:
+		res = c.checkStartOnGrid_NoDeparturePriceLimit(vehicle, state, prices)
+	case GridStrategyDepartureNoPriceLimit:
+		res = c.checkStartOnGrid_DepartureNoPriceLimit(vehicle, state, prices)
+	case GridStrategyDepartureWithPriceLimit:
+		res = c.checkStartOnGrid_DepartureWithPriceLimit(vehicle, state, prices)
+	}
+
+	if res {
+		return true, vehicle.MaxAmps
 	}
 
 	return false, 0
 }
 
-func (c *ChargeController) getCurrentTibberPrice(prices []*TibberPrice) *TibberPrice {
+func (c *ChargeController) getGridPricesBefore(prices []*GridPrice, limit time.Time) []*GridPrice {
+	res := []*GridPrice{}
+	for _, price := range prices {
+		if price.StartsAt.Before(limit) {
+			res = append(res, price)
+		}
+	}
+	return res
+}
+
+func (c *ChargeController) getCurrentGridPrice(prices []*GridPrice) *GridPrice {
 	now := c.Time.UTCNow()
 	for _, price := range prices {
 		if IsCurrentHourUTC(&now, &price.StartsAt) {

@@ -8,15 +8,15 @@ import (
 	"time"
 )
 
-type TibberPrice struct {
+type GridPrice struct {
 	Total    float32   `json:"total"`
 	StartsAt time.Time `json:"startsAt"`
 }
 
 type TibberPriceInfo struct {
-	Current  TibberPrice   `json:"current"`
-	Today    []TibberPrice `json:"today"`
-	Tomorrow []TibberPrice `json:"tomorrow"`
+	Current  GridPrice   `json:"current"`
+	Today    []GridPrice `json:"today"`
+	Tomorrow []GridPrice `json:"tomorrow"`
 }
 
 type TibberSubscription struct {

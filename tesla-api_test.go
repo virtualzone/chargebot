@@ -97,3 +97,14 @@ func (a *TeslaAPIMock) SetScheduledCharging(car *vehicle.Vehicle, enable bool, m
 	args := a.Called(car, enable, minutesAfterMidnight)
 	return args.Error(0)
 }
+
+func UpdateTeslaAPIMockSoC(api *TeslaAPIMock, vehicleID int, batteryLevel int) {
+	vData := &TeslaAPIVehicleData{
+		VehicleID: vehicleID,
+		ChargeState: TeslaAPIChargeState{
+			BatteryLevel: batteryLevel,
+		},
+	}
+	api.On("GetVehicleData", "token", mock.Anything).Unset()
+	api.On("GetVehicleData", "token", mock.Anything).Return(vData, nil)
+}
