@@ -470,7 +470,7 @@ func (db *DB) GetVehicleIDsWithTibberTokenWithoutPricesForStarttime(startTime ti
 	result := []int{}
 	rows, err := db.GetConnection().Query("select vehicles.id "+
 		"from vehicles "+
-		"where ifnull(vehicles.tibber_token, '') != '' and (select count(*) from tibber_prices where tibber_prices.vehicle_id = vehicles.id and hourstamp >= ?) = 0 "+
+		"where vehicles.grid_provider = 'tibber' and ifnull(vehicles.tibber_token, '') != '' and (select count(*) from tibber_prices where tibber_prices.vehicle_id = vehicles.id and hourstamp >= ?) = 0 "+
 		"limit ?",
 		hourstampStart, limit)
 	if err != nil {
