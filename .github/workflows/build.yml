@@ -10,7 +10,7 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
-    container: golang:1.21-alpine
+    container: golang:1.22-alpine
     steps:
     - uses: actions/checkout@v4
     - name: Install dependencies
