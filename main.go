@@ -25,6 +25,7 @@ func main() {
 
 	NewChargeController().Init()
 	InitPeriodicPriceUpdateControl()
+	ServeZMQ()
 	ServeHTTP()
 	os.Exit(0)
 }
