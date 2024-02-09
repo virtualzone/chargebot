@@ -10,16 +10,15 @@ import (
 )
 
 type Config struct {
-	ClientID      string
-	ClientSecret  string
-	Audience      string
-	DBFile        string
-	Hostname      string
-	DevProxy      bool
-	Reset         bool
-	ManualControl bool
-	PrivateKey    protocol.ECDHPrivateKey
-	ZMQPublisher  string
+	ClientID     string
+	ClientSecret string
+	Audience     string
+	DBFile       string
+	Hostname     string
+	DevProxy     bool
+	Reset        bool
+	PrivateKey   protocol.ECDHPrivateKey
+	ZMQPublisher string
 }
 
 var _configInstance *Config
@@ -41,7 +40,6 @@ func (c *Config) ReadConfig() {
 	c.Hostname = c.getEnv("DOMAIN", "chargebot.io")
 	c.DevProxy = (c.getEnv("DEV_PROXY", "0") == "1")
 	c.Reset = (c.getEnv("RESET", "0") == "1")
-	c.ManualControl = (c.getEnv("MANUAL_CONTROL", "0") == "1")
 	privateKeyFile := c.getEnv("PRIVATE_KEY", "./private.key")
 	if privateKeyFile != ":none:" {
 		privateKey, err := protocol.LoadPrivateKey(privateKeyFile)

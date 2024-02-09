@@ -224,16 +224,9 @@ export default function Authorized() {
     return p + " W";
   }
 
-  function manualControl(api: string, i1: number, i2: number) {
-    let s = "";
-    if (i1 >= 0) {
-      s = "/" + i1;
-    }
-    if (i2 >= 0) {
-      s += "/" + i2;
-    }
-    postAPI("/api/1/ctrl/" + vehicle.id + "/" + api + s, null).then(res => {
-      window.alert(JSON.stringify(res));
+  function manualControlTestDrive() {
+    postAPI("/api/1/ctrl/" + vehicle.id + "/testDrive", null).then(res => {
+      window.alert('Charging should start shortly. It will be stopped after 30 seconds. Please check your Tesla App if this automation works.');
     })
   }
 
@@ -565,31 +558,18 @@ export default function Authorized() {
   }
   let accordionManualControl = (
     <Accordion.Item eventKey="5">
-      <Accordion.Header>Manual Control</Accordion.Header>
+      <Accordion.Header>Test Drive</Accordion.Header>
       <Accordion.Body>
+        <p>You can check if chargebot.io can control your vehicle's charging process.</p>
+        <p>After clicking the button below, your vehicle should...</p>
+        <ul>
+          <li>wake up (if asleep),</li>
+          <li>start the charging process,</li>
+          <li>wait for 30 seconds,</li>
+          <li>then stop the charging process.</li>
+        </ul>
         <p>
-          <Button variant="secondary" onClick={() => manualControl("wakeUp", -1, -1)}>Wake Up</Button>
-        </p>
-        <p>
-          <Button variant="secondary" onClick={() => manualControl("chargeStart", -1, -1)}>Start Charging</Button>
-        </p>
-        <p>
-          <Button variant="secondary" onClick={() => manualControl("chargeStop", -1, -1)}>Stop Charging</Button>
-        </p>
-        <p>
-          Percent:
-          <input type="number" value={manCtrlLimit} onChange={e => setManCtrlLimit(Number(e.target.value))} min={1} max={100} />
-          <Button variant="secondary" onClick={() => manualControl("chargeLimit", manCtrlLimit, -1)}>Set Charge Limit</Button>
-        </p>
-        <p>
-          Amps:
-          <input type="number" value={manCtrlAmps} onChange={e => setManCtrlAmps(Number(e.target.value))} min={0} max={16} />
-          <Button variant="secondary" onClick={() => manualControl("chargeAmps", manCtrlAmps, -1)}>Set Charge Amps</Button>
-        </p>
-        <p>
-          <input type="checkbox" checked={manCtrlEnabled === 1} onChange={e => setManCtrlEnabled(e.target.checked ? 1 : 0)} /> Enabled, mins after midnight:
-          <input type="number" value={manCtrlMins} onChange={e => setManCtrlMins(Number(e.target.value))} min={0} max={1440} />
-          <Button variant="secondary" onClick={() => manualControl("scheduledCharging", manCtrlEnabled, manCtrlMins)}>Set Scheduled Charging</Button>
+          <Button variant="primary" onClick={() => manualControlTestDrive()}>Start charge test</Button>
         </p>
       </Accordion.Body>
     </Accordion.Item>
@@ -622,7 +602,7 @@ export default function Authorized() {
         {accordionState}
         {accordionSurpluses}
         {accordionChargingEvents}
-        {/*accordionManualControl*/}
+        {accordionManualControl}
         <Accordion.Item eventKey="99">
           <Accordion.Header>Danger zone</Accordion.Header>
           <Accordion.Body>
