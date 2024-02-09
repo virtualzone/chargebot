@@ -177,9 +177,7 @@ func ServeHTTP() {
 	routers["/api/1/auth/"] = &AuthRouter{}
 	routers["/api/1/tesla/"] = &TeslaRouter{}
 	routers["/api/1/user/"] = &UserRouter{}
-	if GetConfig().ManualControl {
-		routers["/api/1/ctrl/"] = &ManualControlRouter{}
-	}
+	routers["/api/1/ctrl/"] = &ManualControlRouter{}
 
 	for prefix, route := range routers {
 		subRouter := router.PathPrefix(prefix).Subrouter()
