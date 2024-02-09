@@ -80,7 +80,6 @@ type TeslaAPI interface {
 	SetChargeLimit(car *vehicle.Vehicle, limitPercent int) error
 	SetChargeAmps(car *vehicle.Vehicle, amps int) error
 	GetVehicleData(authToken string, vehicle *Vehicle) (*TeslaAPIVehicleData, error)
-	SetScheduledCharging(car *vehicle.Vehicle, enable bool, minutesAfterMidnight int) error
 }
 
 type TeslaAPIImpl struct {
@@ -326,14 +325,4 @@ func (a *TeslaAPIImpl) GetVehicleData(authToken string, vehicle *Vehicle) (*Tesl
 	}
 
 	return &m.Response, nil
-}
-
-func (a *TeslaAPIImpl) SetScheduledCharging(car *vehicle.Vehicle, enable bool, minutesAfterMidnight int) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	err := car.ScheduleCharging(ctx, enable, time.Duration(minutesAfterMidnight*int(time.Minute)))
-	if err != nil && strings.Contains(err.Error(), "already_set") {
-		return nil
-	}
-	return err
 }

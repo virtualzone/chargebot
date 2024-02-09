@@ -93,11 +93,6 @@ func (a *TeslaAPIMock) GetVehicleData(authToken string, vehicle *Vehicle) (*Tesl
 	}
 }
 
-func (a *TeslaAPIMock) SetScheduledCharging(car *vehicle.Vehicle, enable bool, minutesAfterMidnight int) error {
-	args := a.Called(car, enable, minutesAfterMidnight)
-	return args.Error(0)
-}
-
 func UpdateTeslaAPIMockSoC(api *TeslaAPIMock, vehicleID int, batteryLevel int) {
 	vData := &TeslaAPIVehicleData{
 		VehicleID: vehicleID,

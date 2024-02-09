@@ -152,13 +152,6 @@ func (c *ChargeController) activateCharging(accessToken string, vehicle *Vehicle
 	}
 	GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, fmt.Sprintf("charge amps set to %d", amps))
 
-	// disable scheduled charging
-	if err := GetTeslaAPI().SetScheduledCharging(car, false, 0); err != nil {
-		GetDB().LogChargingEvent(vehicle.ID, LogEventSetScheduledCharging, "could not disable scheduled charging: "+err.Error())
-		return false
-	}
-	GetDB().LogChargingEvent(vehicle.ID, LogEventSetScheduledCharging, fmt.Sprintf("disabled scheduled charging"))
-
 	GetTeslaAPI().ChargeStart(car)
 	GetDB().SetVehicleStateCharging(vehicle.ID, source)
 	GetDB().LogChargingEvent(vehicle.ID, LogEventChargeStart, "")
