@@ -1,6 +1,7 @@
 package main
 
 import (
+	"math"
 	"net/http"
 	"strconv"
 	"time"
@@ -31,7 +32,7 @@ func (router *ManualControlRouter) testDrive(w http.ResponseWriter, r *http.Requ
 	go func() {
 		cc := NewChargeController()
 		state := GetDB().GetVehicleState(vehicle.ID)
-		cc.activateCharging(authToken, vehicle, state, vehicle.MaxAmps, ChargeStateChargingOnGrid)
+		cc.activateCharging(authToken, vehicle, state, int(math.Round((float64)(vehicle.MaxAmps)/2)), ChargeStateChargingOnGrid)
 		time.Sleep(30 * time.Second)
 		cc.stopCharging(authToken, vehicle)
 	}()

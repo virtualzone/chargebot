@@ -13,6 +13,7 @@ import (
 	"github.com/allegro/bigcache/v3"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/teslamotors/vehicle-command/pkg/account"
+	"github.com/teslamotors/vehicle-command/pkg/protocol/protobuf/universalmessage"
 	"github.com/teslamotors/vehicle-command/pkg/vehicle"
 )
 
@@ -206,6 +207,10 @@ func (a *TeslaAPIImpl) GetCachedAccessToken(userID string) string {
 }
 
 func (a *TeslaAPIImpl) InitSession(authToken string, vehicle *Vehicle, wakeUp bool) (*vehicle.Vehicle, error) {
+	if wakeUp {
+		a.wakeup(authToken, vehicle)
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	acct, err := account.New(authToken, "chargebot.io/0.0.1")
@@ -219,27 +224,8 @@ func (a *TeslaAPIImpl) InitSession(authToken string, vehicle *Vehicle, wakeUp bo
 	if err := car.Connect(ctx); err != nil {
 		return nil, fmt.Errorf("failed to connect to vehicle: %s", err.Error())
 	}
-	if err := car.StartSession(ctx, nil); err != nil {
+	if err := car.StartSession(ctx, []universalmessage.Domain{universalmessage.Domain_DOMAIN_INFOTAINMENT}); err != nil {
 		return nil, fmt.Errorf("failed to perform handshake with vehicle: %s", err.Error())
-	}
-	if wakeUp {
-		if err := car.Wakeup(ctx); err != nil {
-			return nil, fmt.Errorf("failed to wake up vehicle: %s", err.Error())
-		}
-		retries := 0
-		isOnline := false
-		for (retries < 3) && !isOnline {
-			time.Sleep(10 * time.Second)
-			err := car.Ping(ctx)
-			if err != nil {
-				retries++
-			} else {
-				isOnline = true
-			}
-		}
-		if !isOnline {
-			return nil, fmt.Errorf("vehicle did not respond to ping after wake up")
-		}
 	}
 	return car, nil
 }
@@ -306,7 +292,7 @@ func (a *TeslaAPIImpl) SetChargeAmps(car *vehicle.Vehicle, amps int) error {
 }
 
 func (a *TeslaAPIImpl) GetVehicleData(authToken string, vehicle *Vehicle) (*TeslaAPIVehicleData, error) {
-	target := GetConfig().Audience + "/api/1/vehicles/" + vehicle.VIN + "/vehicle_data?endpoints=charge_state"
+	target := GetConfig().Audience + "/api/1/vehicles/" + vehicle.VIN + "/vehicle_data"
 	r, _ := http.NewRequest("GET", target, nil)
 
 	resp, err := RetryHTTPJSONRequest(r, authToken)
@@ -314,10 +300,6 @@ func (a *TeslaAPIImpl) GetVehicleData(authToken string, vehicle *Vehicle) (*Tesl
 		log.Println(err)
 		return nil, err
 	}
-
-	s, _ := DebugGetResponseBody(resp.Body)
-	log.Println(s)
-	return nil, nil
 
 	var m TeslaAPIVehicleDataResponse
 	if err := UnmarshalValidateBody(resp.Body, &m); err != nil {
@@ -329,4 +311,21 @@ func (a *TeslaAPIImpl) GetVehicleData(authToken string, vehicle *Vehicle) (*Tesl
 	}
 
 	return &m.Response, nil
+}
+
+func (a *TeslaAPIImpl) wakeup(authToken string, vehicle *Vehicle) error {
+	target := GetConfig().Audience + "/api/1/vehicles/" + vehicle.VIN + "/wake_up"
+	r, _ := http.NewRequest("POST", target, nil)
+
+	_, err := RetryHTTPJSONRequest(r, authToken)
+	if err != nil {
+		// TODO
+		log.Println(err)
+		return err
+	}
+
+	// wait a few seconds to assure vehicle is online
+	time.Sleep(20 * time.Second)
+
+	return nil
 }
