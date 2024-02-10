@@ -219,6 +219,9 @@ func (a *TeslaAPIImpl) InitSession(authToken string, vehicle *Vehicle, wakeUp bo
 	if err := car.Connect(ctx); err != nil {
 		return nil, fmt.Errorf("failed to connect to vehicle: %s", err.Error())
 	}
+	if err := car.StartSession(ctx, nil); err != nil {
+		return nil, fmt.Errorf("failed to perform handshake with vehicle: %s", err.Error())
+	}
 	if wakeUp {
 		if err := car.Wakeup(ctx); err != nil {
 			return nil, fmt.Errorf("failed to wake up vehicle: %s", err.Error())
@@ -237,9 +240,6 @@ func (a *TeslaAPIImpl) InitSession(authToken string, vehicle *Vehicle, wakeUp bo
 		if !isOnline {
 			return nil, fmt.Errorf("vehicle did not respond to ping after wake up")
 		}
-	}
-	if err := car.StartSession(ctx, nil); err != nil {
-		return nil, fmt.Errorf("failed to perform handshake with vehicle: %s", err.Error())
 	}
 	return car, nil
 }
