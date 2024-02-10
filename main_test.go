@@ -41,6 +41,7 @@ func ResetTestDB() {
 func NewTestChargeController() *ChargeController {
 	cc := new(ChargeController)
 	cc.Time = GlobalMockTime
+	cc.Async = false
 	return cc
 }
 
