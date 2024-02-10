@@ -208,7 +208,7 @@ func (a *TeslaAPIImpl) GetCachedAccessToken(userID string) string {
 func (a *TeslaAPIImpl) InitSession(authToken string, vehicle *Vehicle, wakeUp bool) (*vehicle.Vehicle, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-	acct, err := account.New(authToken, "tesla-green-charge/0.0.1")
+	acct, err := account.New(authToken, "chargebot.io/0.0.1")
 	if err != nil {
 		return nil, err
 	}
@@ -306,7 +306,7 @@ func (a *TeslaAPIImpl) SetChargeAmps(car *vehicle.Vehicle, amps int) error {
 }
 
 func (a *TeslaAPIImpl) GetVehicleData(authToken string, vehicle *Vehicle) (*TeslaAPIVehicleData, error) {
-	target := GetConfig().Audience + "/api/1/vehicles/" + vehicle.VIN + "/vehicle_data"
+	target := GetConfig().Audience + "/api/1/vehicles/" + vehicle.VIN + "/vehicle_data?endpoints=charge_state"
 	r, _ := http.NewRequest("GET", target, nil)
 
 	resp, err := RetryHTTPJSONRequest(r, authToken)
@@ -314,6 +314,10 @@ func (a *TeslaAPIImpl) GetVehicleData(authToken string, vehicle *Vehicle) (*Tesl
 		log.Println(err)
 		return nil, err
 	}
+
+	s, _ := DebugGetResponseBody(resp.Body)
+	log.Println(s)
+	return nil, nil
 
 	var m TeslaAPIVehicleDataResponse
 	if err := UnmarshalValidateBody(resp.Body, &m); err != nil {
