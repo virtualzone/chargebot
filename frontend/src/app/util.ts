@@ -8,6 +8,13 @@ export function getBaseUrl() {
   return '';
 }
 
+export function deleteTokens() {
+  if (typeof window !== "undefined") {
+    window.sessionStorage.removeItem("accessToken");
+    window.sessionStorage.removeItem("refreshToken");
+  }
+}
+
 export function saveAccessToken(token: string) {
   if (typeof window !== "undefined") {
     window.sessionStorage.setItem("accessToken", token)
@@ -100,7 +107,7 @@ export async function checkAuth() {
         if (validBool) {
           resolve();
           return;
-        } 
+        }
         fetch(getBaseUrl() + "/api/1/auth/refresh", {
           method: 'POST',
           headers: {
@@ -109,12 +116,23 @@ export async function checkAuth() {
           },
           body: JSON.stringify({ access_token: getAccessToken(), refresh_token: getRefreshToken() }),
         }).then(resp => {
+          if (resp.status !== 200) {
+            deleteTokens();
+            window.location.href = "/";
+            reject();
+            return;
+          }
           resp.json().then(json => {
             saveAccessToken(json.access_token);
             saveRefreshToken(json.refresh_token);
             resolve();
           })
         });
+      }).catch(() => {
+        deleteTokens();
+        window.location.href = "/";
+        reject();
+        return;
       });
     });
   });

@@ -35,7 +35,7 @@ func (c *ChargeController) Init() {
 func (c *ChargeController) OnTick() {
 	vehicles := GetDB().GetAllVehicles()
 	for _, vehicle := range vehicles {
-		c.processVehicle(vehicle)
+		go c.processVehicle(vehicle)
 	}
 }
 
