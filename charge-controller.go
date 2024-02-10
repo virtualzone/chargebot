@@ -14,11 +14,13 @@ const MaxVehicleDataUpdateIntervalMinutes int = 15
 type ChargeController struct {
 	Ticker *time.Ticker
 	Time   Time
+	Async  bool
 }
 
 func NewChargeController() *ChargeController {
 	return &ChargeController{
-		Time: new(RealTime),
+		Time:  new(RealTime),
+		Async: true,
 	}
 }
 
@@ -35,7 +37,11 @@ func (c *ChargeController) Init() {
 func (c *ChargeController) OnTick() {
 	vehicles := GetDB().GetAllVehicles()
 	for _, vehicle := range vehicles {
-		go c.processVehicle(vehicle)
+		if c.Async {
+			go c.processVehicle(vehicle)
+		} else {
+			c.processVehicle(vehicle)
+		}
 	}
 }
 
