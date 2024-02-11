@@ -84,7 +84,7 @@ func (c *ChargeController) processVehicle(vehicle *Vehicle) {
 }
 
 func (c *ChargeController) stopCharging(accessToken string, vehicle *Vehicle) {
-	car, err := GetTeslaAPI().InitSession(accessToken, vehicle, false)
+	car, err := GetTeslaAPI().InitSession(accessToken, vehicle, true)
 	if err != nil {
 		GetDB().LogChargingEvent(vehicle.ID, LogEventChargeStop, fmt.Sprintf("could not init session with car: %s", err.Error()))
 		return
@@ -482,7 +482,7 @@ func (c *ChargeController) checkChargeProcess(accessToken string, vehicle *Vehic
 	if !c.minimumChargeTimeReached(vehicle) {
 		// ...except when vehicle is charging on solar and amps need to be adjusted
 		if state.Charging == ChargeStateChargingOnSolar && targetAmps > 0 && targetAmps != state.Amps {
-			car, err := GetTeslaAPI().InitSession(accessToken, vehicle, false)
+			car, err := GetTeslaAPI().InitSession(accessToken, vehicle, true)
 			if err != nil {
 				GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, fmt.Sprintf("could not init session with car: %s", err.Error()))
 			} else {
