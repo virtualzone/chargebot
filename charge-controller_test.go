@@ -792,3 +792,67 @@ func TestChargeControl_TibberChargingDepartureWithPriceLimit(t *testing.T) {
 	assert.Equal(t, ChargeStateNotCharging, state.Charging)
 	UpdateTeslaAPIMockSoC(api, 123, 73)
 }
+
+func TestChargeControl_containsPricesUntilDeparture_true(t *testing.T) {
+	t.Cleanup(ResetTestDB)
+
+	now := time.Now().UTC()
+	departure := time.Date(2023, 2, 11, 15, 0, 0, 0, now.Location())
+	prices := []*GridPrice{
+		{Total: 0.3, StartsAt: time.Date(2023, 2, 11, 13, 0, 0, 0, time.UTC)},
+		{Total: 0.3, StartsAt: time.Date(2023, 2, 11, 14, 0, 0, 0, time.UTC)},
+		{Total: 0.3, StartsAt: time.Date(2023, 2, 11, 15, 0, 0, 0, time.UTC)},
+		{Total: 0.3, StartsAt: time.Date(2023, 2, 11, 16, 0, 0, 0, time.UTC)},
+	}
+
+	cc := NewTestChargeController()
+	assert.True(t, cc.containsPricesUntilDeparture(prices, departure))
+}
+
+func TestChargeControl_containsPricesUntilDeparture_false(t *testing.T) {
+	t.Cleanup(ResetTestDB)
+
+	now := time.Now().UTC()
+	departure := time.Date(2023, 2, 11, 18, 0, 0, 0, now.Location())
+	prices := []*GridPrice{
+		{Total: 0.3, StartsAt: time.Date(2023, 2, 11, 13, 0, 0, 0, time.UTC)},
+		{Total: 0.3, StartsAt: time.Date(2023, 2, 11, 14, 0, 0, 0, time.UTC)},
+		{Total: 0.3, StartsAt: time.Date(2023, 2, 11, 15, 0, 0, 0, time.UTC)},
+		{Total: 0.3, StartsAt: time.Date(2023, 2, 11, 16, 0, 0, 0, time.UTC)},
+	}
+
+	cc := NewTestChargeController()
+	assert.False(t, cc.containsPricesUntilDeparture(prices, departure))
+}
+
+func TestChargeControl_containsPricesUntilDeparture_edge(t *testing.T) {
+	t.Cleanup(ResetTestDB)
+
+	now := time.Now().UTC()
+	departure := time.Date(2023, 2, 11, 16, 0, 0, 0, now.Location())
+	prices := []*GridPrice{
+		{Total: 0.3, StartsAt: time.Date(2023, 2, 11, 13, 0, 0, 0, time.UTC)},
+		{Total: 0.3, StartsAt: time.Date(2023, 2, 11, 14, 0, 0, 0, time.UTC)},
+		{Total: 0.3, StartsAt: time.Date(2023, 2, 11, 15, 0, 0, 0, time.UTC)},
+		{Total: 0.3, StartsAt: time.Date(2023, 2, 11, 16, 0, 0, 0, time.UTC)},
+	}
+
+	cc := NewTestChargeController()
+	assert.True(t, cc.containsPricesUntilDeparture(prices, departure))
+}
+
+func TestChargeControl_containsPricesUntilDeparture_edge2(t *testing.T) {
+	t.Cleanup(ResetTestDB)
+
+	now := time.Now().UTC()
+	departure := time.Date(2023, 2, 11, 17, 0, 0, 0, now.Location())
+	prices := []*GridPrice{
+		{Total: 0.3, StartsAt: time.Date(2023, 2, 11, 13, 0, 0, 0, time.UTC)},
+		{Total: 0.3, StartsAt: time.Date(2023, 2, 11, 14, 0, 0, 0, time.UTC)},
+		{Total: 0.3, StartsAt: time.Date(2023, 2, 11, 15, 0, 0, 0, time.UTC)},
+		{Total: 0.3, StartsAt: time.Date(2023, 2, 11, 16, 0, 0, 0, time.UTC)},
+	}
+
+	cc := NewTestChargeController()
+	assert.True(t, cc.containsPricesUntilDeparture(prices, departure))
+}

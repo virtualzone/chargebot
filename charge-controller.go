@@ -95,7 +95,7 @@ func (c *ChargeController) stopCharging(accessToken string, vehicle *Vehicle) {
 	}
 	GetDB().SetVehicleStateCharging(vehicle.ID, ChargeStateNotCharging)
 	GetDB().SetVehicleStateAmps(vehicle.ID, 0)
-	GetDB().LogChargingEvent(vehicle.ID, LogEventChargeStop, "smart charging is disabled")
+	GetDB().LogChargingEvent(vehicle.ID, LogEventChargeStop, "charging stopped")
 }
 
 func (c *ChargeController) checkTargetState(vehicle *Vehicle, state *VehicleState) (ChargeState, int) {
@@ -309,9 +309,17 @@ func (c *ChargeController) checkStartOnGrid_DepartureNoPriceLimit(vehicle *Vehic
 	}
 	pricesFiltered := c.getGridPricesBefore(prices, *departure)
 
-	//timeUntilDeparture := departure.Sub(c.Time.UTCNow())
 	estimatedChargingTime := c.getEstimatedChargeDurationMinutes(vehicle, state)
 	requiredHourBlocks := int(math.Ceil(float64(estimatedChargingTime) / 60))
+
+	timeUntilDeparture := departure.Sub(c.Time.UTCNow())
+	// do nothing if we don't know the prices valid until departure
+	if !c.containsPricesUntilDeparture(pricesFiltered, *departure) {
+		// but only if the time until departure is at least twice the estimated charging time
+		if timeUntilDeparture.Minutes() >= float64(estimatedChargingTime)*2 {
+			return false
+		}
+	}
 
 	for i, price := range pricesFiltered {
 		if i+1 <= requiredHourBlocks {
@@ -416,6 +424,15 @@ func (c *ChargeController) getGridPricesBefore(prices []*GridPrice, limit time.T
 		}
 	}
 	return res
+}
+
+func (c *ChargeController) containsPricesUntilDeparture(prices []*GridPrice, departure time.Time) bool {
+	for _, price := range prices {
+		if price.StartsAt.Equal(departure) || price.StartsAt.After(departure) || departure.Sub(price.StartsAt).Minutes() <= 60 {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *ChargeController) getCurrentGridPrice(prices []*GridPrice) *GridPrice {
