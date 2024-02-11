@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
 import { Loader as IconLoad } from 'react-feather';
 import Link from "next/link";
 
-export default function Authorized() {
+export default function PageVehicle() {
   let vehicleID = 0
   const router = useRouter()
   const [vehicle, setVehicle] = useState({} as any)

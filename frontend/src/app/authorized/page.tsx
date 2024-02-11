@@ -4,10 +4,10 @@ import Link from "next/link";
 import { checkAuth, deleteAPI, getAPI } from "../util";
 import { useEffect, useState } from "react";
 import Loading from "../loading";
-import { Alert, Button, Container, ListGroup } from "react-bootstrap";
+import { Alert, Container, ListGroup } from "react-bootstrap";
 import { useRouter } from "next/navigation";
 
-export default function Authorized() {
+export default function PageAuthorized() {
   const [vehicles, setVehicles] = useState([] as any[])
   const [isLoading, setLoading] = useState(true)
   const [showAlertAdded, setShowAlertAdded] = useState(false)

@@ -3,12 +3,11 @@
 import { useEffect, useState } from "react";
 import { checkAuth, getAPI, postAPI } from "../util";
 import Loading from "../loading";
-import NoData from "../nodata";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Container, ListGroup } from "react-bootstrap";
 
-export default function Authorized() {
+export default function PageAddVehicle() {
   const [vehicles, setVehicles] = useState([] as any[])
   const [isLoading, setLoading] = useState(true)
   const router = useRouter();
