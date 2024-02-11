@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { Container } from "react-bootstrap"
 
-export default function Authorized() {
+export default function PageLoginFailed() {
   return (
     <Container fluid="sm" className="vh-100 pt-5">
       <h2 className="pb-3">Login failed</h2>

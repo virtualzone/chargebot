@@ -66,6 +66,7 @@ export default function RootLayout({
           <Container>
             <Navbar.Brand href="/"><BatteryCharging /> chargebot.io</Navbar.Brand>
             <Navbar.Text className="justify-content-end">
+              <Button variant='link' href='/help/' hidden={!isAuthenticated}>Help</Button>
               <Button variant='link' href='/api/1/auth/init3rdparty' hidden={isAuthenticated}>Sign In</Button>
               <Button variant='link' href='/authorized/' hidden={!isAuthenticated}>My vehicles</Button>
             </Navbar.Text>
@@ -74,6 +75,7 @@ export default function RootLayout({
         {children}
         <footer className="py-3 my-4 border-top d-flex justify-content-center align-items-center">
           <ul className="nav">
+            <li className="nav-item"><Link href="/help" className="nav-link px-2 text-body-secondary">Help</Link></li>
             <li className="nav-item"><Link href="/imprint" className="nav-link px-2 text-body-secondary">Imprint</Link></li>
             <li className="nav-item"><Link href="/privacy-policy" className="nav-link px-2 text-body-secondary">Privacy Policy</Link></li>
           </ul>

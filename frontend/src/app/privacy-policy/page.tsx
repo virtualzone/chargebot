@@ -1,9 +1,8 @@
 'use client'
 
-import Link from "next/link"
 import { Container } from "react-bootstrap"
 
-export default function Authorized() {
+export default function PagePrivacyPolicy() {
   return (
     <Container fluid="sm" className="pt-5 container-max-width min-height">
       <h2 className="pb-3">Privacy Policy</h2>
