@@ -10,33 +10,33 @@ export function getBaseUrl() {
 
 export function deleteTokens() {
   if (typeof window !== "undefined") {
-    window.sessionStorage.removeItem("accessToken");
-    window.sessionStorage.removeItem("refreshToken");
+    window.localStorage.removeItem("accessToken");
+    window.localStorage.removeItem("refreshToken");
   }
 }
 
 export function saveAccessToken(token: string) {
   if (typeof window !== "undefined") {
-    window.sessionStorage.setItem("accessToken", token)
+    window.localStorage.setItem("accessToken", token)
   }
 }
 
 export function saveRefreshToken(token: string) {
   if (typeof window !== "undefined") {
-    window.sessionStorage.setItem("refreshToken", token)
+    window.localStorage.setItem("refreshToken", token)
   }
 }
 
 export function getAccessToken() {
   if (typeof window !== "undefined") {
-    return window.sessionStorage.getItem("accessToken")
+    return window.localStorage.getItem("accessToken")
   }
   return '';
 }
 
 export function getRefreshToken() {
   if (typeof window !== "undefined") {
-    return window.sessionStorage.getItem("refreshToken")
+    return window.localStorage.getItem("refreshToken")
   }
   return '';
 }

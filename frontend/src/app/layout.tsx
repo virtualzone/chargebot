@@ -8,18 +8,24 @@ import Link from 'next/link';
 import { getAccessToken } from './util';
 import { useEffect, useState } from 'react';
 import { BatteryCharging } from 'react-feather';
+import { usePathname } from 'next/navigation';
 
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const pathname = usePathname();
   const [isAuthenticated, setIsAuthenticated] = useState(false)
 
-  useEffect(() => {
+  const updateAuthState = () => {
     const token = getAccessToken();
     setIsAuthenticated((token !== undefined) && (token !== null) && (token !== ''));
-  }, []);
+  }
+
+  useEffect(() => {
+    updateAuthState();
+  }, [pathname]);
 
   return (
     <html lang="en" data-bs-theme="auto">
