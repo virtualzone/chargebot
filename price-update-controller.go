@@ -27,6 +27,7 @@ func PeriodicPriceUpdateControl_Tibber() {
 	// First, care about the vehicles that don't even have prices for today
 	// Limit to 45 vehicles so we don't exceed the API limits
 	l := GetDB().GetVehicleIDsWithTibberTokenWithoutPricesForToday(45)
+	log.Println(l)
 	for _, vehicleID := range l {
 		vehicle := GetDB().GetVehicleByID(vehicleID)
 		log.Printf("Updating today's Tibber prices for vehicle ID %d ...\n", vehicleID)
@@ -37,6 +38,7 @@ func PeriodicPriceUpdateControl_Tibber() {
 	if now.Hour() > 12 {
 		// Next, if it's past 13:00 GMT, handle the vehicle's without prices for tomorrow
 		l := GetDB().GetVehicleIDsWithTibberTokenWithoutPricesForTomorrow(45)
+		log.Println(l)
 		for _, vehicleID := range l {
 			vehicle := GetDB().GetVehicleByID(vehicleID)
 			log.Printf("Updating tomorrow's Tibber prices for vehicle ID %d ...\n", vehicleID)
