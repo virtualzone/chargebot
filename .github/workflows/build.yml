@@ -13,8 +13,8 @@ jobs:
     container: golang:1.22-bookworm
     steps:
     - uses: actions/checkout@v4
-    - name: install libczmq
-      run: apt-get update && apt install -y libczmq4 libczmq-dev
+#    - name: install libczmq
+#      run: apt-get update && apt install -y libczmq4 libczmq-dev
     - name: Install dependencies
       run: go get -d -v ./...
     - name: Run tests
