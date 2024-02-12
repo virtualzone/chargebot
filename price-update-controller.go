@@ -22,6 +22,8 @@ func PeriodicPriceUpdateControl() {
 }
 
 func PeriodicPriceUpdateControl_Tibber() {
+	log.Println("Updating Tibber prices...")
+
 	// First, care about the vehicles that don't even have prices for today
 	// Limit to 45 vehicles so we don't exceed the API limits
 	l := GetDB().GetVehicleIDsWithTibberTokenWithoutPricesForToday(45)

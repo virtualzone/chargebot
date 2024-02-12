@@ -2,6 +2,7 @@ package main
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -185,4 +186,28 @@ func TestDB_IsUserOwnerOfVehicle(t *testing.T) {
 	assert.False(t, GetDB().IsUserOwnerOfVehicle("b", 1))
 	assert.False(t, GetDB().IsUserOwnerOfVehicle("b", 2))
 	assert.False(t, GetDB().IsUserOwnerOfVehicle("a", 3))
+}
+
+func TestDB_GetVehicleIDsWithTibberTokenWithoutPricesForTomorrow(t *testing.T) {
+	t.Cleanup(ResetTestDB)
+
+	v := &Vehicle{
+		ID:           1,
+		UserID:       "a",
+		DisplayName:  "V 1",
+		GridProvider: GridProviderTibber,
+		TibberToken:  "123",
+	}
+	GetDB().CreateUpdateVehicle(v)
+
+	now := time.Now().UTC()
+	now = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	for i := 0; i <= 22; i++ {
+		SetTibberTestPrice(v.ID, now.Add(time.Hour*time.Duration(i)), 0.32) // 00:00
+	}
+
+	l := GetDB().GetVehicleIDsWithTibberTokenWithoutPricesForTomorrow(45)
+	assert.NotNil(t, l)
+	assert.Len(t, l, 1)
+	assert.Equal(t, v.ID, l[0])
 }
