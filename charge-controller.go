@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-const MaxVehicleDataUpdateIntervalMinutes int = 15
+const MaxVehicleDataUpdateIntervalMinutes int = 5
 
 type ChargeController struct {
 	Ticker *time.Ticker
@@ -76,10 +76,7 @@ func (c *ChargeController) processVehicle(vehicle *Vehicle) {
 		c.checkStartCharging(accessToken, vehicle, state)
 	} else if vehicle.Enabled && state.Charging != ChargeStateNotCharging {
 		// This car is currently charging - check the process
-		// only check every 5 minutes to avoid over-adjusting
-		if c.Time.UTCNow().Minute()%5 == 0 {
-			c.checkChargeProcess(accessToken, vehicle, state)
-		}
+		c.checkChargeProcess(accessToken, vehicle, state)
 	}
 }
 
@@ -226,6 +223,11 @@ func (c *ChargeController) getUpcomingGridPrices(vehicle *Vehicle) []*GridPrice 
 }
 
 func (c *ChargeController) checkStartOnGrid_NoDeparturePriceLimit(vehicle *Vehicle, state *VehicleState, prices []*GridPrice) bool {
+	now := c.Time.UTCNow()
+	if GetDB().IsSelectedGridHourblock(vehicle.ID, now.Year(), int(now.Month()), now.Day(), now.Hour()) {
+		return true
+	}
+
 	// check if lowest price is above user-defined maximum
 	if prices[0].Total*100 > float32(vehicle.MaxPrice) {
 		return false
@@ -253,6 +255,7 @@ func (c *ChargeController) checkStartOnGrid_NoDeparturePriceLimit(vehicle *Vehic
 			now := c.Time.UTCNow()
 			if IsCurrentHourUTC(&now, &price.StartsAt) {
 				if price.Total*100 <= float32(vehicle.MaxPrice) {
+					GetDB().RecordSelectedGridHourblock(vehicle.ID, now.Year(), int(now.Month()), now.Day(), now.Hour())
 					return true
 				}
 			}
@@ -307,8 +310,13 @@ func (c *ChargeController) checkStartOnGrid_DepartureNoPriceLimit(vehicle *Vehic
 		log.Printf("could not get next departure date for vehicle %d: %s\n", vehicle.ID, err.Error())
 		return false
 	}
-	pricesFiltered := c.getGridPricesBefore(prices, *departure)
 
+	now := c.Time.UTCNow()
+	if GetDB().IsSelectedGridHourblock(vehicle.ID, now.Year(), int(now.Month()), now.Day(), now.Hour()) {
+		return true
+	}
+
+	pricesFiltered := c.getGridPricesBefore(prices, *departure)
 	estimatedChargingTime := c.getEstimatedChargeDurationMinutes(vehicle, state)
 	requiredHourBlocks := int(math.Ceil(float64(estimatedChargingTime) / 60))
 
@@ -323,8 +331,8 @@ func (c *ChargeController) checkStartOnGrid_DepartureNoPriceLimit(vehicle *Vehic
 
 	for i, price := range pricesFiltered {
 		if i+1 <= requiredHourBlocks {
-			now := c.Time.UTCNow()
 			if IsCurrentHourUTC(&now, &price.StartsAt) {
+				GetDB().RecordSelectedGridHourblock(vehicle.ID, now.Year(), int(now.Month()), now.Day(), now.Hour())
 				return true
 			}
 		}
@@ -339,6 +347,12 @@ func (c *ChargeController) checkStartOnGrid_DepartureWithPriceLimit(vehicle *Veh
 		log.Printf("could not get next departure date for vehicle %d: %s\n", vehicle.ID, err.Error())
 		return false
 	}
+
+	now := c.Time.UTCNow()
+	if GetDB().IsSelectedGridHourblock(vehicle.ID, now.Year(), int(now.Month()), now.Day(), now.Hour()) {
+		return true
+	}
+
 	pricesFiltered := c.getGridPricesBefore(prices, *departure)
 
 	// check if lowest price is above user-defined maximum
@@ -366,9 +380,9 @@ func (c *ChargeController) checkStartOnGrid_DepartureWithPriceLimit(vehicle *Veh
 	requiredHourBlocks := int(math.Ceil(float64(estimatedChargingTime) / 60))
 	for i, price := range pricesFiltered {
 		if i+1 <= requiredHourBlocks {
-			now := c.Time.UTCNow()
 			if IsCurrentHourUTC(&now, &price.StartsAt) {
 				if price.Total*100 <= float32(vehicle.MaxPrice) {
+					GetDB().RecordSelectedGridHourblock(vehicle.ID, now.Year(), int(now.Month()), now.Day(), now.Hour())
 					return true
 				}
 			}
@@ -377,8 +391,8 @@ func (c *ChargeController) checkStartOnGrid_DepartureWithPriceLimit(vehicle *Veh
 
 	for i, price := range pricesFiltered {
 		if i+1 <= requiredHourBlocks {
-			now := c.Time.UTCNow()
 			if IsCurrentHourUTC(&now, &price.StartsAt) {
+				GetDB().RecordSelectedGridHourblock(vehicle.ID, now.Year(), int(now.Month()), now.Day(), now.Hour())
 				return true
 			}
 		}
@@ -454,18 +468,22 @@ func (c *ChargeController) canUpdateVehicleData(vehicleID int) bool {
 	return event.Timestamp.Before(limit)
 }
 
-func (c *ChargeController) minimumChargeTimeReached(vehicle *Vehicle) bool {
+func (c *ChargeController) minimumChargeTimeReached(vehicle *Vehicle, state *VehicleState) bool {
 	event := GetDB().GetLatestChargingEvent(vehicle.ID, LogEventChargeStart)
 	if event == nil {
 		return true
 	}
-	limit := c.Time.UTCNow().Add(time.Minute * time.Duration(vehicle.MinChargeTime) * -1)
-	return event.Timestamp.Before(limit)
+	if state.Charging == ChargeStateChargingOnSolar {
+		limit := c.Time.UTCNow().Add(time.Minute * time.Duration(vehicle.MinChargeTime) * -1)
+		return event.Timestamp.Before(limit)
+	}
+	return true
 }
 
 func (c *ChargeController) checkChargeProcess(accessToken string, vehicle *Vehicle, state *VehicleState) {
 	// check when vehicle data was last updated
 	if c.canUpdateVehicleData(vehicle.ID) {
+		GetTeslaAPI().Wakeup(accessToken, vehicle)
 		state.SoC = UpdateVehicleDataSaveSoC(accessToken, vehicle)
 	}
 
@@ -479,7 +497,7 @@ func (c *ChargeController) checkChargeProcess(accessToken string, vehicle *Vehic
 	targetState, targetAmps := c.checkTargetState(vehicle, state)
 
 	// if minimum charge time is not reached, do nothing
-	if !c.minimumChargeTimeReached(vehicle) {
+	if !c.minimumChargeTimeReached(vehicle, state) {
 		// ...except when vehicle is charging on solar and amps need to be adjusted
 		if state.Charging == ChargeStateChargingOnSolar && targetAmps > 0 && targetAmps != state.Amps {
 			car, err := GetTeslaAPI().InitSession(accessToken, vehicle, true)
@@ -488,8 +506,9 @@ func (c *ChargeController) checkChargeProcess(accessToken string, vehicle *Vehic
 			} else {
 				if err := GetTeslaAPI().SetChargeAmps(car, targetAmps); err != nil {
 					GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, "could not set charge amps: "+err.Error())
+				} else {
+					GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, fmt.Sprintf("charge amps set to %d", targetAmps))
 				}
-				GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, fmt.Sprintf("charge amps set to %d", targetAmps))
 			}
 		}
 		return

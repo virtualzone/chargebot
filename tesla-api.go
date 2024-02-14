@@ -81,6 +81,7 @@ type TeslaAPI interface {
 	SetChargeLimit(car *vehicle.Vehicle, limitPercent int) error
 	SetChargeAmps(car *vehicle.Vehicle, amps int) error
 	GetVehicleData(authToken string, vehicle *Vehicle) (*TeslaAPIVehicleData, error)
+	Wakeup(authToken string, vehicle *Vehicle) error
 }
 
 type TeslaAPIImpl struct {
@@ -208,7 +209,7 @@ func (a *TeslaAPIImpl) GetCachedAccessToken(userID string) string {
 
 func (a *TeslaAPIImpl) InitSession(authToken string, vehicle *Vehicle, wakeUp bool) (*vehicle.Vehicle, error) {
 	if wakeUp {
-		a.wakeup(authToken, vehicle)
+		a.Wakeup(authToken, vehicle)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
@@ -313,7 +314,7 @@ func (a *TeslaAPIImpl) GetVehicleData(authToken string, vehicle *Vehicle) (*Tesl
 	return &m.Response, nil
 }
 
-func (a *TeslaAPIImpl) wakeup(authToken string, vehicle *Vehicle) error {
+func (a *TeslaAPIImpl) Wakeup(authToken string, vehicle *Vehicle) error {
 	target := GetConfig().Audience + "/api/1/vehicles/" + vehicle.VIN + "/wake_up"
 	r, _ := http.NewRequest("POST", target, nil)
 
