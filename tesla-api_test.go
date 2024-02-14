@@ -93,6 +93,11 @@ func (a *TeslaAPIMock) GetVehicleData(authToken string, vehicle *Vehicle) (*Tesl
 	}
 }
 
+func (a *TeslaAPIMock) Wakeup(authToken string, vehicle *Vehicle) error {
+	args := a.Called(authToken, vehicle)
+	return args.Error(0)
+}
+
 func UpdateTeslaAPIMockSoC(api *TeslaAPIMock, vehicleID int, batteryLevel int) {
 	vData := &TeslaAPIVehicleData{
 		VehicleID: vehicleID,

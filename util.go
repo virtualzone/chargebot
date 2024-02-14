@@ -104,3 +104,8 @@ func AtoiArray(arr []string) ([]int, error) {
 	}
 	return res, nil
 }
+
+func GetHourstamp(year int, month int, day int, hour int) int {
+	hourstamp, _ := strconv.Atoi(fmt.Sprintf("%4d%02d%02d%02d", year, month, day, hour))
+	return hourstamp
+}

@@ -142,6 +142,7 @@ drop table if exists surpluses;
 drop table if exists logs;
 drop table if exists vehicle_states;
 drop table if exists tibber_prices;
+drop table if exists grid_hourblocks;
 `)
 	if err != nil {
 		log.Panicln(err)
@@ -159,6 +160,7 @@ create table if not exists surpluses(vehicle_id int, ts text, surplus_watts int)
 create table if not exists logs(vehicle_id int, ts text, event_id int, details text);
 create table if not exists vehicle_states(vehicle_id int primary key, plugged_in int default 0, charging int default 0, soc int default -1);
 create table if not exists tibber_prices(vehicle_id int not null, hourstamp int not null, price real, primary key(vehicle_id, hourstamp));
+create table if not exists grid_hourblocks(vehicle_id int not null, hourstamp int not null, primary key(vehicle_id, hourstamp));
 `)
 	if err != nil {
 		log.Panicln(err)
@@ -428,8 +430,30 @@ func (db *DB) GetLatestSurplusRecords(vehicleID int, num int) []*SurplusRecord {
 	return result
 }
 
+func (db *DB) RecordSelectedGridHourblock(vehicleID int, year int, month int, day int, hour int) {
+	hourstamp := GetHourstamp(year, month, day, hour)
+	_, err := db.GetConnection().Exec("replace into grid_hourblocks (vehicle_id, hourstamp) values(?, ?)",
+		vehicleID, hourstamp)
+	if err != nil {
+		log.Fatalln(err)
+	}
+}
+
+func (db *DB) IsSelectedGridHourblock(vehicleID int, year int, month int, day int, hour int) bool {
+	hourstamp := GetHourstamp(year, month, day, hour)
+	var num int
+	err := db.GetConnection().QueryRow("select count(*) from grid_hourblocks where vehicle_id = ? and hourstamp = ?",
+		vehicleID, hourstamp).Scan(&num)
+	if err != nil {
+		log.Fatalln(err)
+		return false
+	}
+	return num > 0
+
+}
+
 func (db *DB) SetTibberPrice(vehicleID int, year int, month int, day int, hour int, price float32) {
-	hourstamp, _ := strconv.Atoi(fmt.Sprintf("%4d%02d%02d%02d", year, month, day, hour))
+	hourstamp := GetHourstamp(year, month, day, hour)
 	_, err := db.GetConnection().Exec("replace into tibber_prices (vehicle_id, hourstamp, price) values(?, ?, ?)",
 		vehicleID, hourstamp, price)
 	if err != nil {
@@ -439,7 +463,7 @@ func (db *DB) SetTibberPrice(vehicleID int, year int, month int, day int, hour i
 
 func (db *DB) GetUpcomingTibberPrices(vehicleID int, sortByPriceAsc bool) []*GridPrice {
 	now := db.Time.UTCNow()
-	hourstampStart, _ := strconv.Atoi(fmt.Sprintf("%4d%02d%02d%02d", now.Year(), now.Month(), now.Day(), now.Hour()))
+	hourstampStart := GetHourstamp(now.Year(), int(now.Month()), now.Day(), now.Hour())
 	result := []*GridPrice{}
 	order := "hourstamp asc"
 	if sortByPriceAsc {
