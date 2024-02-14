@@ -2,7 +2,6 @@ package main
 
 import (
 	"database/sql"
-	"fmt"
 	"log"
 	"strconv"
 	"sync"
@@ -501,8 +500,7 @@ func (db *DB) GetUpcomingTibberPrices(vehicleID int, sortByPriceAsc bool) []*Gri
 }
 
 func (db *DB) GetVehicleIDsWithTibberTokenWithoutPricesForStarttime(startTime time.Time, limit int) []int {
-	hourstampStart, _ := strconv.Atoi(fmt.Sprintf("%4d%02d%02d%02d", startTime.Year(), startTime.Month(), startTime.Day(), 0))
-	log.Printf("Running GetVehicleIDsWithTibberTokenWithoutPricesForStarttime() with hourstamp: %d\n", hourstampStart)
+	hourstampStart := GetHourstamp(startTime.Year(), int(startTime.Month()), startTime.Day(), 0)
 	result := []int{}
 	rows, err := db.GetConnection().Query("select vehicles.id "+
 		"from vehicles "+
