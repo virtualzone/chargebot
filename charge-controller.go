@@ -484,6 +484,20 @@ func (c *ChargeController) minimumChargeTimeReached(vehicle *Vehicle, state *Veh
 	return true
 }
 
+func (c *ChargeController) canAdjustSolarAmps(vehicle *Vehicle) bool {
+	surpluses := GetDB().GetLatestSurplusRecords(vehicle.ID, 1)
+	if len(surpluses) == 0 {
+		return false
+	}
+	surplus := surpluses[0]
+	ampsEvent := GetDB().GetLatestChargingEvent(vehicle.ID, LogEventSetChargingAmps)
+	if ampsEvent == nil {
+		return false
+	}
+	diff := surplus.Timestamp.Sub(ampsEvent.Timestamp)
+	return diff.Seconds() > 120 // at least 2 mins
+}
+
 func (c *ChargeController) checkChargeProcess(accessToken string, vehicle *Vehicle, state *VehicleState) {
 	// check when vehicle data was last updated
 	if c.canUpdateVehicleData(vehicle.ID) {
@@ -504,6 +518,10 @@ func (c *ChargeController) checkChargeProcess(accessToken string, vehicle *Vehic
 	if !c.minimumChargeTimeReached(vehicle, state) {
 		// ...except when vehicle is charging on solar and amps need to be adjusted
 		if state.Charging == ChargeStateChargingOnSolar && targetAmps > 0 && targetAmps != state.Amps {
+			// ...and only if the last amps adjustment occured before the latest surplus data came in
+			if !c.canAdjustSolarAmps(vehicle) {
+				return
+			}
 			car, err := GetTeslaAPI().InitSession(accessToken, vehicle, true)
 			if err != nil {
 				GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, fmt.Sprintf("could not init session with car: %s", err.Error()))
