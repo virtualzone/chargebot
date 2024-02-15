@@ -156,6 +156,7 @@ func (c *ChargeController) activateCharging(accessToken string, vehicle *Vehicle
 	GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, fmt.Sprintf("charge amps set to %d", amps))
 
 	GetTeslaAPI().ChargeStart(car)
+	GetDB().SetVehicleStateAmps(vehicle.ID, amps)
 	GetDB().SetVehicleStateCharging(vehicle.ID, source)
 	GetDB().LogChargingEvent(vehicle.ID, LogEventChargeStart, "")
 
@@ -507,6 +508,7 @@ func (c *ChargeController) checkChargeProcess(accessToken string, vehicle *Vehic
 				if err := GetTeslaAPI().SetChargeAmps(car, targetAmps); err != nil {
 					GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, "could not set charge amps: "+err.Error())
 				} else {
+					GetDB().SetVehicleStateAmps(vehicle.ID, targetAmps)
 					GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, fmt.Sprintf("charge amps set to %d", targetAmps))
 				}
 			}
