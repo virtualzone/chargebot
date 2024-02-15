@@ -97,7 +97,7 @@ func (c *ChargeController) stopCharging(accessToken string, vehicle *Vehicle) {
 
 func (c *ChargeController) checkTargetState(vehicle *Vehicle, state *VehicleState) (ChargeState, int) {
 	targetState := ChargeStateNotCharging
-	startCharging, amps := c.checkStartOnSolar(vehicle)
+	startCharging, amps := c.checkStartOnSolar(vehicle, state)
 	if startCharging {
 		targetState = ChargeStateChargingOnSolar
 	} else {
@@ -164,7 +164,7 @@ func (c *ChargeController) activateCharging(accessToken string, vehicle *Vehicle
 	return true
 }
 
-func (c *ChargeController) checkStartOnSolar(vehicle *Vehicle) (bool, int) {
+func (c *ChargeController) checkStartOnSolar(vehicle *Vehicle, state *VehicleState) (bool, int) {
 	if !vehicle.SurplusCharging {
 		return false, 0
 	}
@@ -180,6 +180,9 @@ func (c *ChargeController) checkStartOnSolar(vehicle *Vehicle) (bool, int) {
 	if surplus.Timestamp.Before(now.Add(-10 * time.Minute)) {
 		return false, 0
 	}
+
+	// take currently used watts into account
+	surplus.SurplusWatts += (state.Amps * 230 * vehicle.NumPhases)
 
 	// check if there is any surplus
 	if surplus.SurplusWatts <= 0 {
