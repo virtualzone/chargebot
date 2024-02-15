@@ -48,8 +48,11 @@ func TestChargeControlCheckStartOnSolar(t *testing.T) {
 		MinSurplus:      0,
 		SurplusCharging: true,
 	}
+	s := &VehicleState{
+		Amps: 0,
+	}
 	GetDB().RecordSurplus(v.ID, 4000)
-	res, amps := NewChargeController().checkStartOnSolar(v)
+	res, amps := NewChargeController().checkStartOnSolar(v, s)
 	assert.True(t, res)
 	assert.Equal(t, 6, amps)
 }
@@ -64,8 +67,11 @@ func TestChargeControlCheckStartOnSolarDisabled(t *testing.T) {
 		MinSurplus:      0,
 		SurplusCharging: false,
 	}
+	s := &VehicleState{
+		Amps: 0,
+	}
 	GetDB().RecordSurplus(v.ID, 4000)
-	res, _ := NewChargeController().checkStartOnSolar(v)
+	res, _ := NewChargeController().checkStartOnSolar(v, s)
 	assert.False(t, res)
 }
 
@@ -79,8 +85,11 @@ func TestChargeControlCheckStartOnSolarNoSurplus(t *testing.T) {
 		MinSurplus:      0,
 		SurplusCharging: true,
 	}
+	s := &VehicleState{
+		Amps: 0,
+	}
 	GetDB().RecordSurplus(v.ID, 0)
-	res, _ := NewChargeController().checkStartOnSolar(v)
+	res, _ := NewChargeController().checkStartOnSolar(v, s)
 	assert.False(t, res)
 }
 
@@ -94,8 +103,11 @@ func TestChargeControlCheckStartOnSolarNotEnoughSurplus(t *testing.T) {
 		MinSurplus:      4000,
 		SurplusCharging: true,
 	}
+	s := &VehicleState{
+		Amps: 0,
+	}
 	GetDB().RecordSurplus(v.ID, 2000)
-	res, _ := NewChargeController().checkStartOnSolar(v)
+	res, _ := NewChargeController().checkStartOnSolar(v, s)
 	assert.False(t, res)
 }
 
@@ -109,8 +121,11 @@ func TestChargeControlCheckStartOnSolarNoRecentSurplus(t *testing.T) {
 		MinSurplus:      0,
 		SurplusCharging: true,
 	}
+	s := &VehicleState{
+		Amps: 0,
+	}
 	GetDB().Connection.Exec("insert into surpluses (vehicle_id, ts, surplus_watts) values (?, datetime('now','-15 minutes'), ?)", v.ID, 4000)
-	res, _ := NewChargeController().checkStartOnSolar(v)
+	res, _ := NewChargeController().checkStartOnSolar(v, s)
 	assert.False(t, res)
 }
 
@@ -124,8 +139,11 @@ func TestChargeControlCheckStartOnSolarMinimalSurplus(t *testing.T) {
 		MinSurplus:      0,
 		SurplusCharging: true,
 	}
+	s := &VehicleState{
+		Amps: 0,
+	}
 	GetDB().RecordSurplus(v.ID, 100)
-	res, _ := NewChargeController().checkStartOnSolar(v)
+	res, _ := NewChargeController().checkStartOnSolar(v, s)
 	assert.False(t, res)
 }
 
@@ -482,7 +500,7 @@ func TestChargeControl_SolarCharging(t *testing.T) {
 
 	// record a surplus not large enough anymore, but should keep on charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(10 * time.Minute) // +20
-	GetDB().RecordSurplus(v.ID, 500)
+	GetDB().RecordSurplus(v.ID, -500)
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateChargingOnSolar, state.Charging)
