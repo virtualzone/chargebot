@@ -495,7 +495,7 @@ func (c *ChargeController) canAdjustSolarAmps(vehicle *Vehicle) bool {
 		return false
 	}
 	diff := surplus.Timestamp.Sub(ampsEvent.Timestamp)
-	return diff.Seconds() > 120 // at least 2 mins
+	return diff.Minutes() >= 5 // max. every 5 mins
 }
 
 func (c *ChargeController) checkChargeProcess(accessToken string, vehicle *Vehicle, state *VehicleState) {
@@ -519,18 +519,17 @@ func (c *ChargeController) checkChargeProcess(accessToken string, vehicle *Vehic
 		// ...except when vehicle is charging on solar and amps need to be adjusted
 		if state.Charging == ChargeStateChargingOnSolar && targetAmps > 0 && targetAmps != state.Amps {
 			// ...and only if the last amps adjustment occured before the latest surplus data came in
-			if !c.canAdjustSolarAmps(vehicle) {
-				return
-			}
-			car, err := GetTeslaAPI().InitSession(accessToken, vehicle, true)
-			if err != nil {
-				GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, fmt.Sprintf("could not init session with car: %s", err.Error()))
-			} else {
-				if err := GetTeslaAPI().SetChargeAmps(car, targetAmps); err != nil {
-					GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, "could not set charge amps: "+err.Error())
+			if c.canAdjustSolarAmps(vehicle) {
+				car, err := GetTeslaAPI().InitSession(accessToken, vehicle, true)
+				if err != nil {
+					GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, fmt.Sprintf("could not init session with car: %s", err.Error()))
 				} else {
-					GetDB().SetVehicleStateAmps(vehicle.ID, targetAmps)
-					GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, fmt.Sprintf("charge amps set to %d", targetAmps))
+					if err := GetTeslaAPI().SetChargeAmps(car, targetAmps); err != nil {
+						GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, "could not set charge amps: "+err.Error())
+					} else {
+						GetDB().SetVehicleStateAmps(vehicle.ID, targetAmps)
+						GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, fmt.Sprintf("charge amps set to %d", targetAmps))
+					}
 				}
 			}
 		}

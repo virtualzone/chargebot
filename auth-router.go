@@ -28,7 +28,7 @@ func (router *AuthRouter) SetupRoutes(s *mux.Router) {
 }
 
 func (router *AuthRouter) getRedirectURI() string {
-	if strings.Index(GetConfig().Hostname, "localhost") != -1 {
+	if strings.Contains(GetConfig().Hostname, "localhost") {
 		return "http://" + GetConfig().Hostname + "/callback"
 	}
 	return "https://" + GetConfig().Hostname + "/callback"
