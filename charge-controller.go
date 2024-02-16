@@ -169,20 +169,16 @@ func (c *ChargeController) checkStartOnSolar(vehicle *Vehicle, state *VehicleSta
 		return false, 0
 	}
 
-	surpluses := GetDB().GetLatestSurplusRecords(vehicle.ID, 1)
-	if len(surpluses) == 0 {
+	surplus := c.getActualSurplus(vehicle, state)
+	if surplus == nil {
 		return false, 0
 	}
 
-	surplus := surpluses[0]
 	// check if this is a recent recording
 	now := c.Time.UTCNow()
 	if surplus.Timestamp.Before(now.Add(-10 * time.Minute)) {
 		return false, 0
 	}
-
-	// take currently used watts into account
-	surplus.SurplusWatts += (state.Amps * 230 * vehicle.NumPhases)
 
 	// check if there is any surplus
 	if surplus.SurplusWatts <= 0 {
@@ -195,7 +191,7 @@ func (c *ChargeController) checkStartOnSolar(vehicle *Vehicle, state *VehicleSta
 	}
 
 	// determine amps to charge
-	amps := int(math.Round(float64(surplus.SurplusWatts) / 230.0 / float64(vehicle.NumPhases)))
+	amps := int(math.Floor(float64(surplus.SurplusWatts) / 230.0 / float64(vehicle.NumPhases)))
 	if amps == 0 {
 		return false, 0
 	}
@@ -496,6 +492,18 @@ func (c *ChargeController) canAdjustSolarAmps(vehicle *Vehicle) bool {
 	}
 	diff := surplus.Timestamp.Sub(ampsEvent.Timestamp)
 	return diff.Minutes() >= 5 // max. every 5 mins
+}
+
+func (c *ChargeController) getActualSurplus(vehicle *Vehicle, state *VehicleState) *SurplusRecord {
+	surpluses := GetDB().GetLatestSurplusRecords(vehicle.ID, 1)
+	if len(surpluses) == 0 {
+		return nil
+	}
+	surplus := surpluses[0]
+	if state.Charging == ChargeStateChargingOnSolar {
+		surplus.SurplusWatts += (state.Amps * 230 * vehicle.NumPhases)
+	}
+	return surplus
 }
 
 func (c *ChargeController) checkChargeProcess(accessToken string, vehicle *Vehicle, state *VehicleState) {
