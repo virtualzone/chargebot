@@ -612,7 +612,9 @@ func (db *DB) formatSqliteDatetime(ts time.Time) string {
 	return ts.Format(SQLITE_DATETIME_LAYOUT)
 }
 
+/*
 func (db *DB) parseSqliteDatetime(ts string) *time.Time {
 	parsedTime, _ := time.Parse(SQLITE_DATETIME_LAYOUT, ts)
 	return &parsedTime
 }
+*/
