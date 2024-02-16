@@ -54,7 +54,7 @@ func TestChargeControlCheckStartOnSolar(t *testing.T) {
 	GetDB().RecordSurplus(v.ID, 4000)
 	res, amps := NewChargeController().checkStartOnSolar(v, s)
 	assert.True(t, res)
-	assert.Equal(t, 6, amps)
+	assert.Equal(t, 5, amps)
 }
 
 func TestChargeControlCheckStartOnSolarDisabled(t *testing.T) {
@@ -441,6 +441,78 @@ func TestChargeControl_getNextDeparture_NextWeek(t *testing.T) {
 }
 
 func TestChargeControl_SolarCharging(t *testing.T) {
+	t.Cleanup(ResetTestDB)
+
+	v := &Vehicle{
+		ID:              123,
+		VIN:             "123",
+		UserID:          "999",
+		Enabled:         true,
+		TargetSoC:       70,
+		MaxAmps:         16,
+		NumPhases:       3,
+		SurplusCharging: true,
+		MinSurplus:      2000,
+		MinChargeTime:   15,
+		LowcostCharging: false,
+	}
+	GetDB().CreateUpdateVehicle(v)
+	GetDB().SetVehicleStateSoC(v.ID, 50)
+	GetDB().SetVehicleStatePluggedIn(v.ID, true)
+	GetDB().SetVehicleStateCharging(v.ID, ChargeStateNotCharging)
+	cc := NewTestChargeController()
+
+	api, _ := TeslaAPIInstance.(*TeslaAPIMock)
+	api.On("GetOrRefreshAccessToken", v.UserID).Return("token")
+	api.On("InitSession", "token", mock.Anything, mock.Anything).Return(&vehicle.Vehicle{}, nil)
+	api.On("SetChargeLimit", mock.Anything, mock.Anything).Return(nil)
+	api.On("SetChargeAmps", mock.Anything, mock.Anything).Return(nil)
+	api.On("ChargeStart", mock.Anything).Return(nil)
+	api.On("ChargeStop", mock.Anything).Return(nil)
+	api.On("Wakeup", mock.Anything, mock.Anything).Return(nil)
+	vData := &TeslaAPIVehicleData{
+		VehicleID: 123,
+		ChargeState: TeslaAPIChargeState{
+			BatteryLevel: 53,
+		},
+	}
+	api.On("GetVehicleData", "token", mock.Anything).Return(vData, nil)
+
+	// on start, no surplus records, so vehicle is not charging
+	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(1 * time.Hour).Add(-1 * time.Duration(GlobalMockTime.CurTime.Minute()) * time.Minute)
+	cc.OnTick()
+	state := GetDB().GetVehicleState(v.ID)
+	assert.Equal(t, ChargeStateNotCharging, state.Charging)
+
+	// record a surplus too low, still no charging
+	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(5 * time.Minute) // +5
+	GetDB().RecordSurplus(v.ID, 500)
+	cc.OnTick()
+	state = GetDB().GetVehicleState(v.ID)
+	assert.Equal(t, ChargeStateNotCharging, state.Charging)
+
+	// record a surplus large enough, should start charging
+	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(5 * time.Minute) // +10
+	GetDB().RecordSurplus(v.ID, 2500)
+	cc.OnTick()
+	state = GetDB().GetVehicleState(v.ID)
+	assert.Equal(t, ChargeStateChargingOnSolar, state.Charging)
+
+	// record a surplus not large enough anymore, but should keep on charging
+	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(10 * time.Minute) // +20
+	GetDB().RecordSurplus(v.ID, -500)
+	cc.OnTick()
+	state = GetDB().GetVehicleState(v.ID)
+	assert.Equal(t, ChargeStateChargingOnSolar, state.Charging)
+
+	// charging should end now
+	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(10 * time.Minute) // +30
+	cc.OnTick()
+	state = GetDB().GetVehicleState(v.ID)
+	assert.Equal(t, ChargeStateNotCharging, state.Charging)
+}
+
+func TestChargeControl_SolarCharging_AmpsAdjustment(t *testing.T) {
 	t.Cleanup(ResetTestDB)
 
 	v := &Vehicle{
@@ -1089,4 +1161,70 @@ func TestChargeControl_containsPricesUntilDeparture_edge2(t *testing.T) {
 
 	cc := NewTestChargeController()
 	assert.True(t, cc.containsPricesUntilDeparture(prices, departure))
+}
+
+func TestChargeControl_canAdjustSolarAmps_yes(t *testing.T) {
+	t.Cleanup(ResetTestDB)
+
+	v := &Vehicle{ID: 123}
+	GetDB().GetConnection().Exec("insert into surpluses (vehicle_id, ts, surplus_watts) values (?, ?, ?)", v.ID, GetDB().formatSqliteDatetime(GetDB().Time.UTCNow()), 2000)
+	GetDB().GetConnection().Exec("insert into logs values(?, ?, ?, ?)", v.ID, GetDB().formatSqliteDatetime(GetDB().Time.UTCNow().Add(-10*time.Minute)), LogEventSetChargingAmps, "")
+	cc := NewTestChargeController()
+	assert.True(t, cc.canAdjustSolarAmps(v))
+}
+
+func TestChargeControl_canAdjustSolarAmps_yesEdge(t *testing.T) {
+	t.Cleanup(ResetTestDB)
+
+	v := &Vehicle{ID: 123}
+	GetDB().GetConnection().Exec("insert into surpluses (vehicle_id, ts, surplus_watts) values (?, ?, ?)", v.ID, GetDB().formatSqliteDatetime(GetDB().Time.UTCNow()), 2000)
+	GetDB().GetConnection().Exec("insert into logs values(?, ?, ?, ?)", v.ID, GetDB().formatSqliteDatetime(GetDB().Time.UTCNow().Add(-5*time.Minute)), LogEventSetChargingAmps, "")
+	cc := NewTestChargeController()
+	assert.True(t, cc.canAdjustSolarAmps(v))
+}
+
+func TestChargeControl_canAdjustSolarAmps_no(t *testing.T) {
+	t.Cleanup(ResetTestDB)
+
+	v := &Vehicle{ID: 123}
+	GetDB().GetConnection().Exec("insert into surpluses (vehicle_id, ts, surplus_watts) values (?, ?, ?)", v.ID, GetDB().formatSqliteDatetime(GetDB().Time.UTCNow()), 2000)
+	GetDB().GetConnection().Exec("insert into logs values(?, ?, ?, ?)", v.ID, GetDB().formatSqliteDatetime(GetDB().Time.UTCNow().Add(-4*time.Minute)), LogEventSetChargingAmps, "")
+	cc := NewTestChargeController()
+	assert.False(t, cc.canAdjustSolarAmps(v))
+}
+
+func TestChargeControl_getActualSurplus_charging(t *testing.T) {
+	t.Cleanup(ResetTestDB)
+
+	v := &Vehicle{ID: 123, NumPhases: 3}
+	s := &VehicleState{Charging: ChargeStateChargingOnSolar, Amps: 5}
+	GetDB().RecordSurplus(v.ID, -2000)
+	cc := NewTestChargeController()
+	surplus := cc.getActualSurplus(v, s)
+	assert.NotNil(t, surplus)
+	assert.Equal(t, 1450, surplus.SurplusWatts)
+}
+
+func TestChargeControl_getActualSurplus_charging2(t *testing.T) {
+	t.Cleanup(ResetTestDB)
+
+	v := &Vehicle{ID: 123, NumPhases: 1}
+	s := &VehicleState{Charging: ChargeStateChargingOnSolar, Amps: 1}
+	GetDB().RecordSurplus(v.ID, 0)
+	cc := NewTestChargeController()
+	surplus := cc.getActualSurplus(v, s)
+	assert.NotNil(t, surplus)
+	assert.Equal(t, 230, surplus.SurplusWatts)
+}
+
+func TestChargeControl_getActualSurplus_notCharging(t *testing.T) {
+	t.Cleanup(ResetTestDB)
+
+	v := &Vehicle{ID: 123, NumPhases: 3}
+	s := &VehicleState{Charging: ChargeStateNotCharging, Amps: 0}
+	GetDB().RecordSurplus(v.ID, 2000)
+	cc := NewTestChargeController()
+	surplus := cc.getActualSurplus(v, s)
+	assert.NotNil(t, surplus)
+	assert.Equal(t, 2000, surplus.SurplusWatts)
 }
