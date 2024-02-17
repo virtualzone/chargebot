@@ -1,9 +1,15 @@
 package main
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
 	"database/sql"
+	"encoding/base64"
+	"io"
 	"log"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -218,7 +224,7 @@ func (db *DB) DeleteExpiredAuthCodes() {
 }
 
 func (db *DB) CreateUpdateUser(user *User) {
-	_, err := db.GetConnection().Exec("replace into users values(?, ?)", user.ID, user.RefreshToken)
+	_, err := db.GetConnection().Exec("replace into users values(?, ?)", user.ID, "c:"+db.encrypt(user.RefreshToken))
 	if err != nil {
 		log.Panicln(err)
 	}
@@ -232,6 +238,9 @@ func (db *DB) GetUser(ID string) *User {
 	if err != nil {
 		log.Println(err)
 		return nil
+	}
+	if strings.Index(e.RefreshToken, "c:") == 0 {
+		e.RefreshToken = db.decrypt(e.RefreshToken[2:])
 	}
 	return e
 }
@@ -618,3 +627,41 @@ func (db *DB) parseSqliteDatetime(ts string) *time.Time {
 	return &parsedTime
 }
 */
+
+func (db *DB) encrypt(s string) string {
+	aes, err := aes.NewCipher([]byte(GetConfig().CryptKey))
+	if err != nil {
+		panic(err)
+	}
+	gcm, err := cipher.NewGCM(aes)
+	if err != nil {
+		panic(err)
+	}
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err = io.ReadFull(rand.Reader, nonce); err != nil {
+		panic(err)
+	}
+	ciphertext := gcm.Seal(nonce, nonce, []byte(s), nil)
+	res := base64.StdEncoding.EncodeToString(ciphertext)
+	return res
+}
+
+func (db *DB) decrypt(s string) string {
+	ciphertext, _ := base64.StdEncoding.Strict().DecodeString(s)
+	aes, err := aes.NewCipher([]byte(GetConfig().CryptKey))
+	if err != nil {
+		panic(err)
+	}
+	gcm, err := cipher.NewGCM(aes)
+	if err != nil {
+		panic(err)
+	}
+	nonceSize := gcm.NonceSize()
+	nonce, ciphertext := ciphertext[:nonceSize], ciphertext[nonceSize:]
+	plaintext, err := gcm.Open(nil, []byte(nonce), []byte(ciphertext), nil)
+	if err != nil {
+		panic(err)
+	}
+
+	return string(plaintext)
+}

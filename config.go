@@ -20,6 +20,7 @@ type Config struct {
 	PrivateKey   protocol.ECDHPrivateKey
 	ZMQPublisher string
 	DebugLog     bool
+	CryptKey     string
 }
 
 var _configInstance *Config
@@ -51,6 +52,10 @@ func (c *Config) ReadConfig() {
 	}
 	c.ZMQPublisher = c.getEnv("ZMQ_PUB", "")
 	c.DebugLog = (c.getEnv("DEBUG_LOG", "0") == "1")
+	c.CryptKey = c.getEnv("CRYPT_KEY", "")
+	if len(c.CryptKey) != 32 {
+		log.Panicln("CRYPT_KEY must be 32 bytes long")
+	}
 }
 
 func (c *Config) Print() {
