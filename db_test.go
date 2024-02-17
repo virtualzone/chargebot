@@ -211,3 +211,24 @@ func TestDB_GetVehicleIDsWithTibberTokenWithoutPricesForTomorrow(t *testing.T) {
 	assert.Len(t, l, 1)
 	assert.Equal(t, v.ID, l[0])
 }
+
+func TestDB_encrypt(t *testing.T) {
+	plaintext := "this is a test"
+	in := GetDB().encrypt(plaintext)
+	out := GetDB().decrypt(in)
+	assert.Equal(t, plaintext, out)
+}
+
+func TestDB_UpgradeRefreshTokenEncryption(t *testing.T) {
+	t.Cleanup(ResetTestDB)
+
+	userID := "1234abcd"
+	token := "this-is-the-refresh-token"
+	GetDB().GetConnection().Exec("replace into users values(?, ?)", userID, token)
+	user := GetDB().GetUser(userID)
+	assert.Equal(t, token, user.RefreshToken)
+
+	GetDB().CreateUpdateUser(user)
+	user = GetDB().GetUser(userID)
+	assert.Equal(t, token, user.RefreshToken)
+}
