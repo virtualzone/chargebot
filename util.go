@@ -109,3 +109,7 @@ func GetHourstamp(year int, month int, day int, hour int) int {
 	hourstamp, _ := strconv.Atoi(fmt.Sprintf("%4d%02d%02d%02d", year, month, day, hour))
 	return hourstamp
 }
+
+func LogDebug(s string) {
+	log.Println("DEBUG: " + s)
+}

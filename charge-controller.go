@@ -177,16 +177,19 @@ func (c *ChargeController) checkStartOnSolar(vehicle *Vehicle, state *VehicleSta
 	// check if this is a recent recording
 	now := c.Time.UTCNow()
 	if surplus.Timestamp.Before(now.Add(-10 * time.Minute)) {
+		LogDebug(fmt.Sprintf("checkStartOnSolar() - no current surplus for vehicle %d", vehicle.ID))
 		return false, 0
 	}
 
 	// check if there is any surplus
 	if surplus.SurplusWatts <= 0 {
+		LogDebug(fmt.Sprintf("checkStartOnSolar() - negative surplus %d for vehicle %d", surplus.SurplusWatts, vehicle.ID))
 		return false, 0
 	}
 
 	// check if surplus minimum is reached
 	if surplus.SurplusWatts < vehicle.MinSurplus {
+		LogDebug(fmt.Sprintf("checkStartOnSolar() - too low surplus %d for vehicle %d", surplus.SurplusWatts, vehicle.ID))
 		return false, 0
 	}
 
@@ -198,6 +201,7 @@ func (c *ChargeController) checkStartOnSolar(vehicle *Vehicle, state *VehicleSta
 	if amps > vehicle.MaxAmps {
 		amps = vehicle.MaxAmps
 	}
+	LogDebug(fmt.Sprintf("checkStartOnSolar() - encourage %d amps for vehicle %d", amps, vehicle.ID))
 
 	return true, amps
 }
@@ -521,9 +525,11 @@ func (c *ChargeController) checkChargeProcess(accessToken string, vehicle *Vehic
 
 	// check how the new charging state should be
 	targetState, targetAmps := c.checkTargetState(vehicle, state)
+	LogDebug(fmt.Sprintf("checkChargeProcess() - target state %d with %d amps for vehicle %d", targetState, targetAmps, vehicle.ID))
 
 	// if minimum charge time is not reached, do nothing
 	if !c.minimumChargeTimeReached(vehicle, state) {
+		LogDebug(fmt.Sprintf("checkChargeProcess() - min charge time not reached for vehicle %d", vehicle.ID))
 		// ...except when vehicle is charging on solar and amps need to be adjusted
 		if state.Charging == ChargeStateChargingOnSolar && targetAmps > 0 && targetAmps != state.Amps {
 			// ...and only if the last amps adjustment occured before the latest surplus data came in

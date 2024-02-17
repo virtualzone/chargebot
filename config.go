@@ -19,6 +19,7 @@ type Config struct {
 	Reset        bool
 	PrivateKey   protocol.ECDHPrivateKey
 	ZMQPublisher string
+	DebugLog     bool
 }
 
 var _configInstance *Config
@@ -49,6 +50,7 @@ func (c *Config) ReadConfig() {
 		c.PrivateKey = privateKey
 	}
 	c.ZMQPublisher = c.getEnv("ZMQ_PUB", "")
+	c.DebugLog = (c.getEnv("DEBUG_LOG", "0") == "1")
 }
 
 func (c *Config) Print() {
