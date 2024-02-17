@@ -1,9 +1,15 @@
 package main
 
 import (
+	"io"
+	"log"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
 type MockTime struct {
@@ -26,6 +32,7 @@ func TestMain(m *testing.M) {
 	GetDB().Time = GlobalMockTime
 	GetDB().Connect()
 	ResetTestDB()
+	InitHTTPRouter()
 	code := m.Run()
 	os.Exit(code)
 }
@@ -35,7 +42,6 @@ func ResetTestDB() {
 	GetDB().InitDBStructure()
 	TeslaAPIInstance = &TeslaAPIMock{}
 	GlobalMockTime.CurTime = time.Now().UTC()
-	//TeslaAPIInstance.InitTokenCache()
 }
 
 func NewTestChargeController() *ChargeController {
@@ -58,4 +64,32 @@ func GetNextMondayMidnight() time.Time {
 	now = now.AddDate(0, 0, 8-int(curWeekday))
 	now = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 	return now
+}
+
+func getTestJWT(userID string) string {
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"exp": time.Now().UTC().AddDate(0, 0, 1).Unix(),
+		"iat": time.Now().UTC().Unix(),
+		"sub": userID,
+	})
+	tokenString, err := token.SignedString([]byte("sample-secret"))
+	if err != nil {
+		log.Fatalln(err)
+		return ""
+	}
+	return tokenString
+}
+
+func newHTTPRequest(method, url, bearer string, body io.Reader) *http.Request {
+	req, _ := http.NewRequest(method, url, body)
+	if bearer != "" {
+		req.Header.Set("Authorization", "Bearer "+bearer)
+	}
+	return req
+}
+
+func executeTestRequest(req *http.Request) *httptest.ResponseRecorder {
+	rr := httptest.NewRecorder()
+	httpRouter.ServeHTTP(rr, req)
+	return rr
 }

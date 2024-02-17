@@ -24,6 +24,7 @@ type contextKey string
 var (
 	contextKeyUserID     = contextKey("UserID")
 	contextKeyAuthHeader = contextKey("AuthHeader")
+	httpRouter           *mux.Router
 )
 
 type Route interface {
@@ -150,6 +151,7 @@ func VerifyAuthMiddleware(next http.Handler) http.Handler {
 		if !tokenValid {
 			authURLs := []string{
 				"/api/1/tesla/",
+				"/api/1/ctrl/",
 			}
 			url := r.URL.RequestURI()
 			for _, authURL := range authURLs {
@@ -169,9 +171,7 @@ func VerifyAuthMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func ServeHTTP() {
-	log.Println("Initializing REST services...")
-
+func InitHTTPRouter() {
 	router := mux.NewRouter()
 	routers := make(map[string]Route)
 	routers["/api/1/auth/"] = &AuthRouter{}
@@ -195,12 +195,18 @@ func ServeHTTP() {
 
 	router.Use(VerifyAuthMiddleware)
 
+	httpRouter = router
+}
+
+func ServeHTTP() {
+
+	log.Println("Initializing REST services...")
 	httpServer := &http.Server{
 		Addr:         "0.0.0.0:8080",
 		WriteTimeout: time.Second * 15,
 		ReadTimeout:  time.Second * 15,
 		IdleTimeout:  time.Second * 60,
-		Handler:      router,
+		Handler:      httpRouter,
 	}
 
 	go func() {
