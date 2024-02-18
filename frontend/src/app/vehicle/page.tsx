@@ -250,7 +250,7 @@ export default function PageVehicle() {
         <CopyBlock text={code1} language="bash" wrapLongLines={true} showLineNumbers={false} />
         <p>Alternatively, you can push your current inverter active power and your household&apos;s consumption separately:</p>
         <CopyBlock text={code2} language="bash" wrapLongLines={true} showLineNumbers={false} />
-        <h5>Update plugged in status</h5>
+        <h5 style={{'marginTop': "25px"}}>Update plugged in status</h5>
         <p>If your vehicles gets plugged in:</p>
         <CopyBlock text={code3} language="bash" wrapLongLines={true} showLineNumbers={false} />
         <p>If your vehicles gets unplugged:</p>
@@ -544,11 +544,11 @@ export default function PageVehicle() {
               </tr>
               <tr>
                 <td>SoC</td>
-                <td>{vehicleState.soc} %</td>
+                <td>{vehicleState.soc ? vehicleState.soc + ' %' : 'Unknown'}</td>
               </tr>
               <tr>
                 <td>Amps</td>
-                <td>{vehicleState.amps} A</td>
+                <td>{vehicleState.amps !== undefined ? vehicleState.amps + ' A' : 'Unknown'}</td>
               </tr>
             </tbody>
           </Table>
@@ -581,7 +581,8 @@ export default function PageVehicle() {
       <p>Before chargebot.io can control your vehicle's charging process, you need to set up the virtual key:</p>
       <p><a href="https://tesla.com/_ak/chargebot.io" target="_blank">Set Up Virtual Key</a></p>
       <br />
-      <Accordion defaultActiveKey="0" flush={true}>
+      <Accordion defaultActiveKey={((vehicle.api_token) && (vehicleState)) ? '2' : '0'} flush={true}>
+        {accordionState}
         <Accordion.Item eventKey="0">
           <Accordion.Header>Charging Preferences</Accordion.Header>
           <Accordion.Body>
@@ -599,7 +600,6 @@ export default function PageVehicle() {
             </div>
           </Accordion.Body>
         </Accordion.Item>
-        {accordionState}
         {accordionSurpluses}
         {accordionChargingEvents}
         {accordionManualControl}
