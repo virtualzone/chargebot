@@ -11,6 +11,8 @@ import (
 
 const MaxVehicleDataUpdateIntervalMinutes int = 5
 
+var DelayBetweenAPICommands time.Duration = time.Second * 2
+
 type ChargeController struct {
 	Ticker *time.Ticker
 	Time   Time
@@ -86,10 +88,14 @@ func (c *ChargeController) stopCharging(accessToken string, vehicle *Vehicle) {
 		GetDB().LogChargingEvent(vehicle.ID, LogEventChargeStop, fmt.Sprintf("could not init session with car: %s", err.Error()))
 		return
 	}
+
+	time.Sleep(DelayBetweenAPICommands) // delay
+
 	if err := GetTeslaAPI().ChargeStop(car); err != nil {
 		GetDB().LogChargingEvent(vehicle.ID, LogEventChargeStop, fmt.Sprintf("could not stop charging: %s", err.Error()))
 		return
 	}
+
 	GetDB().SetVehicleStateCharging(vehicle.ID, ChargeStateNotCharging)
 	GetDB().SetVehicleStateAmps(vehicle.ID, 0)
 	GetDB().LogChargingEvent(vehicle.ID, LogEventChargeStop, "charging stopped")
@@ -134,12 +140,16 @@ func (c *ChargeController) activateCharging(accessToken string, vehicle *Vehicle
 	}
 	GetDB().LogChargingEvent(vehicle.ID, LogEventWakeVehicle, "")
 
+	time.Sleep(DelayBetweenAPICommands) // delay
+
 	// ensure current SoC has not changed in the meantime
-	state.SoC = UpdateVehicleDataSaveSoC(accessToken, vehicle)
+	state.SoC, _ = UpdateVehicleDataSaveSoC(accessToken, vehicle)
 	if !c.isChargingRequired(state.SoC, vehicle.TargetSoC) {
 		GetDB().LogChargingEvent(vehicle.ID, LogEventChargeStart, "charging skipped, target SoC is already reached")
 		return false
 	}
+
+	time.Sleep(DelayBetweenAPICommands) // delay
 
 	// set the charge limit
 	if err := GetTeslaAPI().SetChargeLimit(car, vehicle.TargetSoC); err != nil {
@@ -148,6 +158,8 @@ func (c *ChargeController) activateCharging(accessToken string, vehicle *Vehicle
 	}
 	GetDB().LogChargingEvent(vehicle.ID, LogEventSetTargetSoC, fmt.Sprintf("target SoC set to %d", vehicle.TargetSoC))
 
+	time.Sleep(DelayBetweenAPICommands) // delay
+
 	// set amps to charge
 	if err := GetTeslaAPI().SetChargeAmps(car, amps); err != nil {
 		GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, "could not set charge amps: "+err.Error())
@@ -155,10 +167,16 @@ func (c *ChargeController) activateCharging(accessToken string, vehicle *Vehicle
 	}
 	GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, fmt.Sprintf("charge amps set to %d", amps))
 
-	GetTeslaAPI().ChargeStart(car)
+	time.Sleep(DelayBetweenAPICommands) // delay
+
+	if err := GetTeslaAPI().ChargeStart(car); err != nil {
+		GetDB().LogChargingEvent(vehicle.ID, LogEventChargeStart, "could not start charging: "+err.Error())
+		return false
+	}
+	GetDB().LogChargingEvent(vehicle.ID, LogEventChargeStart, "")
+
 	GetDB().SetVehicleStateAmps(vehicle.ID, amps)
 	GetDB().SetVehicleStateCharging(vehicle.ID, source)
-	GetDB().LogChargingEvent(vehicle.ID, LogEventChargeStart, "")
 
 	// charging should start now
 	return true
@@ -514,7 +532,17 @@ func (c *ChargeController) checkChargeProcess(accessToken string, vehicle *Vehic
 	// check when vehicle data was last updated
 	if c.canUpdateVehicleData(vehicle.ID) {
 		GetTeslaAPI().Wakeup(accessToken, vehicle)
-		state.SoC = UpdateVehicleDataSaveSoC(accessToken, vehicle)
+		time.Sleep(DelayBetweenAPICommands) // delay
+		soc, data := UpdateVehicleDataSaveSoC(accessToken, vehicle)
+		state.SoC = soc
+		if strings.ToLower(data.ChargeState.ChargingState) != "charging" {
+			// strange situation: we assume car is charging, but it is not
+			LogDebug(fmt.Sprintf("strange situation for vehicle %d: app assumes state charging , but it's actual state is '%s'", vehicle.ID, data.ChargeState.ChargingState))
+			GetDB().SetVehicleStateCharging(vehicle.ID, ChargeStateNotCharging)
+			GetDB().SetVehicleStateAmps(vehicle.ID, 0)
+			GetDB().LogChargingEvent(vehicle.ID, LogEventChargeStop, "charging state reset (state mismatch between car and app)")
+			return
+		}
 	}
 
 	// if target SoC is reached: stop charging

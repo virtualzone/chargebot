@@ -158,7 +158,6 @@ func VerifyAuthMiddleware(next http.Handler) http.Handler {
 				authURL = strings.TrimSpace(authURL)
 				authURL = strings.TrimSuffix(authURL, "/")
 				if authURL != "" && (url == authURL || strings.HasPrefix(url, authURL+"/")) {
-					log.Println(authURL + " // " + url)
 					SendUnauthorized(w)
 					return
 				}

@@ -477,12 +477,14 @@ func TestChargeControl_SolarCharging(t *testing.T) {
 		},
 	}
 	api.On("GetVehicleData", "token", mock.Anything).Return(vData, nil)
+	UpdateTeslaAPIMockData(api, 123, 53, "")
 
 	// on start, no surplus records, so vehicle is not charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(1 * time.Hour).Add(-1 * time.Duration(GlobalMockTime.CurTime.Minute()) * time.Minute)
 	cc.OnTick()
 	state := GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateNotCharging, state.Charging)
+	UpdateTeslaAPIMockData(api, 123, 53, "")
 
 	// record a surplus too low, still no charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(5 * time.Minute) // +5
@@ -490,6 +492,7 @@ func TestChargeControl_SolarCharging(t *testing.T) {
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateNotCharging, state.Charging)
+	UpdateTeslaAPIMockData(api, 123, 53, "Charging")
 
 	// record a surplus large enough, should start charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(5 * time.Minute) // +10
@@ -497,6 +500,7 @@ func TestChargeControl_SolarCharging(t *testing.T) {
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateChargingOnSolar, state.Charging)
+	UpdateTeslaAPIMockData(api, 123, 53, "Charging")
 
 	// record a surplus not large enough anymore, but should keep on charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(10 * time.Minute) // +20
@@ -504,6 +508,7 @@ func TestChargeControl_SolarCharging(t *testing.T) {
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateChargingOnSolar, state.Charging)
+	UpdateTeslaAPIMockData(api, 123, 53, "")
 
 	// charging should end now
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(10 * time.Minute) // +30
@@ -549,12 +554,14 @@ func TestChargeControl_SolarCharging_AmpsAdjustment(t *testing.T) {
 		},
 	}
 	api.On("GetVehicleData", "token", mock.Anything).Return(vData, nil)
+	UpdateTeslaAPIMockData(api, 123, 53, "")
 
 	// on start, no surplus records, so vehicle is not charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(1 * time.Hour).Add(-1 * time.Duration(GlobalMockTime.CurTime.Minute()) * time.Minute)
 	cc.OnTick()
 	state := GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateNotCharging, state.Charging)
+	UpdateTeslaAPIMockData(api, 123, 53, "")
 
 	// record a surplus too low, still no charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(5 * time.Minute) // +5
@@ -562,6 +569,7 @@ func TestChargeControl_SolarCharging_AmpsAdjustment(t *testing.T) {
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateNotCharging, state.Charging)
+	UpdateTeslaAPIMockData(api, 123, 53, "Charging")
 
 	// record a surplus large enough, should start charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(5 * time.Minute) // +10
@@ -569,6 +577,7 @@ func TestChargeControl_SolarCharging_AmpsAdjustment(t *testing.T) {
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateChargingOnSolar, state.Charging)
+	UpdateTeslaAPIMockData(api, 123, 53, "Charging")
 
 	// record a surplus not large enough anymore, but should keep on charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(10 * time.Minute) // +20
@@ -576,6 +585,7 @@ func TestChargeControl_SolarCharging_AmpsAdjustment(t *testing.T) {
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateChargingOnSolar, state.Charging)
+	UpdateTeslaAPIMockData(api, 123, 53, "")
 
 	// charging should end now
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(10 * time.Minute) // +30
@@ -615,7 +625,7 @@ func TestChargeControl_TibberChargingNoDeparturePriceLimit(t *testing.T) {
 	api.On("ChargeStart", mock.Anything).Return(nil)
 	api.On("ChargeStop", mock.Anything).Return(nil)
 	api.On("Wakeup", mock.Anything, mock.Anything).Return(nil)
-	UpdateTeslaAPIMockSoC(api, 123, 53)
+	UpdateTeslaAPIMockData(api, 123, 53, "")
 
 	now := time.Now().UTC()
 	SetTibberTestPrice(v.ID, now.Add(time.Hour*1), 0.25) // 0
@@ -630,30 +640,35 @@ func TestChargeControl_TibberChargingNoDeparturePriceLimit(t *testing.T) {
 	cc.OnTick()
 	state := GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateNotCharging, state.Charging)
+	UpdateTeslaAPIMockData(api, 123, 53, "")
 
 	// +1 hour, price still above maximum
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(1 * time.Hour) // +1
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateNotCharging, state.Charging)
+	UpdateTeslaAPIMockData(api, 123, 53, "")
 
 	// +2 hours, price is below max, but highest among below-threshold prices, so still no charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(1 * time.Hour) // +1
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateNotCharging, state.Charging)
+	UpdateTeslaAPIMockData(api, 123, 53, "Charging")
 
 	// +3 hours, price is below max and even though not minimum, this hour is required to reach the desired SoC
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(1 * time.Hour) // +1
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateChargingOnGrid, state.Charging)
+	UpdateTeslaAPIMockData(api, 123, 53, "Charging")
 
 	// +4 hours, price is minimal, still charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(1 * time.Hour) // +1
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateChargingOnGrid, state.Charging)
+	UpdateTeslaAPIMockData(api, 123, 53, "")
 
 	// +5 hours, charging should stop
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(1 * time.Hour) // +1
@@ -695,7 +710,7 @@ func TestChargeControl_TibberChargingDepartureNoPriceLimit(t *testing.T) {
 	api.On("ChargeStart", mock.Anything).Return(nil)
 	api.On("ChargeStop", mock.Anything).Return(nil)
 	api.On("Wakeup", mock.Anything, mock.Anything).Return(nil)
-	UpdateTeslaAPIMockSoC(api, 123, 40)
+	UpdateTeslaAPIMockData(api, 123, 40, "")
 
 	now := GetNextMondayMidnight()
 
@@ -720,119 +735,119 @@ func TestChargeControl_TibberChargingDepartureNoPriceLimit(t *testing.T) {
 	cc.OnTick()
 	state := GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateNotCharging, state.Charging)
-	UpdateTeslaAPIMockSoC(api, 123, 40)
+	UpdateTeslaAPIMockData(api, 123, 40, "")
 
 	// 00:30 - not charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(time.Minute * 30)
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateNotCharging, state.Charging)
-	UpdateTeslaAPIMockSoC(api, 123, 40)
+	UpdateTeslaAPIMockData(api, 123, 40, "Charging")
 
 	// 01:00 - charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(time.Minute * 30)
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateChargingOnGrid, state.Charging)
-	UpdateTeslaAPIMockSoC(api, 123, 45)
+	UpdateTeslaAPIMockData(api, 123, 45, "Charging")
 
 	// 01:30 - charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(time.Minute * 30)
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateChargingOnGrid, state.Charging)
-	UpdateTeslaAPIMockSoC(api, 123, 51)
+	UpdateTeslaAPIMockData(api, 123, 51, "Charging")
 
 	// 02:00 - not charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(time.Minute * 30)
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateNotCharging, state.Charging)
-	UpdateTeslaAPIMockSoC(api, 123, 51)
+	UpdateTeslaAPIMockData(api, 123, 51, "Charging")
 
 	// 02:30 - not charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(time.Minute * 30)
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateNotCharging, state.Charging)
-	UpdateTeslaAPIMockSoC(api, 123, 51)
+	UpdateTeslaAPIMockData(api, 123, 51, "Charging")
 
 	// 03:00 - charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(time.Minute * 30)
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateChargingOnGrid, state.Charging)
-	UpdateTeslaAPIMockSoC(api, 123, 56)
+	UpdateTeslaAPIMockData(api, 123, 56, "Charging")
 
 	// 03:30 - charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(time.Minute * 30)
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateChargingOnGrid, state.Charging)
-	UpdateTeslaAPIMockSoC(api, 123, 62)
+	UpdateTeslaAPIMockData(api, 123, 62, "Charging")
 
 	// 04:00 - charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(time.Minute * 30)
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateChargingOnGrid, state.Charging)
-	UpdateTeslaAPIMockSoC(api, 123, 68)
+	UpdateTeslaAPIMockData(api, 123, 68, "Charging")
 
 	// 04:30 - charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(time.Minute * 30)
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateChargingOnGrid, state.Charging)
-	UpdateTeslaAPIMockSoC(api, 123, 73)
+	UpdateTeslaAPIMockData(api, 123, 73, "Charging")
 
 	// 05:00 - charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(time.Minute * 30)
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateChargingOnGrid, state.Charging)
-	UpdateTeslaAPIMockSoC(api, 123, 77)
+	UpdateTeslaAPIMockData(api, 123, 77, "Charging")
 
 	// 05:30 - charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(time.Minute * 30)
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateChargingOnGrid, state.Charging)
-	UpdateTeslaAPIMockSoC(api, 123, 80)
+	UpdateTeslaAPIMockData(api, 123, 80, "")
 
 	// 06:00 - not charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(time.Minute * 30)
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateNotCharging, state.Charging)
-	UpdateTeslaAPIMockSoC(api, 123, 80)
+	UpdateTeslaAPIMockData(api, 123, 80, "")
 
 	// 06:30 - not charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(time.Minute * 30)
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateNotCharging, state.Charging)
-	UpdateTeslaAPIMockSoC(api, 123, 80)
+	UpdateTeslaAPIMockData(api, 123, 80, "")
 
 	// 07:00 - not charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(time.Minute * 30)
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateNotCharging, state.Charging)
-	UpdateTeslaAPIMockSoC(api, 123, 80)
+	UpdateTeslaAPIMockData(api, 123, 80, "")
 
 	// 07:30 - not charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(time.Minute * 30)
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateNotCharging, state.Charging)
-	UpdateTeslaAPIMockSoC(api, 123, 80)
+	UpdateTeslaAPIMockData(api, 123, 80, "")
 
 	// 08:00 - not charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(time.Minute * 30)
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateNotCharging, state.Charging)
-	UpdateTeslaAPIMockSoC(api, 123, 80)
+	UpdateTeslaAPIMockData(api, 123, 80, "")
 }
 
 func TestChargeControl_TibberChargingDepartureNoPriceLimit2(t *testing.T) {
@@ -868,7 +883,7 @@ func TestChargeControl_TibberChargingDepartureNoPriceLimit2(t *testing.T) {
 	api.On("ChargeStart", mock.Anything).Return(nil)
 	api.On("ChargeStop", mock.Anything).Return(nil)
 	api.On("Wakeup", mock.Anything, mock.Anything).Return(nil)
-	UpdateTeslaAPIMockSoC(api, 123, 40)
+	UpdateTeslaAPIMockData(api, 123, 40, "")
 
 	now := GetNextMondayMidnight()
 	now = now.Add(time.Hour * 22)
@@ -894,91 +909,91 @@ func TestChargeControl_TibberChargingDepartureNoPriceLimit2(t *testing.T) {
 	cc.OnTick()
 	state := GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateNotCharging, state.Charging)
-	UpdateTeslaAPIMockSoC(api, 123, 63)
+	UpdateTeslaAPIMockData(api, 123, 63, "")
 
 	// 22:30 - not charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(time.Minute * 30)
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateNotCharging, state.Charging)
-	UpdateTeslaAPIMockSoC(api, 123, 63)
+	UpdateTeslaAPIMockData(api, 123, 63, "")
 
 	// 23:00 - not charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(time.Minute * 30)
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateNotCharging, state.Charging)
-	UpdateTeslaAPIMockSoC(api, 123, 63)
+	UpdateTeslaAPIMockData(api, 123, 63, "")
 
 	// 23:30 - not charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(time.Minute * 30)
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateNotCharging, state.Charging)
-	UpdateTeslaAPIMockSoC(api, 123, 63)
+	UpdateTeslaAPIMockData(api, 123, 63, "")
 
 	// 00:00 - not charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(time.Minute * 30)
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateNotCharging, state.Charging)
-	UpdateTeslaAPIMockSoC(api, 123, 63)
+	UpdateTeslaAPIMockData(api, 123, 63, "")
 
 	// 00:30 - not charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(time.Minute * 30)
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateNotCharging, state.Charging)
-	UpdateTeslaAPIMockSoC(api, 123, 63)
+	UpdateTeslaAPIMockData(api, 123, 63, "")
 
 	// 01:00 - not charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(time.Minute * 30)
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateNotCharging, state.Charging)
-	UpdateTeslaAPIMockSoC(api, 123, 63)
+	UpdateTeslaAPIMockData(api, 123, 63, "")
 
 	// 01:30 - not charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(time.Minute * 30)
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateNotCharging, state.Charging)
-	UpdateTeslaAPIMockSoC(api, 123, 63)
+	UpdateTeslaAPIMockData(api, 123, 63, "Charging")
 
 	// 02:00 - charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(time.Minute * 30)
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateChargingOnGrid, state.Charging)
-	UpdateTeslaAPIMockSoC(api, 123, 65)
+	UpdateTeslaAPIMockData(api, 123, 65, "Charging")
 
 	// 02:30 - charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(time.Minute * 30)
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateChargingOnGrid, state.Charging)
-	UpdateTeslaAPIMockSoC(api, 123, 71)
+	UpdateTeslaAPIMockData(api, 123, 71, "Charging")
 
 	// 03:00 - charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(time.Minute * 30)
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateChargingOnGrid, state.Charging)
-	UpdateTeslaAPIMockSoC(api, 123, 75)
+	UpdateTeslaAPIMockData(api, 123, 75, "")
 
 	// 03:30 - not charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(time.Minute * 30)
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateNotCharging, state.Charging)
-	UpdateTeslaAPIMockSoC(api, 123, 75)
+	UpdateTeslaAPIMockData(api, 123, 75, "")
 
 	// 04:00 - not charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(time.Minute * 30)
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateNotCharging, state.Charging)
-	UpdateTeslaAPIMockSoC(api, 123, 75)
+	UpdateTeslaAPIMockData(api, 123, 75, "")
 
 }
 
@@ -1015,7 +1030,7 @@ func TestChargeControl_TibberChargingDepartureWithPriceLimit(t *testing.T) {
 	api.On("ChargeStart", mock.Anything).Return(nil)
 	api.On("ChargeStop", mock.Anything).Return(nil)
 	api.On("Wakeup", mock.Anything, mock.Anything).Return(nil)
-	UpdateTeslaAPIMockSoC(api, 123, 40)
+	UpdateTeslaAPIMockData(api, 123, 40, "")
 
 	now := GetNextMondayMidnight()
 
@@ -1040,63 +1055,63 @@ func TestChargeControl_TibberChargingDepartureWithPriceLimit(t *testing.T) {
 	cc.OnTick()
 	state := GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateNotCharging, state.Charging)
-	UpdateTeslaAPIMockSoC(api, 123, 40)
+	UpdateTeslaAPIMockData(api, 123, 40, "")
 
 	// 01:00 - not charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(time.Hour * 1)
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateNotCharging, state.Charging)
-	UpdateTeslaAPIMockSoC(api, 123, 40)
+	UpdateTeslaAPIMockData(api, 123, 40, "")
 
 	// 02:00 - not charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(time.Hour * 1)
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateNotCharging, state.Charging)
-	UpdateTeslaAPIMockSoC(api, 123, 40)
+	UpdateTeslaAPIMockData(api, 123, 40, "Charging")
 
 	// 03:00 - charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(time.Hour * 1)
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateChargingOnGrid, state.Charging)
-	UpdateTeslaAPIMockSoC(api, 123, 51)
+	UpdateTeslaAPIMockData(api, 123, 51, "Charging")
 
 	// 04:00 - charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(time.Hour * 1)
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateChargingOnGrid, state.Charging)
-	UpdateTeslaAPIMockSoC(api, 123, 62)
+	UpdateTeslaAPIMockData(api, 123, 62, "Charging")
 
 	// 05:00 - charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(time.Hour * 1)
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateChargingOnGrid, state.Charging)
-	UpdateTeslaAPIMockSoC(api, 123, 73)
+	UpdateTeslaAPIMockData(api, 123, 73, "")
 
 	// 06:00 - not charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(time.Hour * 1)
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateNotCharging, state.Charging)
-	UpdateTeslaAPIMockSoC(api, 123, 73)
+	UpdateTeslaAPIMockData(api, 123, 73, "")
 
 	// 07:00 - not charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(time.Hour * 1)
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateNotCharging, state.Charging)
-	UpdateTeslaAPIMockSoC(api, 123, 73)
+	UpdateTeslaAPIMockData(api, 123, 73, "")
 
 	// 08:00 - not charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(time.Hour * 1)
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateNotCharging, state.Charging)
-	UpdateTeslaAPIMockSoC(api, 123, 73)
+	UpdateTeslaAPIMockData(api, 123, 73, "")
 }
 
 func TestChargeControl_containsPricesUntilDeparture_true(t *testing.T) {
