@@ -73,6 +73,12 @@ func (c *ChargeController) processVehicle(vehicle *Vehicle) {
 	if !vehicle.Enabled && state.Charging != ChargeStateNotCharging {
 		// Stop charging if vehicle is still charging but not enabled anymore
 		c.stopCharging(accessToken, vehicle)
+	} else if !vehicle.SurplusCharging && state.Charging == ChargeStateChargingOnSolar {
+		// Stop charging if vehicle is still charging on solar but surplus charging is not enabled anymore
+		c.stopCharging(accessToken, vehicle)
+	} else if !vehicle.LowcostCharging && state.Charging == ChargeStateChargingOnGrid {
+		// Stop charging if vehicle is still charging on grid but grid charging is not enabled anymore
+		c.stopCharging(accessToken, vehicle)
 	} else if vehicle.Enabled && state.Charging == ChargeStateNotCharging {
 		// Check if we need to start charging
 		c.checkStartCharging(accessToken, vehicle, state)
