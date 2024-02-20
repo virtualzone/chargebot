@@ -98,11 +98,12 @@ func (a *TeslaAPIMock) Wakeup(authToken string, vehicle *Vehicle) error {
 	return args.Error(0)
 }
 
-func UpdateTeslaAPIMockSoC(api *TeslaAPIMock, vehicleID int, batteryLevel int) {
+func UpdateTeslaAPIMockData(api *TeslaAPIMock, vehicleID int, batteryLevel int, chargingState string) {
 	vData := &TeslaAPIVehicleData{
 		VehicleID: vehicleID,
 		ChargeState: TeslaAPIChargeState{
-			BatteryLevel: batteryLevel,
+			BatteryLevel:  batteryLevel,
+			ChargingState: chargingState,
 		},
 	}
 	api.On("GetVehicleData", "token", mock.Anything).Unset()

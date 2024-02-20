@@ -27,6 +27,7 @@ func TestMain(m *testing.M) {
 	os.Setenv("PRIVATE_KEY", ":none:")
 	os.Setenv("CRYPT_KEY", "12345678901234567890123456789012")
 	GetConfig().ReadConfig()
+	DelayBetweenAPICommands = time.Second * 0
 	GlobalMockTime = &MockTime{
 		CurTime: time.Now().UTC(),
 	}

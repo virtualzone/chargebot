@@ -21,16 +21,16 @@ func IsCurrentHourUTC(now *time.Time, ts *time.Time) bool {
 	return false
 }
 
-func UpdateVehicleDataSaveSoC(authToken string, vehicle *Vehicle) int {
+func UpdateVehicleDataSaveSoC(authToken string, vehicle *Vehicle) (int, *TeslaAPIVehicleData) {
 	data, err := GetTeslaAPI().GetVehicleData(authToken, vehicle)
 	if err != nil {
 		log.Println(err)
 		GetDB().LogChargingEvent(vehicle.ID, LogEventVehicleUpdateData, err.Error())
-		return 0
+		return 0, nil
 	} else {
 		GetDB().SetVehicleStateSoC(vehicle.ID, data.ChargeState.BatteryLevel)
 		GetDB().LogChargingEvent(vehicle.ID, LogEventVehicleUpdateData, fmt.Sprintf("vehicle SoC updated: %d", data.ChargeState.BatteryLevel))
-		return data.ChargeState.BatteryLevel
+		return data.ChargeState.BatteryLevel, data
 	}
 }
 
