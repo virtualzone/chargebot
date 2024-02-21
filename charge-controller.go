@@ -549,6 +549,20 @@ func (c *ChargeController) checkChargeProcess(accessToken string, vehicle *Vehic
 			GetDB().LogChargingEvent(vehicle.ID, LogEventChargeStop, "charging state reset (state mismatch between car and app)")
 			return
 		}
+		if data.ChargeState.ChargeAmps != state.Amps {
+			LogDebug(fmt.Sprintf("strange situation for vehicle %d: app assumes %d amps, but it's actual amps is %d", vehicle.ID, state.Amps, data.ChargeState.ChargeAmps))
+			car, err := GetTeslaAPI().InitSession(accessToken, vehicle, true)
+			if err != nil {
+				GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, fmt.Sprintf("could not init session with car: %s", err.Error()))
+			} else {
+				if err := GetTeslaAPI().SetChargeAmps(car, state.Amps); err != nil {
+					GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, "could not correct charge amps: "+err.Error())
+				} else {
+					GetDB().SetVehicleStateAmps(vehicle.ID, state.Amps)
+					GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, fmt.Sprintf("charge amps corrected to %d", state.Amps))
+				}
+			}
+		}
 	}
 
 	// if target SoC is reached: stop charging
