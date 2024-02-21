@@ -550,6 +550,7 @@ func (c *ChargeController) checkChargeProcess(accessToken string, vehicle *Vehic
 			return
 		}
 		if data.ChargeState.ChargeAmps != state.Amps {
+			// strange situation: car is charging at a different amps rate than assumed
 			LogDebug(fmt.Sprintf("strange situation for vehicle %d: app assumes %d amps, but it's actual amps is %d", vehicle.ID, state.Amps, data.ChargeState.ChargeAmps))
 			car, err := GetTeslaAPI().InitSession(accessToken, vehicle, true)
 			if err != nil {
@@ -562,6 +563,7 @@ func (c *ChargeController) checkChargeProcess(accessToken string, vehicle *Vehic
 					GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, fmt.Sprintf("charge amps corrected to %d", state.Amps))
 				}
 			}
+			time.Sleep(DelayBetweenAPICommands) // delay
 		}
 	}
 
