@@ -116,11 +116,11 @@ func (a *TeslaAPIImpl) GetTokens(code string, redirectURI string) (*TeslaAPIToke
 	target := "https://auth.tesla.com/oauth2/v3/token"
 	data := url.Values{}
 	data.Set("grant_type", "authorization_code")
-	data.Set("client_id", GetConfig().ClientID)
-	data.Set("client_secret", GetConfig().ClientSecret)
+	data.Set("client_id", GetConfig().TeslaClientID)
+	data.Set("client_secret", GetConfig().TeslaClientSecret)
 	data.Set("code", code)
 	data.Set("redirect_uri", redirectURI)
-	data.Set("audience", GetConfig().Audience)
+	data.Set("audience", GetConfig().TeslaAudience)
 	r, _ := http.NewRequest("POST", target, strings.NewReader(data.Encode()))
 	r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
@@ -153,7 +153,7 @@ func (a *TeslaAPIImpl) RefreshToken(refreshToken string) (*TeslaAPITokenReponse,
 	target := "https://auth.tesla.com/oauth2/v3/token"
 	data := url.Values{}
 	data.Set("grant_type", "refresh_token")
-	data.Set("client_id", GetConfig().ClientID)
+	data.Set("client_id", GetConfig().TeslaClientID)
 	data.Set("refresh_token", refreshToken)
 	r, _ := http.NewRequest("POST", target, strings.NewReader(data.Encode()))
 	r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -218,7 +218,7 @@ func (a *TeslaAPIImpl) InitSession(authToken string, vehicle *Vehicle, wakeUp bo
 	if err != nil {
 		return nil, err
 	}
-	car, err := acct.GetVehicle(ctx, vehicle.VIN, GetConfig().PrivateKey, nil)
+	car, err := acct.GetVehicle(ctx, vehicle.VIN, GetConfig().TeslaPrivateKey, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -232,7 +232,7 @@ func (a *TeslaAPIImpl) InitSession(authToken string, vehicle *Vehicle, wakeUp bo
 }
 
 func (a *TeslaAPIImpl) ListVehicles(authToken string) ([]TeslaAPIVehicleEntity, error) {
-	r, _ := http.NewRequest("GET", _configInstance.Audience+"/api/1/vehicles", nil)
+	r, _ := http.NewRequest("GET", _configInstance.TeslaAudience+"/api/1/vehicles", nil)
 
 	resp, err := RetryHTTPJSONRequest(r, authToken)
 	if err != nil {
@@ -293,7 +293,7 @@ func (a *TeslaAPIImpl) SetChargeAmps(car *vehicle.Vehicle, amps int) error {
 }
 
 func (a *TeslaAPIImpl) GetVehicleData(authToken string, vehicle *Vehicle) (*TeslaAPIVehicleData, error) {
-	target := GetConfig().Audience + "/api/1/vehicles/" + vehicle.VIN + "/vehicle_data"
+	target := GetConfig().TeslaAudience + "/api/1/vehicles/" + vehicle.VIN + "/vehicle_data"
 	r, _ := http.NewRequest("GET", target, nil)
 
 	resp, err := RetryHTTPJSONRequest(r, authToken)
@@ -315,7 +315,7 @@ func (a *TeslaAPIImpl) GetVehicleData(authToken string, vehicle *Vehicle) (*Tesl
 }
 
 func (a *TeslaAPIImpl) Wakeup(authToken string, vehicle *Vehicle) error {
-	target := GetConfig().Audience + "/api/1/vehicles/" + vehicle.VIN + "/wake_up"
+	target := GetConfig().TeslaAudience + "/api/1/vehicles/" + vehicle.VIN + "/wake_up"
 	r, _ := http.NewRequest("POST", target, nil)
 
 	_, err := RetryHTTPJSONRequest(r, authToken)

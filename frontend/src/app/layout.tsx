@@ -73,7 +73,7 @@ export default function RootLayout({
             <Navbar.Brand href="/"><BatteryCharging /> chargebot.io</Navbar.Brand>
             <Navbar.Text className="justify-content-end">
               <Button variant='link' href='/help/' hidden={!isAuthenticated}>Help</Button>
-              <Button variant='link' href='/api/1/auth/init3rdparty' hidden={isAuthenticated}>Sign In</Button>
+              <Button variant='link' href='/api/1/auth/tesla/init3rdparty' hidden={isAuthenticated}>Sign In</Button>
               <Button variant='link' href='/authorized/' hidden={!isAuthenticated}>My vehicles</Button>
             </Navbar.Text>
           </Container>
