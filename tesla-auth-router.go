@@ -11,7 +11,7 @@ import (
 	"github.com/gorilla/mux"
 )
 
-type AuthRouter struct {
+type TeslaAuthRouter struct {
 }
 
 type LoginResponse struct {
@@ -20,21 +20,21 @@ type LoginResponse struct {
 	UserID       string `json:"user_id"`
 }
 
-func (router *AuthRouter) SetupRoutes(s *mux.Router) {
+func (router *TeslaAuthRouter) SetupRoutes(s *mux.Router) {
 	s.HandleFunc("/init3rdparty", router.initThirdParty).Methods("GET")
 	s.HandleFunc("/callback", router.callback).Methods("GET")
 	s.HandleFunc("/refresh", router.refresh).Methods("POST")
 	s.HandleFunc("/tokenvalid", router.isTokenValid).Methods("GET")
 }
 
-func (router *AuthRouter) getRedirectURI() string {
+func (router *TeslaAuthRouter) getRedirectURI() string {
 	if strings.Contains(GetConfig().Hostname, "localhost") {
 		return "http://" + GetConfig().Hostname + "/callback"
 	}
 	return "https://" + GetConfig().Hostname + "/callback"
 }
 
-func (router *AuthRouter) initThirdParty(w http.ResponseWriter, r *http.Request) {
+func (router *TeslaAuthRouter) initThirdParty(w http.ResponseWriter, r *http.Request) {
 	code := GetDB().CreateAuthCode()
 
 	scope := []string{
@@ -45,7 +45,7 @@ func (router *AuthRouter) initThirdParty(w http.ResponseWriter, r *http.Request)
 		"offline_access",
 	}
 	params := url.Values{}
-	params.Add("client_id", GetConfig().ClientID)
+	params.Add("client_id", GetConfig().TeslaClientID)
 	params.Add("prompt", "login")
 	params.Add("redirect_uri", router.getRedirectURI())
 	params.Add("response_type", "code")
@@ -57,7 +57,7 @@ func (router *AuthRouter) initThirdParty(w http.ResponseWriter, r *http.Request)
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
 
-func (router *AuthRouter) callback(w http.ResponseWriter, r *http.Request) {
+func (router *TeslaAuthRouter) callback(w http.ResponseWriter, r *http.Request) {
 	state := r.URL.Query().Get("state")
 	if !GetDB().IsValidAuthCode(state) {
 		SendNotFound(w)
@@ -90,7 +90,7 @@ func (router *AuthRouter) callback(w http.ResponseWriter, r *http.Request) {
 	SendJSON(w, loginResponse)
 }
 
-func (router *AuthRouter) refresh(w http.ResponseWriter, r *http.Request) {
+func (router *TeslaAuthRouter) refresh(w http.ResponseWriter, r *http.Request) {
 	var m TeslaAPITokenReponse
 	if err := UnmarshalValidateBody(r.Body, &m); err != nil {
 		SendBadRequest(w)
@@ -124,7 +124,7 @@ func (router *AuthRouter) refresh(w http.ResponseWriter, r *http.Request) {
 	SendJSON(w, loginResponse)
 }
 
-func (router *AuthRouter) isTokenValid(w http.ResponseWriter, r *http.Request) {
+func (router *TeslaAuthRouter) isTokenValid(w http.ResponseWriter, r *http.Request) {
 	authToken := GetAuthTokenFromRequest(r)
 	if authToken == "" {
 		SendJSON(w, false)

@@ -173,7 +173,7 @@ func VerifyAuthMiddleware(next http.Handler) http.Handler {
 func InitHTTPRouter() {
 	router := mux.NewRouter()
 	routers := make(map[string]Route)
-	routers["/api/1/auth/"] = &AuthRouter{}
+	routers["/api/1/auth/tesla/"] = &TeslaAuthRouter{}
 	routers["/api/1/tesla/"] = &TeslaRouter{}
 	routers["/api/1/user/"] = &UserRouter{}
 	routers["/api/1/ctrl/"] = &ManualControlRouter{}

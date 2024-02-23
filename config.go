@@ -10,17 +10,23 @@ import (
 )
 
 type Config struct {
-	ClientID     string
-	ClientSecret string
-	Audience     string
-	DBFile       string
-	Hostname     string
-	DevProxy     bool
-	Reset        bool
-	PrivateKey   protocol.ECDHPrivateKey
-	ZMQPublisher string
-	DebugLog     bool
-	CryptKey     string
+	TeslaClientID     string
+	TeslaClientSecret string
+	TeslaAudience     string
+	DBFile            string
+	Hostname          string
+	DevProxy          bool
+	Reset             bool
+	TeslaPrivateKey   protocol.ECDHPrivateKey
+	ZMQPublisher      string
+	DebugLog          bool
+	CryptKey          string
+	AuthURL           string
+	AuthClientID      string
+	AuthClientSecret  string
+	AuthRolesPath     string
+	AuthFieldEmail    string
+	AuthFieldUsername string
 }
 
 var _configInstance *Config
@@ -35,20 +41,20 @@ func GetConfig() *Config {
 }
 
 func (c *Config) ReadConfig() {
-	c.ClientID = c.getEnv("CLIENT_ID", "e9941f08e0d6-4c2f-b8ee-291060ec648a")
-	c.ClientSecret = c.getEnv("CLIENT_SECRET", "")
-	c.Audience = c.getEnv("AUDIENCE", "https://fleet-api.prd.eu.vn.cloud.tesla.com")
+	c.TeslaClientID = c.getEnv("TESLA_CLIENT_ID", "e9941f08e0d6-4c2f-b8ee-291060ec648a")
+	c.TeslaClientSecret = c.getEnv("TESLA_CLIENT_SECRET", "")
+	c.TeslaAudience = c.getEnv("TESLA_AUDIENCE", "https://fleet-api.prd.eu.vn.cloud.tesla.com")
 	c.DBFile = c.getEnv("DB_FILE", "/tmp/tgc.db")
 	c.Hostname = c.getEnv("DOMAIN", "chargebot.io")
 	c.DevProxy = (c.getEnv("DEV_PROXY", "0") == "1")
 	c.Reset = (c.getEnv("RESET", "0") == "1")
-	privateKeyFile := c.getEnv("PRIVATE_KEY", "./private.key")
+	privateKeyFile := c.getEnv("TESLA_PRIVATE_KEY", "./private.key")
 	if privateKeyFile != ":none:" {
 		privateKey, err := protocol.LoadPrivateKey(privateKeyFile)
 		if err != nil {
 			log.Panicf("could not load private key: %s\n", err.Error())
 		}
-		c.PrivateKey = privateKey
+		c.TeslaPrivateKey = privateKey
 	}
 	c.ZMQPublisher = c.getEnv("ZMQ_PUB", "")
 	c.DebugLog = (c.getEnv("DEBUG_LOG", "0") == "1")
@@ -56,6 +62,12 @@ func (c *Config) ReadConfig() {
 	if len(c.CryptKey) != 32 {
 		log.Panicln("CRYPT_KEY must be 32 bytes long")
 	}
+	c.AuthURL = c.getEnv("AUTH_URL", "https://auth.chargebot.io/realms/chargebot")
+	c.AuthClientID = c.getEnv("AUTH_CLIENT_ID", "chargebot-website")
+	c.AuthClientSecret = c.getEnv("AUTH_CLIENT_SECRET", "")
+	c.AuthRolesPath = c.getEnv("AUTH_ROLES_PATH", "resource_access.portfolio-test.roles")
+	c.AuthFieldEmail = c.getEnv("AUTH_FIELD_EMAIL", "email")
+	c.AuthFieldUsername = c.getEnv("AUTH_FIELD_USERNAME", "preferred_username")
 }
 
 func (c *Config) Print() {

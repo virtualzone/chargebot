@@ -14,7 +14,7 @@ export default function CallbackPage() {
     const searchParams = new URLSearchParams(window.location.search);
     const state = searchParams.get("state");
     const code = searchParams.get("code");
-    const url = getBaseUrl() + "/api/1/auth/callback?state=" + state + "&code=" + code;
+    const url = getBaseUrl() + "/api/1/auth/tesla/callback?state=" + state + "&code=" + code;
     fetch(url, { method: 'GET' })
       .then(res => res.json())
       .then(json => {

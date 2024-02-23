@@ -97,7 +97,7 @@ export async function checkAuth() {
       return;
     }
 
-    fetch(getBaseUrl() + "/api/1/auth/tokenvalid", {
+    fetch(getBaseUrl() + "/api/1/auth/tesla/tokenvalid", {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${getAccessToken()}`,
@@ -108,7 +108,7 @@ export async function checkAuth() {
           resolve();
           return;
         }
-        fetch(getBaseUrl() + "/api/1/auth/refresh", {
+        fetch(getBaseUrl() + "/api/1/auth/tesla/refresh", {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${getAccessToken()}`,
