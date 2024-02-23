@@ -1217,7 +1217,7 @@ func TestChargeControl_getActualSurplus_charging(t *testing.T) {
 	cc := NewTestChargeController()
 	surplus := cc.getActualSurplus(v, s)
 	assert.NotNil(t, surplus)
-	assert.Equal(t, 1450, surplus.SurplusWatts)
+	assert.Equal(t, 1450, surplus)
 }
 
 func TestChargeControl_getActualSurplus_charging2(t *testing.T) {
@@ -1229,7 +1229,7 @@ func TestChargeControl_getActualSurplus_charging2(t *testing.T) {
 	cc := NewTestChargeController()
 	surplus := cc.getActualSurplus(v, s)
 	assert.NotNil(t, surplus)
-	assert.Equal(t, 230, surplus.SurplusWatts)
+	assert.Equal(t, 230, surplus)
 }
 
 func TestChargeControl_getActualSurplus_notCharging(t *testing.T) {
@@ -1241,5 +1241,33 @@ func TestChargeControl_getActualSurplus_notCharging(t *testing.T) {
 	cc := NewTestChargeController()
 	surplus := cc.getActualSurplus(v, s)
 	assert.NotNil(t, surplus)
-	assert.Equal(t, 2000, surplus.SurplusWatts)
+	assert.Equal(t, 2000, surplus)
+}
+
+func TestChargeControl_getActualSurplus_multipleRecords(t *testing.T) {
+	t.Cleanup(ResetTestDB)
+
+	v := &Vehicle{ID: 123, NumPhases: 3}
+	s := &VehicleState{Charging: ChargeStateNotCharging, Amps: 0}
+	GetDB().GetConnection().Exec("insert into surpluses (vehicle_id, ts, surplus_watts) values (?, ?, ?)", v.ID, GetDB().formatSqliteDatetime(GetDB().Time.UTCNow().Add(-2*time.Minute)), 1000)
+	GetDB().GetConnection().Exec("insert into surpluses (vehicle_id, ts, surplus_watts) values (?, ?, ?)", v.ID, GetDB().formatSqliteDatetime(GetDB().Time.UTCNow().Add(-1*time.Minute)), 2000)
+	GetDB().GetConnection().Exec("insert into surpluses (vehicle_id, ts, surplus_watts) values (?, ?, ?)", v.ID, GetDB().formatSqliteDatetime(GetDB().Time.UTCNow().Add(-0*time.Minute)), 3000)
+	cc := NewTestChargeController()
+	surplus := cc.getActualSurplus(v, s)
+	assert.NotNil(t, surplus)
+	assert.Equal(t, 2500, surplus)
+}
+
+func TestChargeControl_getActualSurplus_oldRecords(t *testing.T) {
+	t.Cleanup(ResetTestDB)
+
+	v := &Vehicle{ID: 123, NumPhases: 3}
+	s := &VehicleState{Charging: ChargeStateNotCharging, Amps: 0}
+	GetDB().GetConnection().Exec("insert into surpluses (vehicle_id, ts, surplus_watts) values (?, ?, ?)", v.ID, GetDB().formatSqliteDatetime(GetDB().Time.UTCNow().Add(-20*time.Minute)), 1000)
+	GetDB().GetConnection().Exec("insert into surpluses (vehicle_id, ts, surplus_watts) values (?, ?, ?)", v.ID, GetDB().formatSqliteDatetime(GetDB().Time.UTCNow().Add(-10*time.Minute)), 2000)
+	GetDB().GetConnection().Exec("insert into surpluses (vehicle_id, ts, surplus_watts) values (?, ?, ?)", v.ID, GetDB().formatSqliteDatetime(GetDB().Time.UTCNow().Add(-1*time.Minute)), 3000)
+	cc := NewTestChargeController()
+	surplus := cc.getActualSurplus(v, s)
+	assert.NotNil(t, surplus)
+	assert.Equal(t, 3000, surplus)
 }
