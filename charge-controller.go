@@ -194,31 +194,19 @@ func (c *ChargeController) checkStartOnSolar(vehicle *Vehicle, state *VehicleSta
 	}
 
 	surplus := c.getActualSurplus(vehicle, state)
-	if surplus == nil {
-		return false, 0
-	}
-
-	// check if this is a recent recording
-	now := c.Time.UTCNow()
-	if surplus.Timestamp.Before(now.Add(-10 * time.Minute)) {
+	if surplus <= 0 {
 		LogDebug(fmt.Sprintf("checkStartOnSolar() - no current surplus for vehicle %d", vehicle.ID))
 		return false, 0
 	}
 
-	// check if there is any surplus
-	if surplus.SurplusWatts <= 0 {
-		LogDebug(fmt.Sprintf("checkStartOnSolar() - negative surplus %d for vehicle %d", surplus.SurplusWatts, vehicle.ID))
-		return false, 0
-	}
-
 	// check if surplus minimum is reached
-	if surplus.SurplusWatts < vehicle.MinSurplus {
-		LogDebug(fmt.Sprintf("checkStartOnSolar() - too low surplus %d for vehicle %d", surplus.SurplusWatts, vehicle.ID))
+	if surplus < vehicle.MinSurplus {
+		LogDebug(fmt.Sprintf("checkStartOnSolar() - too low surplus %d for vehicle %d", surplus, vehicle.ID))
 		return false, 0
 	}
 
 	// determine amps to charge
-	amps := int(math.Floor(float64(surplus.SurplusWatts) / 230.0 / float64(vehicle.NumPhases)))
+	amps := int(math.Floor(float64(surplus) / 230.0 / float64(vehicle.NumPhases)))
 	if amps == 0 {
 		return false, 0
 	}
@@ -522,16 +510,27 @@ func (c *ChargeController) canAdjustSolarAmps(vehicle *Vehicle) bool {
 	return diff.Minutes() >= 5 // max. every 5 mins
 }
 
-func (c *ChargeController) getActualSurplus(vehicle *Vehicle, state *VehicleState) *SurplusRecord {
-	surpluses := GetDB().GetLatestSurplusRecords(vehicle.ID, 1)
+func (c *ChargeController) getActualSurplus(vehicle *Vehicle, state *VehicleState) int {
+	surpluses := GetDB().GetLatestSurplusRecords(vehicle.ID, 2)
 	if len(surpluses) == 0 {
-		return nil
+		return -1
 	}
-	surplus := surpluses[0]
-	if state.Charging == ChargeStateChargingOnSolar {
-		surplus.SurplusWatts += (state.Amps * 230 * vehicle.NumPhases)
+	now := c.Time.UTCNow()
+	res := 0
+	num := 0
+	for _, surplus := range surpluses {
+		if surplus.Timestamp.After(now.Add(-5 * time.Minute)) {
+			if state.Charging == ChargeStateChargingOnSolar {
+				surplus.SurplusWatts += (state.Amps * 230 * vehicle.NumPhases)
+			}
+			res += surplus.SurplusWatts
+			num++
+		}
 	}
-	return surplus
+	if num == 0 {
+		return -1
+	}
+	return res / num
 }
 
 func (c *ChargeController) checkChargeProcess(accessToken string, vehicle *Vehicle, state *VehicleState) {
