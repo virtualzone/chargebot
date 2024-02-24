@@ -170,6 +170,14 @@ func (router *UserRouter) updateVehiclePlugState(w http.ResponseWriter, r *http.
 				}
 			}()
 		}
+		if !pluggedIn && vehicle.Enabled {
+			state := GetDB().GetVehicleState(vehicle.ID)
+			if state != nil && state.Charging != ChargeStateNotCharging {
+				// Vehicle got unplugged while charging
+				GetDB().SetVehicleStateCharging(vehicle.ID, ChargeStateNotCharging)
+				GetDB().SetVehicleStateAmps(vehicle.ID, 0)
+			}
+		}
 	}
 }
 
