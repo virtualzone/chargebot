@@ -22,12 +22,19 @@ type OIDCProvider struct {
 	Verifier    *oidc.IDTokenVerifier
 }
 
-// var OIDCTestingMode bool = false
-// var OIDCTestingSecret string = "nQTJgFvQGwNacHG6"
+var OIDCTestingMode bool = false
+var OIDCTestingSecret string = "nQTJgFvQGwNacHG6"
 var OIDCInstance *OIDCProvider = &OIDCProvider{}
 
 func GetOIDCProvider() *OIDCProvider {
 	return OIDCInstance
+}
+
+func (op *OIDCProvider) getRedirectURI() string {
+	if strings.Contains(GetConfig().Hostname, "localhost") {
+		return "http://" + GetConfig().Hostname + "/callback"
+	}
+	return "https://" + GetConfig().Hostname + "/callback"
 }
 
 func (op *OIDCProvider) Init() {
@@ -41,7 +48,7 @@ func (op *OIDCProvider) Init() {
 	op.OAuthConfig = &oauth2.Config{
 		ClientID:     GetConfig().AuthClientID,
 		ClientSecret: GetConfig().AuthClientSecret,
-		RedirectURL:  "https://" + GetConfig().Hostname + "/auth/callback",
+		RedirectURL:  op.getRedirectURI(),
 
 		// Discovery returns the OAuth2 endpoints.
 		Endpoint: provider.Endpoint(),

@@ -13,13 +13,8 @@ func (a *TeslaAPIMock) InitTokenCache() {
 	a.Called()
 }
 
-func (a *TeslaAPIMock) IsKnownAccessToken(token string) bool {
-	args := a.Called(token)
-	return args.Bool(0)
-}
-
-func (a *TeslaAPIMock) GetTokens(code string, redirectURI string) (*TeslaAPITokenReponse, error) {
-	args := a.Called(code, redirectURI)
+func (a *TeslaAPIMock) GetTokens(userID string, code string, redirectURI string) (*TeslaAPITokenReponse, error) {
+	args := a.Called(userID, code, redirectURI)
 	if resp, ok := args.Get(0).(*TeslaAPITokenReponse); !ok {
 		panic("assert: arguments wasn't correct type")
 	} else {
@@ -27,8 +22,8 @@ func (a *TeslaAPIMock) GetTokens(code string, redirectURI string) (*TeslaAPIToke
 	}
 }
 
-func (a *TeslaAPIMock) RefreshToken(refreshToken string) (*TeslaAPITokenReponse, error) {
-	args := a.Called(refreshToken)
+func (a *TeslaAPIMock) RefreshToken(userID string, refreshToken string) (*TeslaAPITokenReponse, error) {
+	args := a.Called(userID, refreshToken)
 	if resp, ok := args.Get(0).(*TeslaAPITokenReponse); !ok {
 		panic("assert: arguments wasn't correct type")
 	} else {
@@ -46,8 +41,8 @@ func (a *TeslaAPIMock) GetCachedAccessToken(userID string) string {
 	return args.String(0)
 }
 
-func (a *TeslaAPIMock) InitSession(authToken string, v *Vehicle, wakeUp bool) (*vehicle.Vehicle, error) {
-	args := a.Called(authToken, v, wakeUp)
+func (a *TeslaAPIMock) InitSession(v *Vehicle, wakeUp bool) (*vehicle.Vehicle, error) {
+	args := a.Called(v, wakeUp)
 	if resp, ok := args.Get(0).(*vehicle.Vehicle); !ok {
 		panic("assert: arguments wasn't correct type")
 	} else {
@@ -55,8 +50,8 @@ func (a *TeslaAPIMock) InitSession(authToken string, v *Vehicle, wakeUp bool) (*
 	}
 }
 
-func (a *TeslaAPIMock) ListVehicles(authToken string) ([]TeslaAPIVehicleEntity, error) {
-	args := a.Called(authToken)
+func (a *TeslaAPIMock) ListVehicles(userID string) ([]TeslaAPIVehicleEntity, error) {
+	args := a.Called(userID)
 	if resp, ok := args.Get(0).([]TeslaAPIVehicleEntity); !ok {
 		panic("assert: arguments wasn't correct type")
 	} else {
@@ -84,8 +79,8 @@ func (a *TeslaAPIMock) SetChargeAmps(car *vehicle.Vehicle, amps int) error {
 	return args.Error(0)
 }
 
-func (a *TeslaAPIMock) GetVehicleData(authToken string, vehicle *Vehicle) (*TeslaAPIVehicleData, error) {
-	args := a.Called(authToken, vehicle)
+func (a *TeslaAPIMock) GetVehicleData(vehicle *Vehicle) (*TeslaAPIVehicleData, error) {
+	args := a.Called(vehicle)
 	if resp, ok := args.Get(0).(*TeslaAPIVehicleData); !ok {
 		panic("assert: arguments wasn't correct type")
 	} else {
@@ -93,8 +88,8 @@ func (a *TeslaAPIMock) GetVehicleData(authToken string, vehicle *Vehicle) (*Tesl
 	}
 }
 
-func (a *TeslaAPIMock) Wakeup(authToken string, vehicle *Vehicle) error {
-	args := a.Called(authToken, vehicle)
+func (a *TeslaAPIMock) Wakeup(vehicle *Vehicle) error {
+	args := a.Called(vehicle)
 	return args.Error(0)
 }
 
@@ -106,6 +101,6 @@ func UpdateTeslaAPIMockData(api *TeslaAPIMock, vehicleID int, batteryLevel int, 
 			ChargingState: chargingState,
 		},
 	}
-	api.On("GetVehicleData", "token", mock.Anything).Unset()
-	api.On("GetVehicleData", "token", mock.Anything).Return(vData, nil)
+	api.On("GetVehicleData", mock.Anything).Unset()
+	api.On("GetVehicleData", mock.Anything).Return(vData, nil)
 }

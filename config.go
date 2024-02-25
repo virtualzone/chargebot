@@ -63,7 +63,7 @@ func (c *Config) ReadConfig() {
 		log.Panicln("CRYPT_KEY must be 32 bytes long")
 	}
 	c.AuthURL = c.getEnv("AUTH_URL", "https://auth.chargebot.io/realms/chargebot")
-	c.AuthClientID = c.getEnv("AUTH_CLIENT_ID", "chargebot-website")
+	c.AuthClientID = c.getEnv("AUTH_CLIENT_ID", "chargebot.io-website")
 	c.AuthClientSecret = c.getEnv("AUTH_CLIENT_SECRET", "")
 	c.AuthRolesPath = c.getEnv("AUTH_ROLES_PATH", "resource_access.portfolio-test.roles")
 	c.AuthFieldEmail = c.getEnv("AUTH_FIELD_EMAIL", "email")
