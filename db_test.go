@@ -39,8 +39,7 @@ func TestDB_CRUDUser(t *testing.T) {
 	t.Cleanup(ResetTestDB)
 
 	user := &User{
-		ID:           "123",
-		RefreshToken: "456",
+		ID: "123",
 	}
 	GetDB().CreateUpdateUser(user)
 
@@ -48,7 +47,6 @@ func TestDB_CRUDUser(t *testing.T) {
 	assert.NotNil(t, user2)
 	assert.EqualValues(t, user, user2)
 
-	user.RefreshToken = "789"
 	GetDB().CreateUpdateUser(user)
 
 	user2 = GetDB().GetUser(user.ID)
@@ -86,7 +84,7 @@ func TestDB_CRUDVehicle(t *testing.T) {
 	assert.NotNil(t, vehicle2)
 	assert.EqualValues(t, vehicle, vehicle2)
 
-	token := GetDB().CreateAPIToken(vehicle.ID, "pass1234")
+	token := GetDB().CreateAPIToken(vehicle.UserID, "pass1234")
 	vehicle2 = GetDB().GetVehicleByID(vehicle.ID)
 	assert.Equal(t, token, vehicle2.APIToken)
 
@@ -97,8 +95,8 @@ func TestDB_CRUDVehicle(t *testing.T) {
 	assert.False(t, GetDB().IsTokenPasswordValid(token, "pass1234"))
 	assert.True(t, GetDB().IsTokenPasswordValid(token, "pass5678"))
 
-	vehicleID := GetDB().GetAPITokenVehicleID(token)
-	assert.Equal(t, vehicle.ID, vehicleID)
+	userID := GetDB().GetAPITokenUserID(token)
+	assert.Equal(t, vehicle.UserID, userID)
 
 	GetDB().DeleteVehicle(vehicle.ID)
 	vehicle2 = GetDB().GetVehicleByID(vehicle.ID)
@@ -223,12 +221,14 @@ func TestDB_UpgradeRefreshTokenEncryption(t *testing.T) {
 	t.Cleanup(ResetTestDB)
 
 	userID := "1234abcd"
-	token := "this-is-the-refresh-token"
-	GetDB().GetConnection().Exec("replace into users values(?, ?)", userID, token)
+	GetDB().GetConnection().Exec("replace into users values(?, ?, ?)", userID, "", "")
 	user := GetDB().GetUser(userID)
-	assert.Equal(t, token, user.RefreshToken)
 
+	user.TeslaRefreshToken = "xyzabc"
+	user.TeslaUserID = "009988"
 	GetDB().CreateUpdateUser(user)
+
 	user = GetDB().GetUser(userID)
-	assert.Equal(t, token, user.RefreshToken)
+	assert.Equal(t, "xyzabc", user.TeslaRefreshToken)
+	assert.Equal(t, "009988", user.TeslaUserID)
 }

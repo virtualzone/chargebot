@@ -3,8 +3,7 @@
 import { checkAuth, deleteAPI, getAPI, postAPI, putAPI } from "../util";
 import { useEffect, useState } from "react";
 import Loading from "../loading";
-import { Accordion, Button, Container, Form, InputGroup, Modal, Table } from "react-bootstrap";
-import { CopyBlock } from "react-code-blocks";
+import { Accordion, Button, Container, Form, InputGroup, Table } from "react-bootstrap";
 import { useRouter } from "next/navigation";
 import { Loader as IconLoad } from 'react-feather';
 import Link from "next/link";
@@ -15,7 +14,6 @@ export default function PageVehicle() {
   const [vehicle, setVehicle] = useState({} as any)
   const [isLoading, setLoading] = useState(true)
   const [savingVehicle, setSavingVehicle] = useState(false)
-  const [savingApiToken, setSavingApiToken] = useState(false)
   const [chargingEnabled, setChargingEnabled] = useState(false)
   const [targetSoC, setTargetSoC] = useState(0)
   const [maxAmps, setMaxAmps] = useState(0)
@@ -30,14 +28,9 @@ export default function PageVehicle() {
   const [departDays, setDepartDays] = useState([1, 2, 3, 4, 5])
   const [departTime, setDepartTime] = useState('07:00')
   const [tibberToken, setTibberToken] = useState('')
-  const [showTokenHelp, setShowTokenHelp] = useState(false)
   const [vehicleState, setVehicleState] = useState({} as any)
   const [surpluses, setSurpluses] = useState([] as any)
   const [chargingEvents, setChargingEvents] = useState([] as any)
-  const [manCtrlLimit, setManCtrlLimit] = useState(50)
-  const [manCtrlAmps, setManCtrlAmps] = useState(16)
-  const [manCtrlEnabled, setManCtrlEnabled] = useState(0)
-  const [manCtrlMins, setManCtrlMins] = useState(0)
 
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
@@ -55,29 +48,29 @@ export default function PageVehicle() {
     fetchData();
   }, [router]);
 
-  const loadVehicleState = async (token: string) => {
+  const loadVehicleState = async (token: string, vehicleID: number) => {
     if (!token) {
       return
     }
-    const json = await getAPI("/api/1/user/" + token + "/state");
+    const json = await getAPI("/api/1/user/" + token + "/" + vehicleID + "/state");
     if (json) {
       setVehicleState(json);
     }
   }
 
-  const loadLatestSurpluses = async (token: string) => {
+  const loadLatestSurpluses = async (token: string, vehicleID: number) => {
     if (!token) {
       return
     }
-    const json = await getAPI("/api/1/user/" + token + "/surplus");
+    const json = await getAPI("/api/1/user/" + token + "/" + vehicleID + "/surplus");
     setSurpluses(json);
   }
 
-  const loadLatestChargingEvents = async (token: string) => {
+  const loadLatestChargingEvents = async (token: string, vehicleID: number) => {
     if (!token) {
       return
     }
-    const json = await getAPI("/api/1/user/" + token + "/events");
+    const json = await getAPI("/api/1/user/" + token + "/" + vehicleID + "/events");
     setChargingEvents(json);
   }
 
@@ -99,47 +92,12 @@ export default function PageVehicle() {
         setDepartDays([...e.departDays].map(i => Number(i)));
         setDepartTime(e.departTime);
         setTibberToken(e.tibber_token);
-        setShowTokenHelp(false);
-        loadVehicleState(e.api_token);
-        loadLatestSurpluses(e.api_token);
-        loadLatestChargingEvents(e.api_token);
+        loadVehicleState(e.api_token, e.id);
+        loadLatestSurpluses(e.api_token, e.id);
+        loadLatestChargingEvents(e.api_token, e.id);
         setVehicle(e);
       }
     });
-  }
-
-  function generateAPIToken() {
-    const fetchData = async () => {
-      setSavingApiToken(true);
-      const json = await postAPI("/api/1/tesla/api_token_create", { vehicle_id: vehicle.id });
-      if (vehicle) {
-        let vehicleNew = {
-          ...vehicle,
-          api_token: json.token,
-          api_password: json.password,
-        };
-        setVehicle(vehicleNew);
-      }
-      setSavingApiToken(false);
-    }
-    fetchData();
-  }
-
-  function updateAPITokenPassword(id: string) {
-    const fetchData = async () => {
-      setSavingApiToken(true);
-      const json = await postAPI("/api/1/tesla/api_token_update/" + id, {});
-      if (vehicle) {
-        let vehicleNew = {
-          ...vehicle,
-          api_token: json.token,
-          api_password: json.password,
-        };
-        setVehicle(vehicleNew);
-      }
-      setSavingApiToken(false);
-    }
-    fetchData();
   }
 
   function saveVehicle() {
@@ -200,14 +158,6 @@ export default function PageVehicle() {
     return 'Unknown';
   }
 
-  async function copyToClipboard(s: string) {
-    try {
-      await navigator.clipboard.writeText(s);
-    } catch (err) {
-      console.error('Failed to copy: ', err);
-    }
-  }
-
   function getMaxChargingPower() {
     let i = 0;
     if (maxAmps !== undefined && maxAmps !== undefined) {
@@ -233,31 +183,6 @@ export default function PageVehicle() {
   if (isLoading) {
     return <Loading />
   }
-
-  let code1 = "curl --header 'Content-Type: application/json' --data '{\"password\": \"\", \"surplus_watts\": 1500}' https://chargebot.io/api/1/user/" + vehicle.api_token + "/surplus";
-  let code2 = "curl --header 'Content-Type: application/json' --data '{\"password\": \"\", \"inverter_active_power_watts\": 2000, \"consumption_watts\": 200}' https://chargebot.io/api/1/user/" + vehicle.api_token + "/surplus";
-  let code3 = "curl --header 'Content-Type: application/json' --data '{\"password\": \"\"}' https://chargebot.io/api/1/user/" + vehicle.api_token + "/plugged_in";
-  let code4 = "curl --header 'Content-Type: application/json' --data '{\"password\": \"\"}' https://chargebot.io/api/1/user/" + vehicle.api_token + "/unplugged";
-  let tokenHelp = (
-    <Modal show={showTokenHelp} onHide={() => setShowTokenHelp(false)}>
-      <Modal.Header closeButton>
-        <Modal.Title>How to use your API Token</Modal.Title>
-      </Modal.Header>
-
-      <Modal.Body>
-        <h5>Update surplus</h5>
-        <p>Regularly push your enegery surplus available for charging your vehicle (inverter active power minus consumption) using HTTP POST:</p>
-        <CopyBlock text={code1} language="bash" wrapLongLines={true} showLineNumbers={false} />
-        <p>Alternatively, you can push your current inverter active power and your household&apos;s consumption separately:</p>
-        <CopyBlock text={code2} language="bash" wrapLongLines={true} showLineNumbers={false} />
-        <h5 style={{'marginTop': "25px"}}>Update plugged in status</h5>
-        <p>If your vehicles gets plugged in:</p>
-        <CopyBlock text={code3} language="bash" wrapLongLines={true} showLineNumbers={false} />
-        <p>If your vehicles gets unplugged:</p>
-        <CopyBlock text={code4} language="bash" wrapLongLines={true} showLineNumbers={false} />
-      </Modal.Body>
-    </Modal>
-  );
 
   let surplusRows = <tr><td colSpan={2}>No records founds</td></tr>;
   if (surpluses && surpluses.length > 0) {
@@ -311,31 +236,6 @@ export default function PageVehicle() {
     </Table>
   );
 
-  let token = <Button variant="primary" onClick={() => generateAPIToken()} disabled={savingApiToken}>{savingApiToken ? <><IconLoad className="feather-button loader" /> Creating token...</> : 'Create API Token'}</Button>
-  if (vehicle.api_token) {
-    token = <>
-      <strong>API Token:</strong>
-      <Button variant="link" onClick={() => copyToClipboard(vehicle.api_token)}>Copy</Button>
-      <br />
-      <pre>{vehicle.api_token}</pre>
-      <strong>Password:</strong>
-      <Button variant="link" onClick={() => updateAPITokenPassword(vehicle.api_token)} disabled={savingApiToken}>{savingApiToken ? <><IconLoad className="feather-button loader" /> Updating...</> : 'Update'}</Button>
-      <br />
-      <pre>****************</pre>
-    </>
-    if (vehicle.api_password) {
-      token = <>
-        <strong>API Token:</strong>
-        <Button variant="link" onClick={() => copyToClipboard(vehicle.api_token)}>Copy</Button>
-        <br />
-        <pre>{vehicle.api_token}</pre>
-        <strong>Password:</strong>
-        <Button variant="link" onClick={() => copyToClipboard(vehicle.api_password)}>Copy</Button>
-        <br />
-        <pre>{vehicle.api_password}</pre>
-      </>
-    }
-  }
   let chargePrefs = (
     <Form onSubmit={e => { e.preventDefault(); e.stopPropagation(); saveVehicle() }}>
       <Form.Check // prettier-ignore
@@ -577,7 +477,8 @@ export default function PageVehicle() {
   return (
     <Container fluid="sm" className="pt-5 container-max-width min-height">
       <h2 className="pb-3">{vehicle.display_name}</h2>
-      <p>{vehicle.vin}</p>
+      <p>VIN: {vehicle.vin}</p>
+      <p>ID: {vehicle.id}</p>
       <p>Before chargebot.io can control your vehicle's charging process, you need to set up the virtual key:</p>
       <p><a href="https://tesla.com/_ak/chargebot.io" target="_blank">Set Up Virtual Key</a></p>
       <br />
@@ -587,17 +488,6 @@ export default function PageVehicle() {
           <Accordion.Header>Charging Preferences</Accordion.Header>
           <Accordion.Body>
             {chargePrefs}
-          </Accordion.Body>
-        </Accordion.Item>
-        <Accordion.Item eventKey="1">
-          <Accordion.Header>API Token</Accordion.Header>
-          <Accordion.Body>
-            <p>An individual API token is required to send your solar surplus and plug in events to chargebot.io.</p>
-            <p>{token}</p>
-            <div hidden={vehicle.api_token === ''}>
-              {tokenHelp}
-              <Button variant="primary" onClick={e => setShowTokenHelp(true)}>How to use</Button>
-            </div>
           </Accordion.Body>
         </Accordion.Item>
         {accordionSurpluses}

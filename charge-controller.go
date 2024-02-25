@@ -64,32 +64,26 @@ func (c *ChargeController) processVehicle(vehicle *Vehicle) {
 		return
 	}
 
-	accessToken := GetTeslaAPI().GetOrRefreshAccessToken(vehicle.UserID)
-
-	if accessToken == "" {
-		return
-	}
-
 	if !vehicle.Enabled && state.Charging != ChargeStateNotCharging {
 		// Stop charging if vehicle is still charging but not enabled anymore
-		c.stopCharging(accessToken, vehicle)
+		c.stopCharging(vehicle)
 	} else if !vehicle.SurplusCharging && state.Charging == ChargeStateChargingOnSolar {
 		// Stop charging if vehicle is still charging on solar but surplus charging is not enabled anymore
-		c.stopCharging(accessToken, vehicle)
+		c.stopCharging(vehicle)
 	} else if !vehicle.LowcostCharging && state.Charging == ChargeStateChargingOnGrid {
 		// Stop charging if vehicle is still charging on grid but grid charging is not enabled anymore
-		c.stopCharging(accessToken, vehicle)
+		c.stopCharging(vehicle)
 	} else if vehicle.Enabled && state.Charging == ChargeStateNotCharging {
 		// Check if we need to start charging
-		c.checkStartCharging(accessToken, vehicle, state)
+		c.checkStartCharging(vehicle, state)
 	} else if vehicle.Enabled && state.Charging != ChargeStateNotCharging {
 		// This car is currently charging - check the process
-		c.checkChargeProcess(accessToken, vehicle, state)
+		c.checkChargeProcess(vehicle, state)
 	}
 }
 
-func (c *ChargeController) stopCharging(accessToken string, vehicle *Vehicle) {
-	car, err := GetTeslaAPI().InitSession(accessToken, vehicle, true)
+func (c *ChargeController) stopCharging(vehicle *Vehicle) {
+	car, err := GetTeslaAPI().InitSession(vehicle, true)
 	if err != nil {
 		GetDB().LogChargingEvent(vehicle.ID, LogEventChargeStop, fmt.Sprintf("could not init session with car: %s", err.Error()))
 		return
@@ -125,7 +119,7 @@ func (c *ChargeController) isChargingRequired(currentSoC int, targetSoC int) boo
 	return currentSoC < (targetSoC - 1)
 }
 
-func (c *ChargeController) checkStartCharging(accessToken string, vehicle *Vehicle, state *VehicleState) {
+func (c *ChargeController) checkStartCharging(vehicle *Vehicle, state *VehicleState) {
 	if !c.isChargingRequired(state.SoC, vehicle.TargetSoC) {
 		// nothing to do if target SoC is already reached
 		return
@@ -134,12 +128,12 @@ func (c *ChargeController) checkStartCharging(accessToken string, vehicle *Vehic
 	// check if there is a solar surplus
 	targetState, amps := c.checkTargetState(vehicle, state)
 	if targetState != ChargeStateNotCharging {
-		c.activateCharging(accessToken, vehicle, state, amps, targetState)
+		c.activateCharging(vehicle, state, amps, targetState)
 	}
 }
 
-func (c *ChargeController) activateCharging(accessToken string, vehicle *Vehicle, state *VehicleState, amps int, source ChargeState) bool {
-	car, err := GetTeslaAPI().InitSession(accessToken, vehicle, true)
+func (c *ChargeController) activateCharging(vehicle *Vehicle, state *VehicleState, amps int, source ChargeState) bool {
+	car, err := GetTeslaAPI().InitSession(vehicle, true)
 	if err != nil {
 		GetDB().LogChargingEvent(vehicle.ID, LogEventWakeVehicle, "could not wake vehicle: "+err.Error())
 		return false
@@ -149,7 +143,7 @@ func (c *ChargeController) activateCharging(accessToken string, vehicle *Vehicle
 	time.Sleep(DelayBetweenAPICommands) // delay
 
 	// ensure current SoC has not changed in the meantime
-	state.SoC, _ = UpdateVehicleDataSaveSoC(accessToken, vehicle)
+	state.SoC, _ = UpdateVehicleDataSaveSoC(vehicle)
 	if !c.isChargingRequired(state.SoC, vehicle.TargetSoC) {
 		GetDB().LogChargingEvent(vehicle.ID, LogEventChargeStart, "charging skipped, target SoC is already reached")
 		return false
@@ -533,12 +527,12 @@ func (c *ChargeController) getActualSurplus(vehicle *Vehicle, state *VehicleStat
 	return res / num
 }
 
-func (c *ChargeController) checkChargeProcess(accessToken string, vehicle *Vehicle, state *VehicleState) {
+func (c *ChargeController) checkChargeProcess(vehicle *Vehicle, state *VehicleState) {
 	// check when vehicle data was last updated
 	if c.canUpdateVehicleData(vehicle.ID) {
-		GetTeslaAPI().Wakeup(accessToken, vehicle)
+		GetTeslaAPI().Wakeup(vehicle)
 		time.Sleep(DelayBetweenAPICommands) // delay
-		soc, data := UpdateVehicleDataSaveSoC(accessToken, vehicle)
+		soc, data := UpdateVehicleDataSaveSoC(vehicle)
 		state.SoC = soc
 		if strings.ToLower(data.ChargeState.ChargingState) != "charging" {
 			// strange situation: we assume car is charging, but it is not
@@ -551,7 +545,7 @@ func (c *ChargeController) checkChargeProcess(accessToken string, vehicle *Vehic
 		if data.ChargeState.ChargeAmps != state.Amps {
 			// strange situation: car is charging at a different amps rate than assumed
 			LogDebug(fmt.Sprintf("strange situation for vehicle %d: app assumes %d amps, but it's actual amps is %d", vehicle.ID, state.Amps, data.ChargeState.ChargeAmps))
-			car, err := GetTeslaAPI().InitSession(accessToken, vehicle, true)
+			car, err := GetTeslaAPI().InitSession(vehicle, true)
 			if err != nil {
 				GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, fmt.Sprintf("could not init session with car: %s", err.Error()))
 			} else {
@@ -568,7 +562,7 @@ func (c *ChargeController) checkChargeProcess(accessToken string, vehicle *Vehic
 
 	// if target SoC is reached: stop charging
 	if state.SoC >= vehicle.TargetSoC {
-		c.stopCharging(accessToken, vehicle)
+		c.stopCharging(vehicle)
 		return
 	}
 
@@ -583,7 +577,7 @@ func (c *ChargeController) checkChargeProcess(accessToken string, vehicle *Vehic
 		if state.Charging == ChargeStateChargingOnSolar && targetAmps > 0 && targetAmps != state.Amps {
 			// ...and only if the last amps adjustment occured before the latest surplus data came in
 			if c.canAdjustSolarAmps(vehicle) {
-				car, err := GetTeslaAPI().InitSession(accessToken, vehicle, true)
+				car, err := GetTeslaAPI().InitSession(vehicle, true)
 				if err != nil {
 					GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, fmt.Sprintf("could not init session with car: %s", err.Error()))
 				} else {
@@ -601,6 +595,6 @@ func (c *ChargeController) checkChargeProcess(accessToken string, vehicle *Vehic
 
 	// else, check if charging needs to be stopped
 	if targetState == ChargeStateNotCharging {
-		c.stopCharging(accessToken, vehicle)
+		c.stopCharging(vehicle)
 	}
 }

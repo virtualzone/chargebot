@@ -464,19 +464,19 @@ func TestChargeControl_SolarCharging(t *testing.T) {
 
 	api, _ := TeslaAPIInstance.(*TeslaAPIMock)
 	api.On("GetOrRefreshAccessToken", v.UserID).Return("token")
-	api.On("InitSession", "token", mock.Anything, mock.Anything).Return(&vehicle.Vehicle{}, nil)
+	api.On("InitSession", mock.Anything, mock.Anything).Return(&vehicle.Vehicle{}, nil)
 	api.On("SetChargeLimit", mock.Anything, mock.Anything).Return(nil)
 	api.On("SetChargeAmps", mock.Anything, mock.Anything).Return(nil)
 	api.On("ChargeStart", mock.Anything).Return(nil)
 	api.On("ChargeStop", mock.Anything).Return(nil)
-	api.On("Wakeup", mock.Anything, mock.Anything).Return(nil)
+	api.On("Wakeup", mock.Anything).Return(nil)
 	vData := &TeslaAPIVehicleData{
 		VehicleID: 123,
 		ChargeState: TeslaAPIChargeState{
 			BatteryLevel: 53,
 		},
 	}
-	api.On("GetVehicleData", "token", mock.Anything).Return(vData, nil)
+	api.On("GetVehicleData", mock.Anything).Return(vData, nil)
 	UpdateTeslaAPIMockData(api, 123, 53, "")
 
 	// on start, no surplus records, so vehicle is not charging
@@ -541,12 +541,12 @@ func TestChargeControl_SolarCharging_AmpsAdjustment(t *testing.T) {
 
 	api, _ := TeslaAPIInstance.(*TeslaAPIMock)
 	api.On("GetOrRefreshAccessToken", v.UserID).Return("token")
-	api.On("InitSession", "token", mock.Anything, mock.Anything).Return(&vehicle.Vehicle{}, nil)
+	api.On("InitSession", mock.Anything, mock.Anything).Return(&vehicle.Vehicle{}, nil)
 	api.On("SetChargeLimit", mock.Anything, mock.Anything).Return(nil)
 	api.On("SetChargeAmps", mock.Anything, mock.Anything).Return(nil)
 	api.On("ChargeStart", mock.Anything).Return(nil)
 	api.On("ChargeStop", mock.Anything).Return(nil)
-	api.On("Wakeup", mock.Anything, mock.Anything).Return(nil)
+	api.On("Wakeup", mock.Anything).Return(nil)
 	vData := &TeslaAPIVehicleData{
 		VehicleID: 123,
 		ChargeState: TeslaAPIChargeState{
@@ -619,12 +619,12 @@ func TestChargeControl_TibberChargingNoDeparturePriceLimit(t *testing.T) {
 
 	api, _ := TeslaAPIInstance.(*TeslaAPIMock)
 	api.On("GetOrRefreshAccessToken", v.UserID).Return("token")
-	api.On("InitSession", "token", mock.Anything, mock.Anything).Return(&vehicle.Vehicle{}, nil)
+	api.On("InitSession", mock.Anything, mock.Anything).Return(&vehicle.Vehicle{}, nil)
 	api.On("SetChargeLimit", mock.Anything, mock.Anything).Return(nil)
 	api.On("SetChargeAmps", mock.Anything, mock.Anything).Return(nil)
 	api.On("ChargeStart", mock.Anything).Return(nil)
 	api.On("ChargeStop", mock.Anything).Return(nil)
-	api.On("Wakeup", mock.Anything, mock.Anything).Return(nil)
+	api.On("Wakeup", mock.Anything).Return(nil)
 	UpdateTeslaAPIMockData(api, 123, 53, "")
 
 	now := time.Now().UTC()
@@ -704,12 +704,12 @@ func TestChargeControl_TibberChargingDepartureNoPriceLimit(t *testing.T) {
 
 	api, _ := TeslaAPIInstance.(*TeslaAPIMock)
 	api.On("GetOrRefreshAccessToken", v.UserID).Return("token")
-	api.On("InitSession", "token", mock.Anything, mock.Anything).Return(&vehicle.Vehicle{}, nil)
+	api.On("InitSession", mock.Anything, mock.Anything).Return(&vehicle.Vehicle{}, nil)
 	api.On("SetChargeLimit", mock.Anything, mock.Anything).Return(nil)
 	api.On("SetChargeAmps", mock.Anything, mock.Anything).Return(nil)
 	api.On("ChargeStart", mock.Anything).Return(nil)
 	api.On("ChargeStop", mock.Anything).Return(nil)
-	api.On("Wakeup", mock.Anything, mock.Anything).Return(nil)
+	api.On("Wakeup", mock.Anything).Return(nil)
 	UpdateTeslaAPIMockData(api, 123, 40, "")
 
 	now := GetNextMondayMidnight()
@@ -877,12 +877,12 @@ func TestChargeControl_TibberChargingDepartureNoPriceLimit2(t *testing.T) {
 
 	api, _ := TeslaAPIInstance.(*TeslaAPIMock)
 	api.On("GetOrRefreshAccessToken", v.UserID).Return("token")
-	api.On("InitSession", "token", mock.Anything, mock.Anything).Return(&vehicle.Vehicle{}, nil)
+	api.On("InitSession", mock.Anything, mock.Anything).Return(&vehicle.Vehicle{}, nil)
 	api.On("SetChargeLimit", mock.Anything, mock.Anything).Return(nil)
 	api.On("SetChargeAmps", mock.Anything, mock.Anything).Return(nil)
 	api.On("ChargeStart", mock.Anything).Return(nil)
 	api.On("ChargeStop", mock.Anything).Return(nil)
-	api.On("Wakeup", mock.Anything, mock.Anything).Return(nil)
+	api.On("Wakeup", mock.Anything).Return(nil)
 	UpdateTeslaAPIMockData(api, 123, 40, "")
 
 	now := GetNextMondayMidnight()
@@ -1024,12 +1024,12 @@ func TestChargeControl_TibberChargingDepartureWithPriceLimit(t *testing.T) {
 
 	api, _ := TeslaAPIInstance.(*TeslaAPIMock)
 	api.On("GetOrRefreshAccessToken", v.UserID).Return("token")
-	api.On("InitSession", "token", mock.Anything, mock.Anything).Return(&vehicle.Vehicle{}, nil)
+	api.On("InitSession", mock.Anything, mock.Anything).Return(&vehicle.Vehicle{}, nil)
 	api.On("SetChargeLimit", mock.Anything, mock.Anything).Return(nil)
 	api.On("SetChargeAmps", mock.Anything, mock.Anything).Return(nil)
 	api.On("ChargeStart", mock.Anything).Return(nil)
 	api.On("ChargeStop", mock.Anything).Return(nil)
-	api.On("Wakeup", mock.Anything, mock.Anything).Return(nil)
+	api.On("Wakeup", mock.Anything).Return(nil)
 	UpdateTeslaAPIMockData(api, 123, 40, "")
 
 	now := GetNextMondayMidnight()
