@@ -10,9 +10,9 @@ export default function Home() {
         <div className='text-center' data-bs-theme="auto">
           <h1 className='mb-5 display-3'>Charge Your Tesla with Green Energy</h1>
           <h2 className='mb-5'>Maximum Solar Power, Low Grid Prices.</h2>
-          <a className='btn btn-danger btn-lg text-white' href='/api/1/auth/tesla/init3rdparty' role='button'>
+          <a className='btn btn-danger btn-lg text-white' href='/api/1/auth/login' role='button'>
             <Image src="/tesla-icon.svg" width={24} height={24} alt="" className="me-2" />
-            Sign in with Tesla
+            Sign in
           </a>
         </div>
       </div>

@@ -12,6 +12,7 @@ export function deleteTokens() {
   if (typeof window !== "undefined") {
     window.localStorage.removeItem("accessToken");
     window.localStorage.removeItem("refreshToken");
+    window.localStorage.removeItem("userDetails");
   }
 }
 
@@ -27,6 +28,12 @@ export function saveRefreshToken(token: string) {
   }
 }
 
+export function saveUserDetails(details: any) {
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem("userDetails", JSON.stringify(details))
+  }
+}
+
 export function getAccessToken() {
   if (typeof window !== "undefined") {
     return window.localStorage.getItem("accessToken")
@@ -39,6 +46,16 @@ export function getRefreshToken() {
     return window.localStorage.getItem("refreshToken")
   }
   return '';
+}
+
+export function getUserDetails() {
+  if (typeof window !== "undefined") {
+    let details = window.localStorage.getItem("userDetails")
+    if ((details !== null) && (details !== undefined) && (details !== '')) {
+      return JSON.parse(details)
+    }
+  }
+  return {};
 }
 
 export async function getAPI(endpoint: string): Promise<any> {
@@ -97,7 +114,7 @@ export async function checkAuth() {
       return;
     }
 
-    fetch(getBaseUrl() + "/api/1/auth/tesla/tokenvalid", {
+    fetch(getBaseUrl() + "/api/1/auth/tokenvalid", {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${getAccessToken()}`,
@@ -108,7 +125,7 @@ export async function checkAuth() {
           resolve();
           return;
         }
-        fetch(getBaseUrl() + "/api/1/auth/tesla/refresh", {
+        fetch(getBaseUrl() + "/api/1/auth/refresh", {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${getAccessToken()}`,

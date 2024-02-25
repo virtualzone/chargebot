@@ -4,26 +4,48 @@ import (
 	"net/http"
 	"net/url"
 	"testing"
-	"time"
 
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestTeslaAuthRouter_initThirdParty(t *testing.T) {
+func TestTeslaAuthRouter_initThirdParty_noBearer(t *testing.T) {
 	t.Cleanup(ResetTestDB)
 
 	req := newHTTPRequest("GET", "/api/1/auth/tesla/init3rdparty", "", nil)
 	res := executeTestRequest(req)
 
-	assert.Equal(t, http.StatusTemporaryRedirect, res.Code)
-	assert.Contains(t, res.Header().Get("Location"), "https://auth.tesla.com/oauth2/v3/authorize")
+	assert.Equal(t, http.StatusUnauthorized, res.Code)
+}
+
+func TestTeslaAuthRouter_initThirdParty(t *testing.T) {
+	t.Cleanup(ResetTestDB)
+
+	bearer := getTestJWT("abc")
+	req := newHTTPRequest("GET", "/api/1/auth/tesla/init3rdparty", bearer, nil)
+	res := executeTestRequest(req)
+
+	assert.Equal(t, http.StatusOK, res.Code)
+
+	var m TeslaAuthRouterInitRequest
+	err := UnmarshalBody(res.Result().Body, &m)
+	assert.Nil(t, err)
+	assert.Contains(t, m.URL, "https://auth.tesla.com/oauth2/v3/authorize")
+}
+
+func TestTeslaAuthRouter_callback_noBearer(t *testing.T) {
+	t.Cleanup(ResetTestDB)
+
+	req := newHTTPRequest("GET", "/api/1/auth/tesla/callback?state=foobar", "", nil)
+	res := executeTestRequest(req)
+
+	assert.Equal(t, http.StatusUnauthorized, res.Code)
 }
 
 func TestTeslaAuthRouter_callback_invalidState(t *testing.T) {
 	t.Cleanup(ResetTestDB)
 
-	req := newHTTPRequest("GET", "/api/1/auth/tesla/callback?state=foobar", "", nil)
+	bearer := getTestJWT("abc")
+	req := newHTTPRequest("GET", "/api/1/auth/tesla/callback?state=foobar", bearer, nil)
 	res := executeTestRequest(req)
 
 	assert.Equal(t, http.StatusNotFound, res.Code)
@@ -34,64 +56,21 @@ func TestTeslaAuthRouter_callback_invalidCode(t *testing.T) {
 	TeslaAPIInstance = &TeslaAPIImpl{}
 	TeslaAPIInstance.InitTokenCache()
 
-	req := newHTTPRequest("GET", "/api/1/auth/tesla/init3rdparty", "", nil)
+	bearer := getTestJWT("abc")
+	req := newHTTPRequest("GET", "/api/1/auth/tesla/init3rdparty", bearer, nil)
 	res := executeTestRequest(req)
-	redirectURI, err := url.Parse(res.Header().Get("Location"))
+
+	var m TeslaAuthRouterInitRequest
+	err := UnmarshalBody(res.Result().Body, &m)
+	assert.Nil(t, err)
+
+	redirectURI, err := url.Parse(m.URL)
 	assert.Nil(t, err)
 	redirectParams, _ := url.ParseQuery(redirectURI.RawQuery)
 	state := redirectParams.Get("state")
 	assert.NotEmpty(t, state)
 
-	req = newHTTPRequest("GET", "/api/1/auth/tesla/callback?state="+state, "", nil)
+	req = newHTTPRequest("GET", "/api/1/auth/tesla/callback?state="+state, bearer, nil)
 	res = executeTestRequest(req)
 	assert.Equal(t, http.StatusBadRequest, res.Code)
-}
-
-func TestTeslaAuthRouter_isTokenValid_noBearer(t *testing.T) {
-	t.Cleanup(ResetTestDB)
-
-	req := newHTTPRequest("GET", "/api/1/auth/tesla/tokenvalid", "", nil)
-	res := executeTestRequest(req)
-
-	assert.Equal(t, http.StatusOK, res.Code)
-	var boolResult bool
-	err := UnmarshalBody(res.Result().Body, boolResult)
-	assert.Nil(t, err)
-	assert.False(t, boolResult)
-}
-
-func TestTeslaAuthRouter_isTokenValid_valid(t *testing.T) {
-	t.Cleanup(ResetTestDB)
-	bearer := getTestJWT("12345")
-	api, _ := TeslaAPIInstance.(*TeslaAPIMock)
-	api.On("IsKnownAccessToken", bearer).Return(true)
-
-	req := newHTTPRequest("GET", "/api/1/auth/tesla/tokenvalid", bearer, nil)
-	res := executeTestRequest(req)
-
-	assert.Equal(t, http.StatusOK, res.Code)
-	var boolResult bool
-	err := UnmarshalBody(res.Result().Body, &boolResult)
-	assert.Nil(t, err)
-	assert.True(t, boolResult)
-}
-func TestTeslaAuthRouter_isTokenValid_expired(t *testing.T) {
-	t.Cleanup(ResetTestDB)
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"exp": time.Now().UTC().AddDate(0, 0, -1).Unix(),
-		"iat": time.Now().UTC().Unix(),
-		"sub": "12345",
-	})
-	bearer, _ := token.SignedString([]byte("sample-secret"))
-	api, _ := TeslaAPIInstance.(*TeslaAPIMock)
-	api.On("IsKnownAccessToken", bearer).Return(true)
-
-	req := newHTTPRequest("GET", "/api/1/auth/tesla/tokenvalid", bearer, nil)
-	res := executeTestRequest(req)
-
-	assert.Equal(t, http.StatusOK, res.Code)
-	var boolResult bool
-	err := UnmarshalBody(res.Result().Body, &boolResult)
-	assert.Nil(t, err)
-	assert.False(t, boolResult)
 }

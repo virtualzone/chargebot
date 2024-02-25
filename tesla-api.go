@@ -69,23 +69,21 @@ type TeslaAPIVehicleDataResponse struct {
 
 type TeslaAPI interface {
 	InitTokenCache()
-	IsKnownAccessToken(token string) bool
-	GetTokens(code string, redirectURI string) (*TeslaAPITokenReponse, error)
-	RefreshToken(refreshToken string) (*TeslaAPITokenReponse, error)
+	GetTokens(userID string, code string, redirectURI string) (*TeslaAPITokenReponse, error)
+	RefreshToken(userID string, refreshToken string) (*TeslaAPITokenReponse, error)
 	GetOrRefreshAccessToken(userID string) string
 	GetCachedAccessToken(userID string) string
-	InitSession(authToken string, vehicle *Vehicle, wakeUp bool) (*vehicle.Vehicle, error)
-	ListVehicles(authToken string) ([]TeslaAPIVehicleEntity, error)
+	InitSession(vehicle *Vehicle, wakeUp bool) (*vehicle.Vehicle, error)
+	ListVehicles(userID string) ([]TeslaAPIVehicleEntity, error)
 	ChargeStart(car *vehicle.Vehicle) error
 	ChargeStop(car *vehicle.Vehicle) error
 	SetChargeLimit(car *vehicle.Vehicle, limitPercent int) error
 	SetChargeAmps(car *vehicle.Vehicle, amps int) error
-	GetVehicleData(authToken string, vehicle *Vehicle) (*TeslaAPIVehicleData, error)
-	Wakeup(authToken string, vehicle *Vehicle) error
+	GetVehicleData(vehicle *Vehicle) (*TeslaAPIVehicleData, error)
+	Wakeup(vehicle *Vehicle) error
 }
 
 type TeslaAPIImpl struct {
-	TokenCache         *bigcache.BigCache
 	UserIDToTokenCache *bigcache.BigCache
 }
 
@@ -94,12 +92,6 @@ func (a *TeslaAPIImpl) InitTokenCache() {
 	config.CleanWindow = 1 * time.Minute
 	config.HardMaxCacheSize = 1024
 
-	cache, err := bigcache.New(context.Background(), config)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	a.TokenCache = cache
-
 	cache2, err := bigcache.New(context.Background(), config)
 	if err != nil {
 		log.Fatalln(err)
@@ -107,12 +99,7 @@ func (a *TeslaAPIImpl) InitTokenCache() {
 	a.UserIDToTokenCache = cache2
 }
 
-func (a *TeslaAPIImpl) IsKnownAccessToken(token string) bool {
-	v, err := a.TokenCache.Get(token)
-	return err == nil && v != nil
-}
-
-func (a *TeslaAPIImpl) GetTokens(code string, redirectURI string) (*TeslaAPITokenReponse, error) {
+func (a *TeslaAPIImpl) GetTokens(userID string, code string, redirectURI string) (*TeslaAPITokenReponse, error) {
 	target := "https://auth.tesla.com/oauth2/v3/token"
 	data := url.Values{}
 	data.Set("grant_type", "authorization_code")
@@ -140,16 +127,14 @@ func (a *TeslaAPIImpl) GetTokens(code string, redirectURI string) (*TeslaAPIToke
 	if parsedToken == nil || parsedToken.Claims == nil {
 		return nil, errors.New("could not parse jwt")
 	}
-	sub, _ := parsedToken.Claims.GetSubject()
 
 	// Cache token
-	a.TokenCache.Set(m.AccessToken, []byte("1"))
-	a.UserIDToTokenCache.Set(sub, []byte(m.AccessToken))
+	a.UserIDToTokenCache.Set(userID, []byte(m.AccessToken))
 
 	return &m, nil
 }
 
-func (a *TeslaAPIImpl) RefreshToken(refreshToken string) (*TeslaAPITokenReponse, error) {
+func (a *TeslaAPIImpl) RefreshToken(userID string, refreshToken string) (*TeslaAPITokenReponse, error) {
 	target := "https://auth.tesla.com/oauth2/v3/token"
 	data := url.Values{}
 	data.Set("grant_type", "refresh_token")
@@ -174,25 +159,29 @@ func (a *TeslaAPIImpl) RefreshToken(refreshToken string) (*TeslaAPITokenReponse,
 	if parsedToken == nil || parsedToken.Claims == nil {
 		return nil, errors.New("could not parse jwt")
 	}
-	sub, _ := parsedToken.Claims.GetSubject()
 
 	// Cache token
-	a.TokenCache.Set(m.AccessToken, []byte("1"))
-	a.UserIDToTokenCache.Set(sub, []byte(m.AccessToken))
+	a.UserIDToTokenCache.Set(userID, []byte(m.AccessToken))
 
 	return &m, nil
 }
 
 func (a *TeslaAPIImpl) GetOrRefreshAccessToken(userID string) string {
+	//log.Printf("GetOrRefreshAccessToken() with userID %s\n", userID)
+	//debug.PrintStack()
 	accessToken := a.GetCachedAccessToken(userID)
 	if accessToken == "" {
 		user := GetDB().GetUser(userID)
-		token, err := a.RefreshToken(user.RefreshToken)
+		if user == nil {
+			log.Printf("user not found: %s\n", userID)
+			return ""
+		}
+		token, err := a.RefreshToken(userID, user.TeslaRefreshToken)
 		if err != nil {
 			log.Println(err)
 			return ""
 		}
-		user.RefreshToken = token.RefreshToken
+		user.TeslaRefreshToken = token.RefreshToken
 		GetDB().CreateUpdateUser(user)
 		accessToken = token.AccessToken
 	}
@@ -207,9 +196,11 @@ func (a *TeslaAPIImpl) GetCachedAccessToken(userID string) string {
 	return string(token)
 }
 
-func (a *TeslaAPIImpl) InitSession(authToken string, vehicle *Vehicle, wakeUp bool) (*vehicle.Vehicle, error) {
+func (a *TeslaAPIImpl) InitSession(vehicle *Vehicle, wakeUp bool) (*vehicle.Vehicle, error) {
+	authToken := a.GetOrRefreshAccessToken(vehicle.UserID)
+
 	if wakeUp {
-		a.Wakeup(authToken, vehicle)
+		a.Wakeup(vehicle)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
@@ -231,7 +222,8 @@ func (a *TeslaAPIImpl) InitSession(authToken string, vehicle *Vehicle, wakeUp bo
 	return car, nil
 }
 
-func (a *TeslaAPIImpl) ListVehicles(authToken string) ([]TeslaAPIVehicleEntity, error) {
+func (a *TeslaAPIImpl) ListVehicles(userID string) ([]TeslaAPIVehicleEntity, error) {
+	authToken := a.GetOrRefreshAccessToken(userID)
 	r, _ := http.NewRequest("GET", _configInstance.TeslaAudience+"/api/1/vehicles", nil)
 
 	resp, err := RetryHTTPJSONRequest(r, authToken)
@@ -292,7 +284,8 @@ func (a *TeslaAPIImpl) SetChargeAmps(car *vehicle.Vehicle, amps int) error {
 	return err
 }
 
-func (a *TeslaAPIImpl) GetVehicleData(authToken string, vehicle *Vehicle) (*TeslaAPIVehicleData, error) {
+func (a *TeslaAPIImpl) GetVehicleData(vehicle *Vehicle) (*TeslaAPIVehicleData, error) {
+	authToken := a.GetOrRefreshAccessToken(vehicle.UserID)
 	target := GetConfig().TeslaAudience + "/api/1/vehicles/" + vehicle.VIN + "/vehicle_data"
 	r, _ := http.NewRequest("GET", target, nil)
 
@@ -314,7 +307,8 @@ func (a *TeslaAPIImpl) GetVehicleData(authToken string, vehicle *Vehicle) (*Tesl
 	return &m.Response, nil
 }
 
-func (a *TeslaAPIImpl) Wakeup(authToken string, vehicle *Vehicle) error {
+func (a *TeslaAPIImpl) Wakeup(vehicle *Vehicle) error {
+	authToken := a.GetOrRefreshAccessToken(vehicle.UserID)
 	target := GetConfig().TeslaAudience + "/api/1/vehicles/" + vehicle.VIN + "/wake_up"
 	r, _ := http.NewRequest("POST", target, nil)
 

@@ -21,8 +21,8 @@ func IsCurrentHourUTC(now *time.Time, ts *time.Time) bool {
 	return false
 }
 
-func UpdateVehicleDataSaveSoC(authToken string, vehicle *Vehicle) (int, *TeslaAPIVehicleData) {
-	data, err := GetTeslaAPI().GetVehicleData(authToken, vehicle)
+func UpdateVehicleDataSaveSoC(vehicle *Vehicle) (int, *TeslaAPIVehicleData) {
+	data, err := GetTeslaAPI().GetVehicleData(vehicle)
 	if err != nil {
 		log.Println(err)
 		GetDB().LogChargingEvent(vehicle.ID, LogEventVehicleUpdateData, err.Error())

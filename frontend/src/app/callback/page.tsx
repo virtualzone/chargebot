@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect, useState } from "react";
-import { getBaseUrl, saveAccessToken, saveRefreshToken } from "../util";
+import { getBaseUrl, saveAccessToken, saveRefreshToken, saveUserDetails } from "../util";
 import { useRouter } from "next/navigation";
 import { Container } from "react-bootstrap";
 import Loading from "../loading";
@@ -14,13 +14,14 @@ export default function CallbackPage() {
     const searchParams = new URLSearchParams(window.location.search);
     const state = searchParams.get("state");
     const code = searchParams.get("code");
-    const url = getBaseUrl() + "/api/1/auth/tesla/callback?state=" + state + "&code=" + code;
+    const url = getBaseUrl() + "/api/1/auth/callback?state=" + state + "&code=" + code;
     fetch(url, { method: 'GET' })
       .then(res => res.json())
       .then(json => {
         if (json.access_token) {
           saveAccessToken(json.access_token);
           saveRefreshToken(json.refresh_token);
+          saveUserDetails(json.user)
           setData(json);
           router.push('/authorized');
         }

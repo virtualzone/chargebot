@@ -23,6 +23,7 @@ func (m MockTime) UTCNow() time.Time {
 var GlobalMockTime *MockTime
 
 func TestMain(m *testing.M) {
+	OIDCTestingMode = true
 	os.Setenv("DB_FILE", ":memory:")
 	os.Setenv("TESLA_PRIVATE_KEY", ":none:")
 	os.Setenv("CRYPT_KEY", "12345678901234567890123456789012")
@@ -73,8 +74,9 @@ func getTestJWT(userID string) string {
 		"exp": time.Now().UTC().AddDate(0, 0, 1).Unix(),
 		"iat": time.Now().UTC().Unix(),
 		"sub": userID,
+		"iss": "",
 	})
-	tokenString, err := token.SignedString([]byte("sample-secret"))
+	tokenString, err := token.SignedString([]byte(OIDCTestingSecret))
 	if err != nil {
 		log.Fatalln(err)
 		return ""
