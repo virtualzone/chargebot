@@ -62,8 +62,9 @@ func (router *AuthRouter) callback(w http.ResponseWriter, r *http.Request) {
 	token := GetDB().GetAPIToken(user.ID)
 	if token == "" {
 		password := GeneratePassword(16, true, true)
-		GetDB().CreateAPIToken(user.ID, password)
+		token = GetDB().CreateAPIToken(user.ID, password)
 	}
+	user.APIToken = token
 
 	loginResponse := LoginResponse{
 		AccessToken:  oauth2Token.AccessToken,
