@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -25,21 +26,32 @@ type PlugInOutRequest struct {
 }
 
 func (router *UserRouter) SetupRoutes(s *mux.Router) {
-	s.HandleFunc("/{token}/state", router.getVehicleState).Methods("GET")
-	s.HandleFunc("/{token}/surplus", router.recordSurplus).Methods("POST")
-	s.HandleFunc("/{token}/surplus", router.getLatestSurpluses).Methods("GET")
-	s.HandleFunc("/{token}/plugged_in", router.vehiclePluggedIn).Methods("POST")
-	s.HandleFunc("/{token}/unplugged", router.vehicleUnplugged).Methods("POST")
-	s.HandleFunc("/{token}/events", router.getLatestChargingEvents).Methods("GET")
+	s.HandleFunc("/{token}/{id}/state", router.getVehicleState).Methods("GET")
+	s.HandleFunc("/{token}/{id}/surplus", router.recordSurplus).Methods("POST")
+	s.HandleFunc("/{token}/{id}/surplus", router.getLatestSurpluses).Methods("GET")
+	s.HandleFunc("/{token}/{id}/plugged_in", router.vehiclePluggedIn).Methods("POST")
+	s.HandleFunc("/{token}/{id}/unplugged", router.vehicleUnplugged).Methods("POST")
+	s.HandleFunc("/{token}/{id}/events", router.getLatestChargingEvents).Methods("GET")
 }
 
 func (router *UserRouter) getVehicleState(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	token := vars["token"]
-
-	vehicleID := GetDB().GetAPITokenVehicleID(token)
-	if vehicleID == 0 {
+	vehicleIDString := vars["id"]
+	vehicleID, err := strconv.Atoi(vehicleIDString)
+	if err != nil {
 		SendBadRequest(w)
+		return
+	}
+
+	userID := GetDB().GetAPITokenUserID(token)
+	if userID == "" {
+		SendBadRequest(w)
+		return
+	}
+
+	if !GetDB().IsUserOwnerOfVehicle(userID, vehicleID) {
+		SendForbidden(w)
 		return
 	}
 
@@ -54,6 +66,12 @@ func (router *UserRouter) getVehicleState(w http.ResponseWriter, r *http.Request
 func (router *UserRouter) recordSurplus(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	token := vars["token"]
+	vehicleIDString := vars["id"]
+	vehicleID, err := strconv.Atoi(vehicleIDString)
+	if err != nil {
+		SendBadRequest(w)
+		return
+	}
 
 	var m *SurplusRecordingRequest
 	if err := UnmarshalBody(r.Body, &m); err != nil {
@@ -66,9 +84,14 @@ func (router *UserRouter) recordSurplus(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	vehicleID := GetDB().GetAPITokenVehicleID(token)
-	if vehicleID == 0 {
+	userID := GetDB().GetAPITokenUserID(token)
+	if userID == "" {
 		SendBadRequest(w)
+		return
+	}
+
+	if !GetDB().IsUserOwnerOfVehicle(userID, vehicleID) {
+		SendForbidden(w)
 		return
 	}
 
@@ -92,10 +115,21 @@ func (router *UserRouter) recordSurplus(w http.ResponseWriter, r *http.Request) 
 func (router *UserRouter) getLatestSurpluses(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	token := vars["token"]
-
-	vehicleID := GetDB().GetAPITokenVehicleID(token)
-	if vehicleID == 0 {
+	vehicleIDString := vars["id"]
+	vehicleID, err := strconv.Atoi(vehicleIDString)
+	if err != nil {
 		SendBadRequest(w)
+		return
+	}
+
+	userID := GetDB().GetAPITokenUserID(token)
+	if userID == "" {
+		SendBadRequest(w)
+		return
+	}
+
+	if !GetDB().IsUserOwnerOfVehicle(userID, vehicleID) {
+		SendForbidden(w)
 		return
 	}
 
@@ -106,10 +140,21 @@ func (router *UserRouter) getLatestSurpluses(w http.ResponseWriter, r *http.Requ
 func (router *UserRouter) getLatestChargingEvents(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	token := vars["token"]
-
-	vehicleID := GetDB().GetAPITokenVehicleID(token)
-	if vehicleID == 0 {
+	vehicleIDString := vars["id"]
+	vehicleID, err := strconv.Atoi(vehicleIDString)
+	if err != nil {
 		SendBadRequest(w)
+		return
+	}
+
+	userID := GetDB().GetAPITokenUserID(token)
+	if userID == "" {
+		SendBadRequest(w)
+		return
+	}
+
+	if !GetDB().IsUserOwnerOfVehicle(userID, vehicleID) {
+		SendForbidden(w)
 		return
 	}
 
@@ -120,6 +165,12 @@ func (router *UserRouter) getLatestChargingEvents(w http.ResponseWriter, r *http
 func (router *UserRouter) updateVehiclePlugState(w http.ResponseWriter, r *http.Request, pluggedIn bool) {
 	vars := mux.Vars(r)
 	token := vars["token"]
+	vehicleIDString := vars["id"]
+	vehicleID, err := strconv.Atoi(vehicleIDString)
+	if err != nil {
+		SendBadRequest(w)
+		return
+	}
 
 	var m *SurplusRecordingRequest
 	if err := UnmarshalBody(r.Body, &m); err != nil {
@@ -132,9 +183,14 @@ func (router *UserRouter) updateVehiclePlugState(w http.ResponseWriter, r *http.
 		return
 	}
 
-	vehicleID := GetDB().GetAPITokenVehicleID(token)
-	if vehicleID == 0 {
+	userID := GetDB().GetAPITokenUserID(token)
+	if userID == "" {
 		SendBadRequest(w)
+		return
+	}
+
+	if !GetDB().IsUserOwnerOfVehicle(userID, vehicleID) {
+		SendForbidden(w)
 		return
 	}
 
@@ -147,36 +203,31 @@ func (router *UserRouter) updateVehiclePlugState(w http.ResponseWriter, r *http.
 		GetDB().LogChargingEvent(vehicleID, LogEventVehicleUnplug, "")
 	}
 
-	authToken := GetTeslaAPI().GetOrRefreshAccessToken(vehicle.UserID)
-	if authToken == "" {
-		log.Printf("could not get access token to update vehicle data on plug in/out for vehicle id %d\n", vehicleID)
-	} else {
-		if pluggedIn && vehicle.Enabled {
-			go func() {
-				// wait a few moments to ensure vehicle is online
-				time.Sleep(10 * time.Second)
-				car, err := GetTeslaAPI().InitSession(authToken, vehicle, false)
-				if err != nil {
-					log.Printf("could not init session for vehicle %d on plug in: %s\n", vehicleID, err.Error())
-					return
-				}
-				UpdateVehicleDataSaveSoC(authToken, vehicle)
-				if err := GetTeslaAPI().SetChargeLimit(car, 50); err != nil {
-					log.Printf("could not set charge limit for vehicle %d on plug in: %s\n", vehicleID, err.Error())
-				}
-				time.Sleep(5 * time.Second)
-				if err := GetTeslaAPI().ChargeStop(car); err != nil {
-					log.Printf("could not stop charging for vehicle %d on plug in: %s\n", vehicleID, err.Error())
-				}
-			}()
-		}
-		if !pluggedIn && vehicle.Enabled {
-			state := GetDB().GetVehicleState(vehicle.ID)
-			if state != nil && state.Charging != ChargeStateNotCharging {
-				// Vehicle got unplugged while charging
-				GetDB().SetVehicleStateCharging(vehicle.ID, ChargeStateNotCharging)
-				GetDB().SetVehicleStateAmps(vehicle.ID, 0)
+	if pluggedIn && vehicle.Enabled {
+		go func() {
+			// wait a few moments to ensure vehicle is online
+			time.Sleep(10 * time.Second)
+			car, err := GetTeslaAPI().InitSession(vehicle, false)
+			if err != nil {
+				log.Printf("could not init session for vehicle %d on plug in: %s\n", vehicleID, err.Error())
+				return
 			}
+			UpdateVehicleDataSaveSoC(vehicle)
+			if err := GetTeslaAPI().SetChargeLimit(car, 50); err != nil {
+				log.Printf("could not set charge limit for vehicle %d on plug in: %s\n", vehicleID, err.Error())
+			}
+			time.Sleep(5 * time.Second)
+			if err := GetTeslaAPI().ChargeStop(car); err != nil {
+				log.Printf("could not stop charging for vehicle %d on plug in: %s\n", vehicleID, err.Error())
+			}
+		}()
+	}
+	if !pluggedIn && vehicle.Enabled {
+		state := GetDB().GetVehicleState(vehicle.ID)
+		if state != nil && state.Charging != ChargeStateNotCharging {
+			// Vehicle got unplugged while charging
+			GetDB().SetVehicleStateCharging(vehicle.ID, ChargeStateNotCharging)
+			GetDB().SetVehicleStateAmps(vehicle.ID, 0)
 		}
 	}
 }

@@ -21,7 +21,6 @@ func (router *ManualControlRouter) SetupRoutes(s *mux.Router) {
 }
 
 func (router *ManualControlRouter) testDrive(w http.ResponseWriter, r *http.Request) {
-	authToken := GetAuthTokenFromRequest(r)
 	vehicle := router.getVehicleFromRequest(r)
 	if vehicle == nil {
 		SendNotFound(w)
@@ -32,9 +31,14 @@ func (router *ManualControlRouter) testDrive(w http.ResponseWriter, r *http.Requ
 	go func() {
 		cc := NewChargeController()
 		state := GetDB().GetVehicleState(vehicle.ID)
-		cc.activateCharging(authToken, vehicle, state, int(math.Round((float64)(vehicle.MaxAmps)/2)), ChargeStateChargingOnGrid)
+		if state == nil {
+			GetDB().SetVehicleStateAmps(vehicle.ID, 0)
+			GetDB().SetVehicleStateCharging(vehicle.ID, ChargeStateNotCharging)
+			state = GetDB().GetVehicleState(vehicle.ID)
+		}
+		cc.activateCharging(vehicle, state, int(math.Round((float64)(vehicle.MaxAmps)/2)), ChargeStateChargingOnGrid)
 		time.Sleep(30 * time.Second)
-		cc.stopCharging(authToken, vehicle)
+		cc.stopCharging(vehicle)
 	}()
 }
 

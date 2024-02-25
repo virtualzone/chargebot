@@ -19,6 +19,7 @@ func main() {
 		GetDB().ResetDBStructure()
 	}
 	GetDB().InitDBStructure()
+	GetOIDCProvider().Init()
 
 	TeslaAPIInstance = &TeslaAPIImpl{}
 	TeslaAPIInstance.InitTokenCache()

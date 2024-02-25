@@ -20,8 +20,10 @@ import (
 var SQLITE_DATETIME_LAYOUT string = "2006-01-02 15:04:05"
 
 type User struct {
-	ID           string `json:"id"`
-	RefreshToken string `json:"refresh_token"`
+	ID                string `json:"id"`
+	TeslaUserID       string `json:"tesla_user_id"`
+	TeslaRefreshToken string `json:"tesla_refresh_token"`
+	APIToken          string `json:"api_token"`
 }
 
 type Vehicle struct {
@@ -158,35 +160,17 @@ func (db *DB) InitDBStructure() {
 	log.Println("Initializing database structure...")
 	_, err := db.GetConnection().Exec(`
 create table if not exists auth_codes(id text primary key, ts text);
-create table if not exists users(id text primary key, refresh_token text);
-create table if not exists vehicles(id int primary key, user_id text, vin text, display_name text, enabled int, target_soc int, max_amps int, surplus_charging int, min_surplus int, min_chargetime int, lowcost_charging int, max_price int, tibber_token text);
-create table if not exists api_tokens(token text primary key, vehicle_id int, passhash text);
+create table if not exists users(id text primary key, tesla_refresh_token text, tesla_user_id text default '');
+create table if not exists vehicles(id int primary key, user_id text, vin text, display_name text, enabled int, target_soc int, max_amps int, surplus_charging int, min_surplus int, min_chargetime int, lowcost_charging int, max_price int, tibber_token text, num_phases int default 3, grid_provider text default 'tibber', grid_strategy int default 1, depart_days text default '12345', depart_time text default '07:00');
+create table if not exists api_tokens(token text primary key, user_id text, passhash text);
 create table if not exists surpluses(vehicle_id int, ts text, surplus_watts int);
 create table if not exists logs(vehicle_id int, ts text, event_id int, details text);
-create table if not exists vehicle_states(vehicle_id int primary key, plugged_in int default 0, charging int default 0, soc int default -1);
+create table if not exists vehicle_states(vehicle_id int primary key, plugged_in int default 0, charging int default 0, soc int default -1, charge_amps int default 0);
 create table if not exists tibber_prices(vehicle_id int not null, hourstamp int not null, price real, primary key(vehicle_id, hourstamp));
 create table if not exists grid_hourblocks(vehicle_id int not null, hourstamp int not null, primary key(vehicle_id, hourstamp));
 `)
 	if err != nil {
 		log.Panicln(err)
-	}
-	if _, err = db.GetConnection().Exec(`alter table vehicles add column num_phases int default 3;`); err != nil {
-		log.Println(err)
-	}
-	if _, err = db.GetConnection().Exec(`alter table vehicle_states add column charge_amps int default 0;`); err != nil {
-		log.Println(err)
-	}
-	if _, err = db.GetConnection().Exec(`alter table vehicles add column grid_provider text default 'tibber';`); err != nil {
-		log.Println(err)
-	}
-	if _, err = db.GetConnection().Exec(`alter table vehicles add column grid_strategy int default 1;`); err != nil {
-		log.Println(err)
-	}
-	if _, err = db.GetConnection().Exec(`alter table vehicles add column depart_days text default '12345';`); err != nil {
-		log.Println(err)
-	}
-	if _, err = db.GetConnection().Exec(`alter table vehicles add column depart_time text default '07:00';`); err != nil {
-		log.Println(err)
 	}
 }
 
@@ -224,7 +208,7 @@ func (db *DB) DeleteExpiredAuthCodes() {
 }
 
 func (db *DB) CreateUpdateUser(user *User) {
-	_, err := db.GetConnection().Exec("replace into users values(?, ?)", user.ID, "c:"+db.encrypt(user.RefreshToken))
+	_, err := db.GetConnection().Exec("replace into users values(?, ?, ?)", user.ID, "c:"+db.encrypt(user.TeslaRefreshToken), user.TeslaUserID)
 	if err != nil {
 		log.Panicln(err)
 	}
@@ -232,15 +216,18 @@ func (db *DB) CreateUpdateUser(user *User) {
 
 func (db *DB) GetUser(ID string) *User {
 	e := &User{}
-	err := db.GetConnection().QueryRow("select id, refresh_token from users where id = ?",
+	err := db.GetConnection().QueryRow("select id, tesla_refresh_token, tesla_user_id, ifnull(token, '') "+
+		"from users "+
+		"left join api_tokens on api_tokens.user_id = users.id "+
+		"where id = ?",
 		ID).
-		Scan(&e.ID, &e.RefreshToken)
+		Scan(&e.ID, &e.TeslaRefreshToken, &e.TeslaUserID, &e.APIToken)
 	if err != nil {
 		log.Println(err)
 		return nil
 	}
-	if strings.Index(e.RefreshToken, "c:") == 0 {
-		e.RefreshToken = db.decrypt(e.RefreshToken[2:])
+	if strings.Index(e.TeslaRefreshToken, "c:") == 0 {
+		e.TeslaRefreshToken = db.decrypt(e.TeslaRefreshToken[2:])
 	}
 	return e
 }
@@ -256,10 +243,10 @@ func (db *DB) CreateUpdateVehicle(e *Vehicle) {
 
 func (db *DB) GetVehicleByID(ID int) *Vehicle {
 	e := &Vehicle{}
-	err := db.GetConnection().QueryRow("select id, user_id, vin, display_name, ifnull(api_tokens.token, ''), "+
+	err := db.GetConnection().QueryRow("select id, vehicles.user_id, vin, display_name, ifnull(api_tokens.token, ''), "+
 		"enabled, target_soc, max_amps, num_phases, surplus_charging, min_surplus, min_chargetime, lowcost_charging, grid_provider, grid_strategy, depart_days, depart_time, max_price, tibber_token "+
 		"from vehicles "+
-		"left join api_tokens on api_tokens.vehicle_id = vehicles.id "+
+		"left join api_tokens on api_tokens.user_id = vehicles.user_id "+
 		"where vehicles.id = ?",
 		ID).
 		Scan(&e.ID, &e.UserID, &e.VIN, &e.DisplayName, &e.APIToken, &e.Enabled, &e.TargetSoC, &e.MaxAmps, &e.NumPhases, &e.SurplusCharging, &e.MinSurplus, &e.MinChargeTime, &e.LowcostCharging, &e.GridProvider, &e.GridStrategy, &e.DepartDays, &e.DepartTime, &e.MaxPrice, &e.TibberToken)
@@ -272,11 +259,11 @@ func (db *DB) GetVehicleByID(ID int) *Vehicle {
 
 func (db *DB) GetVehicles(UserID string) []*Vehicle {
 	result := []*Vehicle{}
-	rows, err := db.GetConnection().Query("select id, user_id, vin, display_name, ifnull(api_tokens.token, ''), "+
+	rows, err := db.GetConnection().Query("select id, vehicles.user_id, vin, display_name, ifnull(api_tokens.token, ''), "+
 		"enabled, target_soc, max_amps, num_phases, surplus_charging, min_surplus, min_chargetime, lowcost_charging, grid_provider, grid_strategy, depart_days, depart_time, max_price, tibber_token "+
 		"from vehicles "+
-		"left join api_tokens on api_tokens.vehicle_id = vehicles.id "+
-		"where user_id = ? "+
+		"left join api_tokens on api_tokens.user_id = vehicles.user_id "+
+		"where vehicles.user_id = ? "+
 		"order by display_name",
 		UserID)
 	if err != nil {
@@ -294,10 +281,10 @@ func (db *DB) GetVehicles(UserID string) []*Vehicle {
 
 func (db *DB) GetAllVehicles() []*Vehicle {
 	result := []*Vehicle{}
-	rows, err := db.GetConnection().Query("select id, user_id, vin, display_name, ifnull(api_tokens.token, ''), " +
+	rows, err := db.GetConnection().Query("select id, vehicles.user_id, vin, display_name, ifnull(api_tokens.token, ''), " +
 		"enabled, target_soc, max_amps, num_phases, surplus_charging, min_surplus, min_chargetime, lowcost_charging, grid_provider, grid_strategy, depart_days, depart_time, max_price, tibber_token " +
 		"from vehicles " +
-		"left join api_tokens on api_tokens.vehicle_id = vehicles.id")
+		"left join api_tokens on api_tokens.user_id = vehicles.user_id")
 	if err != nil {
 		log.Println(err)
 		return nil
@@ -315,9 +302,6 @@ func (db *DB) DeleteVehicle(ID int) {
 	if _, err := db.GetConnection().Exec("delete from vehicles where id = ?", ID); err != nil {
 		log.Panicln(err)
 	}
-	if _, err := db.GetConnection().Exec("delete from api_tokens where vehicle_id = ?", ID); err != nil {
-		log.Panicln(err)
-	}
 	if _, err := db.GetConnection().Exec("delete from surpluses where vehicle_id = ?", ID); err != nil {
 		log.Panicln(err)
 	}
@@ -329,10 +313,10 @@ func (db *DB) DeleteVehicle(ID int) {
 	}
 }
 
-func (db *DB) CreateAPIToken(VehicleID int, password string) string {
+func (db *DB) CreateAPIToken(userID string, password string) string {
 	id := uuid.New().String()
 	passhash := GetSHA256Hash(password)
-	_, err := db.GetConnection().Exec("insert into api_tokens values(?, ?, ?)", id, VehicleID, passhash)
+	_, err := db.GetConnection().Exec("insert into api_tokens values(?, ?, ?)", id, userID, passhash)
 	if err != nil {
 		log.Panicln(err)
 	}
@@ -347,16 +331,28 @@ func (db *DB) UpdateAPITokenPassword(token string, password string) {
 	}
 }
 
-func (db *DB) GetAPITokenVehicleID(token string) int {
-	var vehicleID int
-	err := db.GetConnection().QueryRow("select vehicle_id from api_tokens where token = ?",
+func (db *DB) GetAPITokenUserID(token string) string {
+	var userID string
+	err := db.GetConnection().QueryRow("select user_id from api_tokens where token = ?",
 		token).
-		Scan(&vehicleID)
+		Scan(&userID)
 	if err != nil {
 		log.Println(err)
-		return 0
+		return ""
 	}
-	return vehicleID
+	return userID
+}
+
+func (db *DB) GetAPIToken(userID string) string {
+	var token string
+	err := db.GetConnection().QueryRow("select token from api_tokens where user_id = ?",
+		userID).
+		Scan(&token)
+	if err != nil {
+		log.Println(err)
+		return ""
+	}
+	return token
 }
 
 func (db *DB) GetVehicleState(vehicleID int) *VehicleState {

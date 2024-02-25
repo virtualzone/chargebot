@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/go-playground/validator"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/mux"
@@ -130,19 +131,30 @@ func VerifyAuthMiddleware(next http.Handler) http.Handler {
 		if strings.Index(bearer, "Bearer ") == 0 {
 			h := strings.TrimPrefix(bearer, "Bearer ")
 			if h != "" {
-				if GetTeslaAPI().IsKnownAccessToken(h) {
-					parsedToken, _ := jwt.Parse(h, nil)
-					if !(parsedToken == nil || parsedToken.Claims == nil) {
-						exp, err := parsedToken.Claims.GetExpirationTime()
-						if err == nil {
-							now := time.Now().UTC()
-							if exp.After(now) {
-								userID, _ = parsedToken.Claims.GetSubject()
-								authHeader = h
-								tokenValid = true
-							}
+				if OIDCTestingMode {
+					token, err := jwt.Parse(h, func(token *jwt.Token) (interface{}, error) {
+						return []byte(OIDCTestingSecret), nil
+					})
+					log.Println(err)
+					if err == nil {
+						claims, _ := token.Claims.(jwt.MapClaims)
+						resClaims := Claims{}
+						for k, v := range claims {
+							resClaims[k] = v
 						}
-
+						idToken := oidc.IDToken{
+							Subject: resClaims["sub"].(string),
+						}
+						tokenValid = true
+						authHeader = h
+						userID = idToken.Subject
+					}
+				} else {
+					idToken, _, err := GetOIDCProvider().VerifyAuthHeader(h)
+					if err == nil {
+						tokenValid = true
+						authHeader = h
+						userID = idToken.Subject
 					}
 				}
 			}
@@ -150,6 +162,7 @@ func VerifyAuthMiddleware(next http.Handler) http.Handler {
 
 		if !tokenValid {
 			authURLs := []string{
+				"/api/1/auth/tesla/",
 				"/api/1/tesla/",
 				"/api/1/ctrl/",
 			}
@@ -174,6 +187,7 @@ func InitHTTPRouter() {
 	router := mux.NewRouter()
 	routers := make(map[string]Route)
 	routers["/api/1/auth/tesla/"] = &TeslaAuthRouter{}
+	routers["/api/1/auth/"] = &AuthRouter{}
 	routers["/api/1/tesla/"] = &TeslaRouter{}
 	routers["/api/1/user/"] = &UserRouter{}
 	routers["/api/1/ctrl/"] = &ManualControlRouter{}

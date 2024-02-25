@@ -12,14 +12,10 @@ import (
 type TeslaRouter struct {
 }
 
-type CreateAPITokenRequest struct {
-	VehicleID int `json:"vehicle_id"`
-}
-
 type GetAPITokenResponse struct {
-	Token     string `json:"token"`
-	VehicleID int    `json:"vehicle_id"`
-	Password  string `json:"password"`
+	Token    string `json:"token"`
+	UserID   string `json:"user_id"`
+	Password string `json:"password"`
 }
 
 func (router *TeslaRouter) SetupRoutes(s *mux.Router) {
@@ -33,11 +29,11 @@ func (router *TeslaRouter) SetupRoutes(s *mux.Router) {
 }
 
 func (router *TeslaRouter) listVehicles(w http.ResponseWriter, r *http.Request) {
-	authToken := GetAuthTokenFromRequest(r)
-	list, err := GetTeslaAPI().ListVehicles(authToken)
+	userID := GetUserIDFromRequest(r)
+	list, err := GetTeslaAPI().ListVehicles(userID)
 	if err != nil {
 		log.Println(err)
-		SendInternalServerError(w)
+		SendUnauthorized(w)
 		return
 	}
 	SendJSON(w, list)
@@ -50,12 +46,12 @@ func (router *TeslaRouter) myVehicles(w http.ResponseWriter, r *http.Request) {
 }
 
 func (router *TeslaRouter) addVehicle(w http.ResponseWriter, r *http.Request) {
-	authToken := GetAuthTokenFromRequest(r)
+	userID := GetUserIDFromRequest(r)
 	vars := mux.Vars(r)
 	vehicleId, _ := strconv.Atoi(vars["id"])
 
 	// Check if vehicle belongs to request user
-	list, err := GetTeslaAPI().ListVehicles(authToken)
+	list, err := GetTeslaAPI().ListVehicles(userID)
 	if err != nil {
 		log.Println(err)
 		SendInternalServerError(w)
@@ -75,7 +71,7 @@ func (router *TeslaRouter) addVehicle(w http.ResponseWriter, r *http.Request) {
 
 	e := &Vehicle{
 		ID:              vehicle.VehicleID,
-		UserID:          GetUserIDFromRequest(r),
+		UserID:          userID,
 		VIN:             vehicle.VIN,
 		DisplayName:     vehicle.DisplayName,
 		Enabled:         false,
@@ -98,12 +94,12 @@ func (router *TeslaRouter) addVehicle(w http.ResponseWriter, r *http.Request) {
 }
 
 func (router *TeslaRouter) updateVehicle(w http.ResponseWriter, r *http.Request) {
-	authToken := GetAuthTokenFromRequest(r)
+	userID := GetUserIDFromRequest(r)
 	vars := mux.Vars(r)
 	vehicleId, _ := strconv.Atoi(vars["id"])
 
 	// Check if vehicle belongs to request user
-	list, err := GetTeslaAPI().ListVehicles(authToken)
+	list, err := GetTeslaAPI().ListVehicles(userID)
 	if err != nil {
 		log.Println(err)
 		SendInternalServerError(w)
@@ -128,7 +124,7 @@ func (router *TeslaRouter) updateVehicle(w http.ResponseWriter, r *http.Request)
 
 	e := &Vehicle{
 		ID:              vehicle.VehicleID,
-		UserID:          GetUserIDFromRequest(r),
+		UserID:          userID,
 		VIN:             vehicle.VIN,
 		DisplayName:     vehicle.DisplayName,
 		Enabled:         m.Enabled,
@@ -151,12 +147,12 @@ func (router *TeslaRouter) updateVehicle(w http.ResponseWriter, r *http.Request)
 	// If vehicle was not enabled, but is enabled now, update current SoC
 	if (eOld != nil) && (e.Enabled) && (!eOld.Enabled) {
 		go func() {
-			car, err := GetTeslaAPI().InitSession(authToken, e, true)
+			car, err := GetTeslaAPI().InitSession(e, true)
 			if err != nil {
 				log.Printf("could not init session for vehicle %d on plug in: %s\n", e.ID, err.Error())
 				return
 			}
-			UpdateVehicleDataSaveSoC(authToken, e)
+			UpdateVehicleDataSaveSoC(e)
 			if err := GetTeslaAPI().SetChargeLimit(car, 50); err != nil {
 				log.Printf("could not set charge limit for vehicle %d on plug in: %s\n", e.ID, err.Error())
 			}
@@ -171,12 +167,12 @@ func (router *TeslaRouter) updateVehicle(w http.ResponseWriter, r *http.Request)
 }
 
 func (router *TeslaRouter) deleteVehicle(w http.ResponseWriter, r *http.Request) {
-	authToken := GetAuthTokenFromRequest(r)
+	userID := GetUserIDFromRequest(r)
 	vars := mux.Vars(r)
 	vehicleId, _ := strconv.Atoi(vars["id"])
 
 	// Check if vehicle belongs to request user
-	list, err := GetTeslaAPI().ListVehicles(authToken)
+	list, err := GetTeslaAPI().ListVehicles(userID)
 	if err != nil {
 		log.Println(err)
 		SendInternalServerError(w)
@@ -199,26 +195,15 @@ func (router *TeslaRouter) deleteVehicle(w http.ResponseWriter, r *http.Request)
 }
 
 func (router *TeslaRouter) createAPIToken(w http.ResponseWriter, r *http.Request) {
-	var m CreateAPITokenRequest
-	err := UnmarshalValidateBody(r.Body, &m)
-	if err != nil {
-		SendBadRequest(w)
-		return
-	}
-
 	userID := GetUserIDFromRequest(r)
-	if !GetDB().IsUserOwnerOfVehicle(userID, m.VehicleID) {
-		SendForbidden(w)
-		return
-	}
 
 	password := GeneratePassword(16, true, true)
-	token := GetDB().CreateAPIToken(m.VehicleID, password)
+	token := GetDB().CreateAPIToken(userID, password)
 
 	resp := GetAPITokenResponse{
-		Token:     token,
-		VehicleID: m.VehicleID,
-		Password:  password,
+		Token:    token,
+		UserID:   userID,
+		Password: password,
 	}
 	SendJSON(w, resp)
 }
@@ -227,8 +212,8 @@ func (router *TeslaRouter) updateAPIToken(w http.ResponseWriter, r *http.Request
 	vars := mux.Vars(r)
 	token := vars["id"]
 	userID := GetUserIDFromRequest(r)
-	vehicleID := GetDB().GetAPITokenVehicleID(token)
-	if !GetDB().IsUserOwnerOfVehicle(userID, vehicleID) {
+	userIDToken := GetDB().GetAPITokenUserID(token)
+	if userID != userIDToken {
 		SendForbidden(w)
 		return
 	}
@@ -237,9 +222,9 @@ func (router *TeslaRouter) updateAPIToken(w http.ResponseWriter, r *http.Request
 	GetDB().UpdateAPITokenPassword(token, password)
 
 	resp := GetAPITokenResponse{
-		Token:     token,
-		VehicleID: vehicleID,
-		Password:  password,
+		Token:    token,
+		UserID:   userID,
+		Password: password,
 	}
 	SendJSON(w, resp)
 }
