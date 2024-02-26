@@ -48,29 +48,20 @@ export default function PageVehicle() {
     fetchData();
   }, [router]);
 
-  const loadVehicleState = async (token: string, vehicleID: number) => {
-    if (!token) {
-      return
-    }
-    const json = await getAPI("/api/1/user/" + token + "/" + vehicleID + "/state");
+  const loadVehicleState = async (vehicleID: number) => {
+    const json = await getAPI("/api/1/tesla/state/" + vehicleID);
     if (json) {
       setVehicleState(json);
     }
   }
 
-  const loadLatestSurpluses = async (token: string, vehicleID: number) => {
-    if (!token) {
-      return
-    }
-    const json = await getAPI("/api/1/user/" + token + "/" + vehicleID + "/surplus");
+  const loadLatestSurpluses = async (vehicleID: number) => {
+    const json = await getAPI("/api/1/tesla/surplus/" + vehicleID);
     setSurpluses(json);
   }
 
-  const loadLatestChargingEvents = async (token: string, vehicleID: number) => {
-    if (!token) {
-      return
-    }
-    const json = await getAPI("/api/1/user/" + token + "/" + vehicleID + "/events");
+  const loadLatestChargingEvents = async (vehicleID: number) => {
+    const json = await getAPI("/api/1/tesla/events/" + vehicleID);
     setChargingEvents(json);
   }
 
@@ -92,9 +83,9 @@ export default function PageVehicle() {
         setDepartDays([...e.departDays].map(i => Number(i)));
         setDepartTime(e.departTime);
         setTibberToken(e.tibber_token);
-        loadVehicleState(e.api_token, e.id);
-        loadLatestSurpluses(e.api_token, e.id);
-        loadLatestChargingEvents(e.api_token, e.id);
+        loadVehicleState(e.id);
+        loadLatestSurpluses(e.id);
+        loadLatestChargingEvents(e.id);
         setVehicle(e);
       }
     });
