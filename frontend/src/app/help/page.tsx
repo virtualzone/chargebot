@@ -6,18 +6,19 @@ import { CopyBlock } from "react-code-blocks"
 export default function PageHelp() {
   const shellCommandPushSurplus = `shell_command:
   push_pv_surplus: >
-    curl --header 'Content-Type: application/json' --data '{"password": "{{password}}", "surplus_watts": {{surplus}}}' https://chargebot.io/api/1/user/{{token}}/surplus`
+    curl --header 'Content-Type: application/json' --data '{"password": "{{password}}", "surplus_watts": {{surplus}}}' https://chargebot.io/api/1/user/{{token}}/{{vehicle}}/surplus`
   const haScriptSurplus = `service: shell_command.push_pv_surplus
   data:
     token: your-chargebot.io-token
+    vehicle: your-chargebot.io-vehicle-id
     password: your-chargebot.io-password
     surplus: "{{ states('sensor.power_production_changeme') }}"`
   const shellCommandPlugState = `shell_command:
   push_tesla_plugged_in: >
-    curl --header 'Content-Type: application/json' --data '{"password": "{{password}}"}' https://chargebot.io/api/1/user/{{token}}/plugged_in
+    curl --header 'Content-Type: application/json' --data '{"password": "{{password}}"}' https://chargebot.io/api/1/user/{{token}}/{{vehicle}}/plugged_in
   push_tesla_unplugged: >
-    curl --header 'Content-Type: application/json' --data '{"password": "{{password}}"}' https://chargebot.io/api/1/user/{{token}}/unplugged`
-  const haScriptPlugIn = `token: your-chargebot.io-token\npassword: your-chargebot.io-password`
+    curl --header 'Content-Type: application/json' --data '{"password": "{{password}}"}' https://chargebot.io/api/1/user/{{token}}/{{vehicle}}/unplugged`
+  const haScriptPlugIn = `token: your-chargebot.io-token\nvehicle: your-chargebot.io-vehicle-id\npassword: your-chargebot.io-password`
 
   return (
     <Container fluid="sm" className="pt-5 container-max-width min-height">
