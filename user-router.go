@@ -26,41 +26,9 @@ type PlugInOutRequest struct {
 }
 
 func (router *UserRouter) SetupRoutes(s *mux.Router) {
-	s.HandleFunc("/{token}/{id}/state", router.getVehicleState).Methods("GET")
 	s.HandleFunc("/{token}/{id}/surplus", router.recordSurplus).Methods("POST")
-	s.HandleFunc("/{token}/{id}/surplus", router.getLatestSurpluses).Methods("GET")
 	s.HandleFunc("/{token}/{id}/plugged_in", router.vehiclePluggedIn).Methods("POST")
 	s.HandleFunc("/{token}/{id}/unplugged", router.vehicleUnplugged).Methods("POST")
-	s.HandleFunc("/{token}/{id}/events", router.getLatestChargingEvents).Methods("GET")
-}
-
-func (router *UserRouter) getVehicleState(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	token := vars["token"]
-	vehicleIDString := vars["id"]
-	vehicleID, err := strconv.Atoi(vehicleIDString)
-	if err != nil {
-		SendBadRequest(w)
-		return
-	}
-
-	userID := GetDB().GetAPITokenUserID(token)
-	if userID == "" {
-		SendBadRequest(w)
-		return
-	}
-
-	if !GetDB().IsUserOwnerOfVehicle(userID, vehicleID) {
-		SendForbidden(w)
-		return
-	}
-
-	state := GetDB().GetVehicleState(vehicleID)
-	if state == nil {
-		SendNotFound(w)
-		return
-	}
-	SendJSON(w, state)
 }
 
 func (router *UserRouter) recordSurplus(w http.ResponseWriter, r *http.Request) {
@@ -110,56 +78,6 @@ func (router *UserRouter) recordSurplus(w http.ResponseWriter, r *http.Request) 
 
 	GetDB().RecordSurplus(vehicle.ID, surplus)
 	SendJSON(w, true)
-}
-
-func (router *UserRouter) getLatestSurpluses(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	token := vars["token"]
-	vehicleIDString := vars["id"]
-	vehicleID, err := strconv.Atoi(vehicleIDString)
-	if err != nil {
-		SendBadRequest(w)
-		return
-	}
-
-	userID := GetDB().GetAPITokenUserID(token)
-	if userID == "" {
-		SendBadRequest(w)
-		return
-	}
-
-	if !GetDB().IsUserOwnerOfVehicle(userID, vehicleID) {
-		SendForbidden(w)
-		return
-	}
-
-	res := GetDB().GetLatestSurplusRecords(vehicleID, 50)
-	SendJSON(w, res)
-}
-
-func (router *UserRouter) getLatestChargingEvents(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	token := vars["token"]
-	vehicleIDString := vars["id"]
-	vehicleID, err := strconv.Atoi(vehicleIDString)
-	if err != nil {
-		SendBadRequest(w)
-		return
-	}
-
-	userID := GetDB().GetAPITokenUserID(token)
-	if userID == "" {
-		SendBadRequest(w)
-		return
-	}
-
-	if !GetDB().IsUserOwnerOfVehicle(userID, vehicleID) {
-		SendForbidden(w)
-		return
-	}
-
-	res := GetDB().GetLatestChargingEvents(vehicleID, 50)
-	SendJSON(w, res)
 }
 
 func (router *UserRouter) updateVehiclePlugState(w http.ResponseWriter, r *http.Request, pluggedIn bool) {

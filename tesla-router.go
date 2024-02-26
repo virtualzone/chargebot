@@ -26,6 +26,9 @@ func (router *TeslaRouter) SetupRoutes(s *mux.Router) {
 	s.HandleFunc("/vehicle_delete/{id}", router.deleteVehicle).Methods("DELETE")
 	s.HandleFunc("/api_token_create", router.createAPIToken).Methods("POST")
 	s.HandleFunc("/api_token_update/{id}", router.updateAPIToken).Methods("POST")
+	s.HandleFunc("/state/{id}", router.getVehicleState).Methods("GET")
+	s.HandleFunc("/surplus/{id}", router.getLatestSurpluses).Methods("GET")
+	s.HandleFunc("/events/{id}", router.getLatestChargingEvents).Methods("GET")
 }
 
 func (router *TeslaRouter) listVehicles(w http.ResponseWriter, r *http.Request) {
@@ -227,4 +230,69 @@ func (router *TeslaRouter) updateAPIToken(w http.ResponseWriter, r *http.Request
 		Password: password,
 	}
 	SendJSON(w, resp)
+}
+
+func (router *TeslaRouter) getVehicleState(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	vehicleIDString := vars["id"]
+	vehicleID, err := strconv.Atoi(vehicleIDString)
+	if err != nil {
+		SendBadRequest(w)
+		return
+	}
+
+	userID := GetUserIDFromRequest(r)
+
+	if !GetDB().IsUserOwnerOfVehicle(userID, vehicleID) {
+		SendForbidden(w)
+		return
+	}
+
+	state := GetDB().GetVehicleState(vehicleID)
+	if state == nil {
+		SendNotFound(w)
+		return
+	}
+	SendJSON(w, state)
+}
+
+func (router *TeslaRouter) getLatestSurpluses(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	vehicleIDString := vars["id"]
+	vehicleID, err := strconv.Atoi(vehicleIDString)
+	if err != nil {
+		SendBadRequest(w)
+		return
+	}
+
+	userID := GetUserIDFromRequest(r)
+
+	if !GetDB().IsUserOwnerOfVehicle(userID, vehicleID) {
+		SendForbidden(w)
+		return
+	}
+
+	res := GetDB().GetLatestSurplusRecords(vehicleID, 50)
+	SendJSON(w, res)
+}
+
+func (router *TeslaRouter) getLatestChargingEvents(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	vehicleIDString := vars["id"]
+	vehicleID, err := strconv.Atoi(vehicleIDString)
+	if err != nil {
+		log.Println(err)
+		SendBadRequest(w)
+		return
+	}
+
+	userID := GetUserIDFromRequest(r)
+
+	if !GetDB().IsUserOwnerOfVehicle(userID, vehicleID) {
+		SendForbidden(w)
+		return
+	}
+
+	res := GetDB().GetLatestChargingEvents(vehicleID, 50)
+	SendJSON(w, res)
 }
