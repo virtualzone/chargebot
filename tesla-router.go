@@ -93,6 +93,11 @@ func (router *TeslaRouter) addVehicle(w http.ResponseWriter, r *http.Request) {
 		TibberToken:     "",
 	}
 	GetDB().CreateUpdateVehicle(e)
+
+	if err := GetTeslaAPI().CreateTelemetryConfig(e); err != nil {
+		log.Printf("Could not enroll vehicle %d in fleet telemetry: %s\n", e.ID, err.Error())
+	}
+
 	SendJSON(w, true)
 }
 
@@ -191,6 +196,16 @@ func (router *TeslaRouter) deleteVehicle(w http.ResponseWriter, r *http.Request)
 	if vehicle == nil {
 		SendBadRequest(w)
 		return
+	}
+
+	e := GetDB().GetVehicleByID(vehicleId)
+	if e == nil {
+		SendBadRequest(w)
+		return
+	}
+
+	if err := GetTeslaAPI().DeleteTelemetryConfig(e); err != nil {
+		log.Printf("Could not remove vehicle %d from fleet telemetry: %s\n", e.ID, err.Error())
 	}
 
 	GetDB().DeleteVehicle(vehicle.VehicleID)

@@ -27,25 +27,26 @@ type User struct {
 }
 
 type Vehicle struct {
-	ID              int          `json:"id"`
-	UserID          string       `json:"user_id"`
-	VIN             string       `json:"vin"`
-	DisplayName     string       `json:"display_name"`
-	APIToken        string       `json:"api_token"`
-	Enabled         bool         `json:"enabled"`
-	TargetSoC       int          `json:"target_soc"`
-	MaxAmps         int          `json:"max_amps"`
-	NumPhases       int          `json:"num_phases"`
-	SurplusCharging bool         `json:"surplus_charging"`
-	MinSurplus      int          `json:"min_surplus"`
-	MinChargeTime   int          `json:"min_chargetime"`
-	LowcostCharging bool         `json:"lowcost_charging"`
-	MaxPrice        int          `json:"max_price"`
-	GridProvider    GridProvider `json:"gridProvider"`
-	GridStrategy    GridStrategy `json:"gridStrategy"`
-	DepartDays      string       `json:"departDays"`
-	DepartTime      string       `json:"departTime"`
-	TibberToken     string       `json:"tibber_token"`
+	ID                  int          `json:"id"`
+	UserID              string       `json:"user_id"`
+	VIN                 string       `json:"vin"`
+	DisplayName         string       `json:"display_name"`
+	APIToken            string       `json:"api_token"`
+	Enabled             bool         `json:"enabled"`
+	TargetSoC           int          `json:"target_soc"`
+	MaxAmps             int          `json:"max_amps"`
+	NumPhases           int          `json:"num_phases"`
+	SurplusCharging     bool         `json:"surplus_charging"`
+	MinSurplus          int          `json:"min_surplus"`
+	MinChargeTime       int          `json:"min_chargetime"`
+	LowcostCharging     bool         `json:"lowcost_charging"`
+	MaxPrice            int          `json:"max_price"`
+	GridProvider        GridProvider `json:"gridProvider"`
+	GridStrategy        GridStrategy `json:"gridStrategy"`
+	DepartDays          string       `json:"departDays"`
+	DepartTime          string       `json:"departTime"`
+	TibberToken         string       `json:"tibber_token"`
+	TelemetryEnrollDate *time.Time   `json:"telemetry_enroll_date"`
 }
 
 type APIToken struct {
@@ -172,6 +173,9 @@ create table if not exists grid_hourblocks(vehicle_id int not null, hourstamp in
 	if err != nil {
 		log.Panicln(err)
 	}
+	if _, err := db.GetConnection().Exec(`alter table vehicles add column telemetry_enroll_date string default ''`); err != nil {
+		log.Println(err)
+	}
 }
 
 func (db *DB) CreateAuthCode() string {
@@ -233,9 +237,13 @@ func (db *DB) GetUser(ID string) *User {
 }
 
 func (db *DB) CreateUpdateVehicle(e *Vehicle) {
-	_, err := db.GetConnection().Exec("replace into vehicles values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+	ts := ""
+	if e.TelemetryEnrollDate != nil {
+		ts = db.formatSqliteDatetime(*e.TelemetryEnrollDate)
+	}
+	_, err := db.GetConnection().Exec("replace into vehicles values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 		e.ID, e.UserID, e.VIN, e.DisplayName,
-		e.Enabled, e.TargetSoC, e.MaxAmps, e.SurplusCharging, e.MinSurplus, e.MinChargeTime, e.LowcostCharging, e.MaxPrice, e.TibberToken, e.NumPhases, e.GridProvider, e.GridStrategy, e.DepartDays, e.DepartTime)
+		e.Enabled, e.TargetSoC, e.MaxAmps, e.SurplusCharging, e.MinSurplus, e.MinChargeTime, e.LowcostCharging, e.MaxPrice, e.TibberToken, e.NumPhases, e.GridProvider, e.GridStrategy, e.DepartDays, e.DepartTime, ts)
 	if err != nil {
 		log.Panicln(err)
 	}
@@ -243,16 +251,21 @@ func (db *DB) CreateUpdateVehicle(e *Vehicle) {
 
 func (db *DB) GetVehicleByID(ID int) *Vehicle {
 	e := &Vehicle{}
+	var ts string
 	err := db.GetConnection().QueryRow("select id, vehicles.user_id, vin, display_name, ifnull(api_tokens.token, ''), "+
-		"enabled, target_soc, max_amps, num_phases, surplus_charging, min_surplus, min_chargetime, lowcost_charging, grid_provider, grid_strategy, depart_days, depart_time, max_price, tibber_token "+
+		"enabled, target_soc, max_amps, num_phases, surplus_charging, min_surplus, min_chargetime, lowcost_charging, grid_provider, grid_strategy, depart_days, depart_time, max_price, tibber_token, telemetry_enroll_date "+
 		"from vehicles "+
 		"left join api_tokens on api_tokens.user_id = vehicles.user_id "+
 		"where vehicles.id = ?",
 		ID).
-		Scan(&e.ID, &e.UserID, &e.VIN, &e.DisplayName, &e.APIToken, &e.Enabled, &e.TargetSoC, &e.MaxAmps, &e.NumPhases, &e.SurplusCharging, &e.MinSurplus, &e.MinChargeTime, &e.LowcostCharging, &e.GridProvider, &e.GridStrategy, &e.DepartDays, &e.DepartTime, &e.MaxPrice, &e.TibberToken)
+		Scan(&e.ID, &e.UserID, &e.VIN, &e.DisplayName, &e.APIToken, &e.Enabled, &e.TargetSoC, &e.MaxAmps, &e.NumPhases, &e.SurplusCharging, &e.MinSurplus, &e.MinChargeTime, &e.LowcostCharging, &e.GridProvider, &e.GridStrategy, &e.DepartDays, &e.DepartTime, &e.MaxPrice, &e.TibberToken, &ts)
 	if err != nil {
 		log.Println(err)
 		return nil
+	}
+	if ts != "" {
+		parsedDate, _ := time.Parse(SQLITE_DATETIME_LAYOUT, ts)
+		e.TelemetryEnrollDate = &parsedDate
 	}
 	return e
 }
@@ -260,7 +273,7 @@ func (db *DB) GetVehicleByID(ID int) *Vehicle {
 func (db *DB) GetVehicles(UserID string) []*Vehicle {
 	result := []*Vehicle{}
 	rows, err := db.GetConnection().Query("select id, vehicles.user_id, vin, display_name, ifnull(api_tokens.token, ''), "+
-		"enabled, target_soc, max_amps, num_phases, surplus_charging, min_surplus, min_chargetime, lowcost_charging, grid_provider, grid_strategy, depart_days, depart_time, max_price, tibber_token "+
+		"enabled, target_soc, max_amps, num_phases, surplus_charging, min_surplus, min_chargetime, lowcost_charging, grid_provider, grid_strategy, depart_days, depart_time, max_price, tibber_token, telemetry_enroll_date "+
 		"from vehicles "+
 		"left join api_tokens on api_tokens.user_id = vehicles.user_id "+
 		"where vehicles.user_id = ? "+
@@ -272,8 +285,13 @@ func (db *DB) GetVehicles(UserID string) []*Vehicle {
 	}
 	defer rows.Close()
 	for rows.Next() {
+		var ts string
 		e := &Vehicle{}
-		rows.Scan(&e.ID, &e.UserID, &e.VIN, &e.DisplayName, &e.APIToken, &e.Enabled, &e.TargetSoC, &e.MaxAmps, &e.NumPhases, &e.SurplusCharging, &e.MinSurplus, &e.MinChargeTime, &e.LowcostCharging, &e.GridProvider, &e.GridStrategy, &e.DepartDays, &e.DepartTime, &e.MaxPrice, &e.TibberToken)
+		rows.Scan(&e.ID, &e.UserID, &e.VIN, &e.DisplayName, &e.APIToken, &e.Enabled, &e.TargetSoC, &e.MaxAmps, &e.NumPhases, &e.SurplusCharging, &e.MinSurplus, &e.MinChargeTime, &e.LowcostCharging, &e.GridProvider, &e.GridStrategy, &e.DepartDays, &e.DepartTime, &e.MaxPrice, &e.TibberToken, &ts)
+		if ts != "" {
+			parsedDate, _ := time.Parse(SQLITE_DATETIME_LAYOUT, ts)
+			e.TelemetryEnrollDate = &parsedDate
+		}
 		result = append(result, e)
 	}
 	return result
@@ -282,7 +300,7 @@ func (db *DB) GetVehicles(UserID string) []*Vehicle {
 func (db *DB) GetAllVehicles() []*Vehicle {
 	result := []*Vehicle{}
 	rows, err := db.GetConnection().Query("select id, vehicles.user_id, vin, display_name, ifnull(api_tokens.token, ''), " +
-		"enabled, target_soc, max_amps, num_phases, surplus_charging, min_surplus, min_chargetime, lowcost_charging, grid_provider, grid_strategy, depart_days, depart_time, max_price, tibber_token " +
+		"enabled, target_soc, max_amps, num_phases, surplus_charging, min_surplus, min_chargetime, lowcost_charging, grid_provider, grid_strategy, depart_days, depart_time, max_price, tibber_token, telemetry_enroll_date " +
 		"from vehicles " +
 		"left join api_tokens on api_tokens.user_id = vehicles.user_id")
 	if err != nil {
@@ -291,8 +309,13 @@ func (db *DB) GetAllVehicles() []*Vehicle {
 	}
 	defer rows.Close()
 	for rows.Next() {
+		var ts string
 		e := &Vehicle{}
-		rows.Scan(&e.ID, &e.UserID, &e.VIN, &e.DisplayName, &e.APIToken, &e.Enabled, &e.TargetSoC, &e.MaxAmps, &e.NumPhases, &e.SurplusCharging, &e.MinSurplus, &e.MinChargeTime, &e.LowcostCharging, &e.GridProvider, &e.GridStrategy, &e.DepartDays, &e.DepartTime, &e.MaxPrice, &e.TibberToken)
+		rows.Scan(&e.ID, &e.UserID, &e.VIN, &e.DisplayName, &e.APIToken, &e.Enabled, &e.TargetSoC, &e.MaxAmps, &e.NumPhases, &e.SurplusCharging, &e.MinSurplus, &e.MinChargeTime, &e.LowcostCharging, &e.GridProvider, &e.GridStrategy, &e.DepartDays, &e.DepartTime, &e.MaxPrice, &e.TibberToken, &ts)
+		if ts != "" {
+			parsedDate, _ := time.Parse(SQLITE_DATETIME_LAYOUT, ts)
+			e.TelemetryEnrollDate = &parsedDate
+		}
 		result = append(result, e)
 	}
 	return result
