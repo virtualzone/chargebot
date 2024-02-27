@@ -4,29 +4,32 @@ import (
 	"encoding/json"
 	"log"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/teslamotors/vehicle-command/pkg/protocol"
 )
 
 type Config struct {
-	TeslaClientID     string
-	TeslaClientSecret string
-	TeslaAudience     string
-	DBFile            string
-	Hostname          string
-	DevProxy          bool
-	Reset             bool
-	TeslaPrivateKey   protocol.ECDHPrivateKey
-	ZMQPublisher      string
-	DebugLog          bool
-	CryptKey          string
-	AuthURL           string
-	AuthClientID      string
-	AuthClientSecret  string
-	AuthRolesPath     string
-	AuthFieldEmail    string
-	AuthFieldUsername string
+	TeslaClientID      string
+	TeslaClientSecret  string
+	TeslaAudience      string
+	TeslaTelemetryHost string
+	TeslaTelemetryCA   string
+	DBFile             string
+	Hostname           string
+	DevProxy           bool
+	Reset              bool
+	TeslaPrivateKey    protocol.ECDHPrivateKey
+	ZMQPublisher       string
+	DebugLog           bool
+	CryptKey           string
+	AuthURL            string
+	AuthClientID       string
+	AuthClientSecret   string
+	AuthRolesPath      string
+	AuthFieldEmail     string
+	AuthFieldUsername  string
 }
 
 var _configInstance *Config
@@ -44,6 +47,15 @@ func (c *Config) ReadConfig() {
 	c.TeslaClientID = c.getEnv("TESLA_CLIENT_ID", "e9941f08e0d6-4c2f-b8ee-291060ec648a")
 	c.TeslaClientSecret = c.getEnv("TESLA_CLIENT_SECRET", "")
 	c.TeslaAudience = c.getEnv("TESLA_AUDIENCE", "https://fleet-api.prd.eu.vn.cloud.tesla.com")
+	c.TeslaTelemetryHost = c.getEnv("TESLA_TELEMETRY_HOST", "tesla-telemetry.chargebot.io")
+	c.TeslaTelemetryCA = c.getEnv("TESLA_TELEMETRY_CA", "")
+	if c.TeslaTelemetryCA != "" {
+		ca, err := os.ReadFile(c.TeslaTelemetryCA)
+		if err != nil {
+			log.Panicf("could not load ca file: %s\n", err.Error())
+		}
+		c.TeslaTelemetryCA = strings.ReplaceAll(string(ca), "\r", "")
+	}
 	c.DBFile = c.getEnv("DB_FILE", "/tmp/tgc.db")
 	c.Hostname = c.getEnv("DOMAIN", "chargebot.io")
 	c.DevProxy = (c.getEnv("DEV_PROXY", "0") == "1")

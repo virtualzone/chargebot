@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -43,6 +45,11 @@ type TeslaAPIBoolResponse struct {
 	Response TeslaAPIBool `json:"response"`
 }
 
+type TeslaAPIVehicleUpdateResponse struct {
+	TeslaAPIErrorResponse
+	NumUpdatedVehicles int `json:"updated_vehicles"`
+}
+
 type TeslaAPIListVehiclesResponse struct {
 	TeslaAPIErrorResponse
 	Response []TeslaAPIVehicleEntity `json:"response"`
@@ -67,6 +74,24 @@ type TeslaAPIVehicleDataResponse struct {
 	Response TeslaAPIVehicleData `json:"response"`
 }
 
+type TeslaAPITelemetryField struct {
+	IntervalSeconds int `json:"interval_seconds"`
+}
+
+type TeslaAPITelemetryConfig struct {
+	Hostname   string                            `json:"hostname"`
+	CA         string                            `json:"ca"`
+	Fields     map[string]TeslaAPITelemetryField `json:"fields"`
+	AlertTypes []string                          `json:"alert_types"`
+	Expiration int64                             `json:"exp"`
+	Port       int                               `json:"port"`
+}
+
+type TeslaAPITelemetryConfigCreate struct {
+	VINs   []string                `json:"vins"`
+	Config TeslaAPITelemetryConfig `json:"config"`
+}
+
 type TeslaAPI interface {
 	InitTokenCache()
 	GetTokens(userID string, code string, redirectURI string) (*TeslaAPITokenReponse, error)
@@ -81,6 +106,8 @@ type TeslaAPI interface {
 	SetChargeAmps(car *vehicle.Vehicle, amps int) error
 	GetVehicleData(vehicle *Vehicle) (*TeslaAPIVehicleData, error)
 	Wakeup(vehicle *Vehicle) error
+	CreateTelemetryConfig(vehicle *Vehicle) error
+	DeleteTelemetryConfig(vehicle *Vehicle) error
 }
 
 type TeslaAPIImpl struct {
@@ -321,6 +348,56 @@ func (a *TeslaAPIImpl) Wakeup(vehicle *Vehicle) error {
 
 	// wait a few seconds to assure vehicle is online
 	time.Sleep(20 * time.Second)
+
+	return nil
+}
+
+func (a *TeslaAPIImpl) CreateTelemetryConfig(vehicle *Vehicle) error {
+	config := TeslaAPITelemetryConfigCreate{
+		VINs: []string{vehicle.VIN},
+		Config: TeslaAPITelemetryConfig{
+			Hostname:   GetConfig().TeslaTelemetryHost,
+			Port:       443,
+			CA:         GetConfig().TeslaTelemetryCA,
+			Expiration: time.Now().UTC().AddDate(0, 10, 0).Unix(),
+			Fields: map[string]TeslaAPITelemetryField{
+				"ChargeState":    {IntervalSeconds: 60},
+				"Soc":            {IntervalSeconds: 60},
+				"Location":       {IntervalSeconds: 60},
+				"ChargeLimitSoc": {IntervalSeconds: 60},
+				"ChargeAmps":     {IntervalSeconds: 60},
+			},
+			AlertTypes: []string{"service"},
+		},
+	}
+	json, err := json.Marshal(config)
+	if err != nil {
+		return err
+	}
+
+	authToken := a.GetOrRefreshAccessToken(vehicle.UserID)
+	target := GetConfig().TeslaAudience + "/api/1/vehicles/fleet_telemetry_config"
+	r, _ := http.NewRequest("POST", target, bytes.NewReader(json))
+
+	_, err = RetryHTTPJSONRequest(r, authToken)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	return nil
+}
+
+func (a *TeslaAPIImpl) DeleteTelemetryConfig(vehicle *Vehicle) error {
+	authToken := a.GetOrRefreshAccessToken(vehicle.UserID)
+	target := GetConfig().TeslaAudience + "/api/1/vehicles/" + vehicle.VIN + "/fleet_telemetry_config"
+	r, _ := http.NewRequest("DELETE", target, nil)
+
+	_, err := RetryHTTPJSONRequest(r, authToken)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
 
 	return nil
 }

@@ -93,6 +93,16 @@ func (a *TeslaAPIMock) Wakeup(vehicle *Vehicle) error {
 	return args.Error(0)
 }
 
+func (a *TeslaAPIMock) CreateTelemetryConfig(vehicle *Vehicle) error {
+	args := a.Called(vehicle)
+	return args.Error(0)
+}
+
+func (a *TeslaAPIMock) DeleteTelemetryConfig(vehicle *Vehicle) error {
+	args := a.Called(vehicle)
+	return args.Error(0)
+}
+
 func UpdateTeslaAPIMockData(api *TeslaAPIMock, vehicleID int, batteryLevel int, chargingState string) {
 	vData := &TeslaAPIVehicleData{
 		VehicleID: vehicleID,
