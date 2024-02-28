@@ -5,6 +5,7 @@ import (
 	"net/rpc"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 
 	"chargebot.io/zmq-proxy/protos"
@@ -83,15 +84,22 @@ func zmqLoop(s *zmq.Socket) {
 		for _, e := range data.Data {
 			switch e.Key {
 			case protos.Field_ChargeAmps:
-				res.Amps = int(e.Value.GetIntValue())
+				if v, err := strconv.Atoi(e.Value.GetStringValue()); err == nil {
+					res.Amps = v
+				}
 			case protos.Field_ChargeLimitSoc:
-				res.ChargeLimit = int(e.Value.GetIntValue())
+				if v, err := strconv.Atoi(e.Value.GetStringValue()); err == nil {
+					res.ChargeLimit = v
+				}
 			case protos.Field_Soc:
-				res.SoC = int(e.Value.GetFloatValue())
+				if v, err := strconv.ParseFloat(e.Value.GetStringValue(), 32); err == nil {
+					res.SoC = int(v)
+				}
 			case protos.Field_ChargeState:
-				if strings.ToLower(e.Value.String()) == "idle" {
+				s := strings.ToLower(e.Value.GetStringValue())
+				if s == "idle" {
 					res.PluggedIn = true
-				} else if strings.ToLower(e.Value.String()) == "enable" {
+				} else if s == "enable" {
 					res.PluggedIn = true
 					res.Charging = true
 				}
