@@ -1,12 +1,13 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
 
+	"chargebot.io/zmq-proxy/protos"
 	zmq "github.com/pebbe/zmq4"
+	"google.golang.org/protobuf/proto"
 )
 
 func ServeZMQ() {
@@ -18,7 +19,7 @@ func ServeZMQ() {
 
 	zctx, _ := zmq.NewContext()
 	s, _ := zctx.NewSocket(zmq.SUB)
-	//defer s.Close()
+	defer s.Close()
 	if err := s.Connect(GetConfig().ZMQPublisher); err != nil {
 		log.Fatal(err)
 		os.Exit(-1)
@@ -30,20 +31,32 @@ func ServeZMQ() {
 
 	go func() {
 		for {
-			address, err := s.Recv(0)
-			if err != nil {
-				panic(err)
-			}
-
-			if msg, err := s.Recv(0); err != nil {
-				panic(err)
-			} else {
-				fmt.Printf("ZMQ message in channel %s: %s\n", address, msg)
-			}
+			zmqLoop(s)
 		}
 	}()
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
 	<-c
-	s.Close()
+}
+
+func zmqLoop(s *zmq.Socket) {
+	address, err := s.Recv(0)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	log.Printf("reading zmq message in channel %s\n", address)
+
+	if msg, err := s.RecvBytes(0); err != nil {
+		log.Println(err)
+		return
+	} else {
+		data := &protos.Payload{}
+		if err := proto.Unmarshal(msg, data); err != nil {
+			log.Println(err)
+			return
+		}
+		log.Println(data)
+	}
 }
