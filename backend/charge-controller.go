@@ -527,6 +527,25 @@ func (c *ChargeController) getActualSurplus(vehicle *Vehicle, state *VehicleStat
 	return res / num
 }
 
+func (c *ChargeController) chargeProcessAdjustSolarAmps(vehicle *Vehicle, state *VehicleState, targetAmps int) {
+	if state.Charging == ChargeStateChargingOnSolar && targetAmps > 0 && targetAmps != state.Amps {
+		// ...and only if the last amps adjustment occured before the latest surplus data came in
+		if c.canAdjustSolarAmps(vehicle) {
+			car, err := GetTeslaAPI().InitSession(vehicle, true)
+			if err != nil {
+				GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, fmt.Sprintf("could not init session with car: %s", err.Error()))
+			} else {
+				if err := GetTeslaAPI().SetChargeAmps(car, targetAmps); err != nil {
+					GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, "could not set charge amps: "+err.Error())
+				} else {
+					GetDB().SetVehicleStateAmps(vehicle.ID, targetAmps)
+					GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, fmt.Sprintf("charge amps set to %d", targetAmps))
+				}
+			}
+		}
+	}
+}
+
 func (c *ChargeController) checkChargeProcess(vehicle *Vehicle, state *VehicleState) {
 	// check when vehicle data was last updated
 	if c.canUpdateVehicleData(vehicle.ID) {
@@ -574,24 +593,11 @@ func (c *ChargeController) checkChargeProcess(vehicle *Vehicle, state *VehicleSt
 	if !c.minimumChargeTimeReached(vehicle, state) {
 		LogDebug(fmt.Sprintf("checkChargeProcess() - min charge time not reached for vehicle %d", vehicle.ID))
 		// ...except when vehicle is charging on solar and amps need to be adjusted
-		if state.Charging == ChargeStateChargingOnSolar && targetAmps > 0 && targetAmps != state.Amps {
-			// ...and only if the last amps adjustment occured before the latest surplus data came in
-			if c.canAdjustSolarAmps(vehicle) {
-				car, err := GetTeslaAPI().InitSession(vehicle, true)
-				if err != nil {
-					GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, fmt.Sprintf("could not init session with car: %s", err.Error()))
-				} else {
-					if err := GetTeslaAPI().SetChargeAmps(car, targetAmps); err != nil {
-						GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, "could not set charge amps: "+err.Error())
-					} else {
-						GetDB().SetVehicleStateAmps(vehicle.ID, targetAmps)
-						GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, fmt.Sprintf("charge amps set to %d", targetAmps))
-					}
-				}
-			}
-		}
+		c.chargeProcessAdjustSolarAmps(vehicle, state, targetAmps)
 		return
 	}
+
+	c.chargeProcessAdjustSolarAmps(vehicle, state, targetAmps)
 
 	// else, check if charging needs to be stopped
 	if targetState == ChargeStateNotCharging {
