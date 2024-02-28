@@ -589,15 +589,13 @@ func (c *ChargeController) checkChargeProcess(vehicle *Vehicle, state *VehicleSt
 	targetState, targetAmps := c.checkTargetState(vehicle, state)
 	LogDebug(fmt.Sprintf("checkChargeProcess() - target state %d with %d amps for vehicle %d", targetState, targetAmps, vehicle.ID))
 
+	c.chargeProcessAdjustSolarAmps(vehicle, state, targetAmps)
+
 	// if minimum charge time is not reached, do nothing
 	if !c.minimumChargeTimeReached(vehicle, state) {
 		LogDebug(fmt.Sprintf("checkChargeProcess() - min charge time not reached for vehicle %d", vehicle.ID))
-		// ...except when vehicle is charging on solar and amps need to be adjusted
-		c.chargeProcessAdjustSolarAmps(vehicle, state, targetAmps)
 		return
 	}
-
-	c.chargeProcessAdjustSolarAmps(vehicle, state, targetAmps)
 
 	// else, check if charging needs to be stopped
 	if targetState == ChargeStateNotCharging {

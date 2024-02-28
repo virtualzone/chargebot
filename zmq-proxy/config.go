@@ -9,6 +9,7 @@ import (
 
 type Config struct {
 	ZMQPublisher string
+	BackendRPC   string
 }
 
 var _configInstance *Config
@@ -24,6 +25,7 @@ func GetConfig() *Config {
 
 func (c *Config) ReadConfig() {
 	c.ZMQPublisher = c.getEnv("ZMQ_PUB", "")
+	c.BackendRPC = c.getEnv("BACKEND_RPC", "127.0.0.1:1234")
 }
 
 func (c *Config) Print() {

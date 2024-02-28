@@ -27,6 +27,7 @@ func main() {
 	NewChargeController().Init()
 	InitPeriodicPriceUpdateControl()
 	InitHTTPRouter()
+	ServeRPC()
 	ServeHTTP()
 	os.Exit(0)
 }
