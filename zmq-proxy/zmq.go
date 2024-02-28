@@ -2,13 +2,26 @@ package main
 
 import (
 	"log"
+	"net/rpc"
 	"os"
 	"os/signal"
+	"strings"
 
 	"chargebot.io/zmq-proxy/protos"
 	zmq "github.com/pebbe/zmq4"
 	"google.golang.org/protobuf/proto"
 )
+
+type TelemetryState struct {
+	VIN         string
+	PluggedIn   bool
+	Charging    bool
+	ChargeLimit int
+	SoC         int
+	Amps        int
+	Latitude    float64
+	Longitude   float64
+}
 
 func ServeZMQ() {
 	if GetConfig().ZMQPublisher == "" {
@@ -57,6 +70,48 @@ func zmqLoop(s *zmq.Socket) {
 			log.Println(err)
 			return
 		}
+		res := &TelemetryState{
+			VIN:         data.Vin,
+			PluggedIn:   false,
+			Charging:    false,
+			ChargeLimit: 0,
+			SoC:         0,
+			Amps:        0,
+			Latitude:    0,
+			Longitude:   0,
+		}
+		for _, e := range data.Data {
+			switch e.Key {
+			case protos.Field_ChargeAmps:
+				res.Amps = int(e.Value.GetIntValue())
+			case protos.Field_ChargeLimitSoc:
+				res.ChargeLimit = int(e.Value.GetIntValue())
+			case protos.Field_Soc:
+				res.SoC = int(e.Value.GetFloatValue())
+			case protos.Field_ChargeState:
+				if strings.ToLower(e.Value.String()) == "idle" {
+					res.PluggedIn = true
+				} else if strings.ToLower(e.Value.String()) == "enable" {
+					res.PluggedIn = true
+					res.Charging = true
+				}
+			case protos.Field_Location:
+				res.Latitude = e.Value.GetLocationValue().Latitude
+				res.Longitude = e.Value.GetLocationValue().Longitude
+			}
+		}
+		client, err := rpc.DialHTTP("tcp", GetConfig().BackendRPC)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		var reply bool
+		if err := client.Call("VehicleStateTelemetry.Update", res, &reply); err != nil {
+			log.Println(err)
+			return
+		}
 		log.Println(data)
+		log.Println(res)
+		log.Println(reply)
 	}
 }

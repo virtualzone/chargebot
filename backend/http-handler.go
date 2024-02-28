@@ -212,7 +212,6 @@ func InitHTTPRouter() {
 }
 
 func ServeHTTP() {
-
 	log.Println("Initializing REST services...")
 	httpServer := &http.Server{
 		Addr:         "0.0.0.0:8080",
