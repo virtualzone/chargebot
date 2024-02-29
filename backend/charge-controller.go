@@ -142,32 +142,25 @@ func (c *ChargeController) activateCharging(vehicle *Vehicle, state *VehicleStat
 
 	time.Sleep(DelayBetweenAPICommands) // delay
 
-	// ensure current SoC has not changed in the meantime
-	state.SoC, _ = UpdateVehicleDataSaveSoC(vehicle)
-	if !c.isChargingRequired(state.SoC, vehicle.TargetSoC) {
-		GetDB().LogChargingEvent(vehicle.ID, LogEventChargeStart, "charging skipped, target SoC is already reached")
-		return false
-	}
-
-	time.Sleep(DelayBetweenAPICommands) // delay
-
 	// set the charge limit
-	if err := GetTeslaAPI().SetChargeLimit(car, vehicle.TargetSoC); err != nil {
-		GetDB().LogChargingEvent(vehicle.ID, LogEventSetTargetSoC, "could not set target SoC: "+err.Error())
-		return false
+	if state.ChargeLimit != vehicle.TargetSoC {
+		if err := GetTeslaAPI().SetChargeLimit(car, vehicle.TargetSoC); err != nil {
+			GetDB().LogChargingEvent(vehicle.ID, LogEventSetTargetSoC, "could not set target SoC: "+err.Error())
+			return false
+		}
+		GetDB().LogChargingEvent(vehicle.ID, LogEventSetTargetSoC, fmt.Sprintf("target SoC set to %d", vehicle.TargetSoC))
+		time.Sleep(DelayBetweenAPICommands) // delay
 	}
-	GetDB().LogChargingEvent(vehicle.ID, LogEventSetTargetSoC, fmt.Sprintf("target SoC set to %d", vehicle.TargetSoC))
-
-	time.Sleep(DelayBetweenAPICommands) // delay
 
 	// set amps to charge
-	if err := GetTeslaAPI().SetChargeAmps(car, amps); err != nil {
-		GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, "could not set charge amps: "+err.Error())
-		return false
+	if state.Amps != amps {
+		if err := GetTeslaAPI().SetChargeAmps(car, amps); err != nil {
+			GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, "could not set charge amps: "+err.Error())
+			return false
+		}
+		GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, fmt.Sprintf("charge amps set to %d", amps))
+		time.Sleep(DelayBetweenAPICommands) // delay
 	}
-	GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, fmt.Sprintf("charge amps set to %d", amps))
-
-	time.Sleep(DelayBetweenAPICommands) // delay
 
 	if err := GetTeslaAPI().ChargeStart(car); err != nil {
 		GetDB().LogChargingEvent(vehicle.ID, LogEventChargeStart, "could not start charging: "+err.Error())
@@ -469,6 +462,7 @@ func (c *ChargeController) getCurrentGridPrice(prices []*GridPrice) *GridPrice {
 	return nil
 }
 
+/*
 func (c *ChargeController) canUpdateVehicleData(vehicleID int) bool {
 	event := GetDB().GetLatestChargingEvent(vehicleID, LogEventVehicleUpdateData)
 	if event == nil {
@@ -477,6 +471,7 @@ func (c *ChargeController) canUpdateVehicleData(vehicleID int) bool {
 	limit := c.Time.UTCNow().Add(time.Minute * time.Duration(MaxVehicleDataUpdateIntervalMinutes) * -1)
 	return event.Timestamp.Before(limit)
 }
+*/
 
 func (c *ChargeController) minimumChargeTimeReached(vehicle *Vehicle, state *VehicleState) bool {
 	event := GetDB().GetLatestChargingEvent(vehicle.ID, LogEventChargeStart)
@@ -547,38 +542,6 @@ func (c *ChargeController) chargeProcessAdjustSolarAmps(vehicle *Vehicle, state 
 }
 
 func (c *ChargeController) checkChargeProcess(vehicle *Vehicle, state *VehicleState) {
-	// check when vehicle data was last updated
-	if c.canUpdateVehicleData(vehicle.ID) {
-		GetTeslaAPI().Wakeup(vehicle)
-		time.Sleep(DelayBetweenAPICommands) // delay
-		soc, data := UpdateVehicleDataSaveSoC(vehicle)
-		state.SoC = soc
-		if strings.ToLower(data.ChargeState.ChargingState) != "charging" {
-			// strange situation: we assume car is charging, but it is not
-			LogDebug(fmt.Sprintf("strange situation for vehicle %d: app assumes state charging , but it's actual state is '%s'", vehicle.ID, data.ChargeState.ChargingState))
-			GetDB().SetVehicleStateCharging(vehicle.ID, ChargeStateNotCharging)
-			GetDB().SetVehicleStateAmps(vehicle.ID, 0)
-			GetDB().LogChargingEvent(vehicle.ID, LogEventChargeStop, "charging state reset (state mismatch between car and app)")
-			return
-		}
-		if data.ChargeState.ChargeAmps != state.Amps {
-			// strange situation: car is charging at a different amps rate than assumed
-			LogDebug(fmt.Sprintf("strange situation for vehicle %d: app assumes %d amps, but it's actual amps is %d", vehicle.ID, state.Amps, data.ChargeState.ChargeAmps))
-			car, err := GetTeslaAPI().InitSession(vehicle, true)
-			if err != nil {
-				GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, fmt.Sprintf("could not init session with car: %s", err.Error()))
-			} else {
-				if err := GetTeslaAPI().SetChargeAmps(car, state.Amps); err != nil {
-					GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, "could not correct charge amps: "+err.Error())
-				} else {
-					GetDB().SetVehicleStateAmps(vehicle.ID, state.Amps)
-					GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, fmt.Sprintf("charge amps corrected to %d", state.Amps))
-				}
-			}
-			time.Sleep(DelayBetweenAPICommands) // delay
-		}
-	}
-
 	// if target SoC is reached: stop charging
 	if state.SoC >= vehicle.TargetSoC {
 		c.stopCharging(vehicle)

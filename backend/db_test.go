@@ -221,7 +221,7 @@ func TestDB_UpgradeRefreshTokenEncryption(t *testing.T) {
 	t.Cleanup(ResetTestDB)
 
 	userID := "1234abcd"
-	GetDB().GetConnection().Exec("replace into users values(?, ?, ?)", userID, "", "")
+	GetDB().GetConnection().Exec("replace into users values(?, ?, ?, ?, ?, ?)", userID, "", "", 0.0, 0.0, 100)
 	user := GetDB().GetUser(userID)
 
 	user.TeslaRefreshToken = "xyzabc"

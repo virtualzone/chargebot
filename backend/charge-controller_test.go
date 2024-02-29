@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"testing"
 	"time"
 
@@ -311,6 +312,7 @@ func TestChargeControlCheckStartOnTibberChargeDuration(t *testing.T) {
 	assert.Equal(t, 16, amps)
 }
 
+/*
 func TestChargeControlCanUpdateVehicleDataNoEventYet(t *testing.T) {
 	t.Cleanup(ResetTestDB)
 	res := NewChargeController().canUpdateVehicleData(123)
@@ -330,6 +332,7 @@ func TestChargeControlCanUpdateVehicleDataUpdatePossible(t *testing.T) {
 	res := NewChargeController().canUpdateVehicleData(123)
 	assert.True(t, res)
 }
+*/
 
 func TestChargeControlMinimumChargeTimeReachedNoEventYet(t *testing.T) {
 	t.Cleanup(ResetTestDB)
@@ -883,15 +886,15 @@ func TestChargeControl_TibberChargingDepartureNoPriceLimit2(t *testing.T) {
 	api.On("ChargeStart", mock.Anything).Return(nil)
 	api.On("ChargeStop", mock.Anything).Return(nil)
 	api.On("Wakeup", mock.Anything).Return(nil)
-	UpdateTeslaAPIMockData(api, 123, 40, "")
+	UpdateTeslaAPIMockData(api, 123, 63, "")
 
 	now := GetNextMondayMidnight()
 	now = now.Add(time.Hour * 22)
 
-	SetTibberTestPrice(v.ID, now.Add(time.Hour*0), 0.231900006532669)  // 22:00
+	SetTibberTestPrice(v.ID, now.Add(time.Hour*0), 0.231900006532669)  // 22:00 <-- charge
 	SetTibberTestPrice(v.ID, now.Add(time.Hour*1), 0.23989999294281)   // 23:00
 	SetTibberTestPrice(v.ID, now.Add(time.Hour*2), 0.236100003123283)  // 00:00
-	SetTibberTestPrice(v.ID, now.Add(time.Hour*3), 0.233700007200241)  // 01:00
+	SetTibberTestPrice(v.ID, now.Add(time.Hour*3), 0.233700007200241)  // 01:00 <-- charge
 	SetTibberTestPrice(v.ID, now.Add(time.Hour*4), 0.23029999434948)   // 02:00 <-- charge
 	SetTibberTestPrice(v.ID, now.Add(time.Hour*5), 0.229800000786781)  // 03:00 <-- charge
 	SetTibberTestPrice(v.ID, now.Add(time.Hour*6), 0.233999997377396)  // 04:00
@@ -902,16 +905,19 @@ func TestChargeControl_TibberChargingDepartureNoPriceLimit2(t *testing.T) {
 	SetTibberTestPrice(v.ID, now.Add(time.Hour*11), 0.240600004792213) // 09:00
 	SetTibberTestPrice(v.ID, now.Add(time.Hour*12), 0.234300002455711) // 10:00
 
-	// Calculated charge duration 40 -> 80: 3.7 hours
+	state := GetDB().GetVehicleState(v.ID)
+	assert.Equal(t, ChargeStateNotCharging, state.Charging)
 
-	// 22:00 - not charging
+	// Calculated charge duration 63 -> 80: 3.7 hours
+
+	// 22:00 - charging
 	GlobalMockTime.CurTime = now
 	cc.OnTick()
-	state := GetDB().GetVehicleState(v.ID)
+	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateNotCharging, state.Charging)
 	UpdateTeslaAPIMockData(api, 123, 63, "")
 
-	// 22:30 - not charging
+	// 22:30 - charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(time.Minute * 30)
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
@@ -920,6 +926,7 @@ func TestChargeControl_TibberChargingDepartureNoPriceLimit2(t *testing.T) {
 
 	// 23:00 - not charging
 	GlobalMockTime.CurTime = GlobalMockTime.CurTime.Add(time.Minute * 30)
+	log.Println(GlobalMockTime.CurTime)
 	cc.OnTick()
 	state = GetDB().GetVehicleState(v.ID)
 	assert.Equal(t, ChargeStateNotCharging, state.Charging)

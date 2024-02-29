@@ -16,12 +16,19 @@ type LoginResponse struct {
 	User         User   `json:"user"`
 }
 
+type HomeLocation struct {
+	Latitude  float64 `json:"lat"`
+	Longitude float64 `json:"lng"`
+	Radius    int     `json:"radius"`
+}
+
 func (router *AuthRouter) SetupRoutes(s *mux.Router) {
 	s.HandleFunc("/login", router.login).Methods("GET")
 	s.HandleFunc("/callback", router.callback).Methods("GET")
 	s.HandleFunc("/refresh", router.refresh).Methods("POST")
 	s.HandleFunc("/tokenvalid", router.isTokenValid).Methods("GET")
 	s.HandleFunc("/me", router.getMe).Methods("GET")
+	s.HandleFunc("/home", router.setHomeLocation).Methods("POST")
 }
 
 func (router *AuthRouter) login(w http.ResponseWriter, r *http.Request) {
@@ -127,4 +134,26 @@ func (router *AuthRouter) getMe(w http.ResponseWriter, r *http.Request) {
 	}
 	user := GetDB().GetUser(userID)
 	SendJSON(w, user)
+}
+
+func (router *AuthRouter) setHomeLocation(w http.ResponseWriter, r *http.Request) {
+	var m HomeLocation
+	if err := UnmarshalValidateBody(r.Body, &m); err != nil {
+		SendBadRequest(w)
+		return
+	}
+
+	userID := GetUserIDFromRequest(r)
+	user := GetDB().GetUser(userID)
+	if user == nil {
+		SendNotFound(w)
+		return
+	}
+
+	user.HomeLatitude = m.Latitude
+	user.HomeLongitude = m.Longitude
+	user.HomeRadius = m.Radius
+	GetDB().CreateUpdateUser(user)
+
+	SendJSON(w, true)
 }

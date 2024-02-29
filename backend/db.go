@@ -20,10 +20,13 @@ import (
 var SQLITE_DATETIME_LAYOUT string = "2006-01-02 15:04:05"
 
 type User struct {
-	ID                string `json:"id"`
-	TeslaUserID       string `json:"tesla_user_id"`
-	TeslaRefreshToken string `json:"tesla_refresh_token"`
-	APIToken          string `json:"api_token"`
+	ID                string  `json:"id"`
+	TeslaUserID       string  `json:"tesla_user_id"`
+	TeslaRefreshToken string  `json:"tesla_refresh_token"`
+	APIToken          string  `json:"api_token"`
+	HomeLatitude      float64 `json:"home_lat"`
+	HomeLongitude     float64 `json:"home_lng"`
+	HomeRadius        int     `json:"home_radius"`
 }
 
 type Vehicle struct {
@@ -82,11 +85,12 @@ const (
 )
 
 type VehicleState struct {
-	VehicleID int         `json:"vehicle_id"`
-	PluggedIn bool        `json:"pluggedIn"`
-	Charging  ChargeState `json:"chargingState"`
-	SoC       int         `json:"soc"`
-	Amps      int         `json:"amps"`
+	VehicleID   int         `json:"vehicle_id"`
+	PluggedIn   bool        `json:"pluggedIn"`
+	Charging    ChargeState `json:"chargingState"`
+	SoC         int         `json:"soc"`
+	Amps        int         `json:"amps"`
+	ChargeLimit int         `json:"chargeLimit"`
 }
 
 type ChargingEvent struct {
@@ -176,6 +180,18 @@ create table if not exists grid_hourblocks(vehicle_id int not null, hourstamp in
 	if _, err := db.GetConnection().Exec(`alter table vehicles add column telemetry_enroll_date string default ''`); err != nil {
 		log.Println(err)
 	}
+	if _, err := db.GetConnection().Exec(`alter table users add column home_lat real default 0.0`); err != nil {
+		log.Println(err)
+	}
+	if _, err := db.GetConnection().Exec(`alter table users add column home_lng real default 0.0`); err != nil {
+		log.Println(err)
+	}
+	if _, err := db.GetConnection().Exec(`alter table users add column home_radius real default 100`); err != nil {
+		log.Println(err)
+	}
+	if _, err := db.GetConnection().Exec(`alter table vehicle_states add column charge_limit int default 0`); err != nil {
+		log.Println(err)
+	}
 }
 
 func (db *DB) CreateAuthCode() string {
@@ -212,7 +228,7 @@ func (db *DB) DeleteExpiredAuthCodes() {
 }
 
 func (db *DB) CreateUpdateUser(user *User) {
-	_, err := db.GetConnection().Exec("replace into users values(?, ?, ?)", user.ID, "c:"+db.encrypt(user.TeslaRefreshToken), user.TeslaUserID)
+	_, err := db.GetConnection().Exec("replace into users values(?, ?, ?, ?, ?, ?)", user.ID, "c:"+db.encrypt(user.TeslaRefreshToken), user.TeslaUserID, user.HomeLatitude, user.HomeLongitude, user.HomeRadius)
 	if err != nil {
 		log.Panicln(err)
 	}
@@ -220,12 +236,12 @@ func (db *DB) CreateUpdateUser(user *User) {
 
 func (db *DB) GetUser(ID string) *User {
 	e := &User{}
-	err := db.GetConnection().QueryRow("select id, tesla_refresh_token, tesla_user_id, ifnull(token, '') "+
+	err := db.GetConnection().QueryRow("select id, tesla_refresh_token, tesla_user_id, home_lat, home_lng, home_radius, ifnull(token, '') "+
 		"from users "+
 		"left join api_tokens on api_tokens.user_id = users.id "+
 		"where id = ?",
 		ID).
-		Scan(&e.ID, &e.TeslaRefreshToken, &e.TeslaUserID, &e.APIToken)
+		Scan(&e.ID, &e.TeslaRefreshToken, &e.TeslaUserID, &e.HomeLatitude, &e.HomeLongitude, &e.HomeRadius, &e.APIToken)
 	if err != nil {
 		log.Println(err)
 		return nil
@@ -258,6 +274,27 @@ func (db *DB) GetVehicleByID(ID int) *Vehicle {
 		"left join api_tokens on api_tokens.user_id = vehicles.user_id "+
 		"where vehicles.id = ?",
 		ID).
+		Scan(&e.ID, &e.UserID, &e.VIN, &e.DisplayName, &e.APIToken, &e.Enabled, &e.TargetSoC, &e.MaxAmps, &e.NumPhases, &e.SurplusCharging, &e.MinSurplus, &e.MinChargeTime, &e.LowcostCharging, &e.GridProvider, &e.GridStrategy, &e.DepartDays, &e.DepartTime, &e.MaxPrice, &e.TibberToken, &ts)
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+	if ts != "" {
+		parsedDate, _ := time.Parse(SQLITE_DATETIME_LAYOUT, ts)
+		e.TelemetryEnrollDate = &parsedDate
+	}
+	return e
+}
+
+func (db *DB) GetVehicleByVIN(vin string) *Vehicle {
+	e := &Vehicle{}
+	var ts string
+	err := db.GetConnection().QueryRow("select id, vehicles.user_id, vin, display_name, ifnull(api_tokens.token, ''), "+
+		"enabled, target_soc, max_amps, num_phases, surplus_charging, min_surplus, min_chargetime, lowcost_charging, grid_provider, grid_strategy, depart_days, depart_time, max_price, tibber_token, telemetry_enroll_date "+
+		"from vehicles "+
+		"left join api_tokens on api_tokens.user_id = vehicles.user_id "+
+		"where vehicles.vin = ?",
+		vin).
 		Scan(&e.ID, &e.UserID, &e.VIN, &e.DisplayName, &e.APIToken, &e.Enabled, &e.TargetSoC, &e.MaxAmps, &e.NumPhases, &e.SurplusCharging, &e.MinSurplus, &e.MinChargeTime, &e.LowcostCharging, &e.GridProvider, &e.GridStrategy, &e.DepartDays, &e.DepartTime, &e.MaxPrice, &e.TibberToken, &ts)
 	if err != nil {
 		log.Println(err)
@@ -380,9 +417,9 @@ func (db *DB) GetAPIToken(userID string) string {
 
 func (db *DB) GetVehicleState(vehicleID int) *VehicleState {
 	e := &VehicleState{}
-	err := db.GetConnection().QueryRow("select vehicle_id, plugged_in, charging, soc, charge_amps from vehicle_states where vehicle_id = ?",
+	err := db.GetConnection().QueryRow("select vehicle_id, plugged_in, charging, soc, charge_amps, charge_limit from vehicle_states where vehicle_id = ?",
 		vehicleID).
-		Scan(&e.VehicleID, &e.PluggedIn, &e.Charging, &e.SoC, &e.Amps)
+		Scan(&e.VehicleID, &e.PluggedIn, &e.Charging, &e.SoC, &e.Amps, &e.ChargeLimit)
 	if err != nil {
 		log.Println(err)
 		return nil
@@ -421,6 +458,15 @@ func (db *DB) SetVehicleStateAmps(vehicleID int, amps int) {
 	_, err := db.GetConnection().Exec("insert into vehicle_states (vehicle_id, charge_amps) values(?, ?) "+
 		"on conflict(vehicle_id) do update set charge_amps = ?",
 		vehicleID, amps, amps)
+	if err != nil {
+		log.Fatalln(err)
+	}
+}
+
+func (db *DB) SetVehicleStateChargeLimit(vehicleID int, limit int) {
+	_, err := db.GetConnection().Exec("insert into vehicle_states (vehicle_id, charge_limit) values(?, ?) "+
+		"on conflict(vehicle_id) do update set charge_limit = ?",
+		vehicleID, limit, limit)
 	if err != nil {
 		log.Fatalln(err)
 	}
