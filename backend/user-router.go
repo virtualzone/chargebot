@@ -2,7 +2,6 @@ package main
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/gorilla/mux"
 )
@@ -30,12 +29,6 @@ func (router *UserRouter) SetupRoutes(s *mux.Router) {
 func (router *UserRouter) recordSurplus(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	token := vars["token"]
-	vehicleIDString := vars["id"]
-	vehicleID, err := strconv.Atoi(vehicleIDString)
-	if err != nil {
-		SendBadRequest(w)
-		return
-	}
 
 	var m *SurplusRecordingRequest
 	if err := UnmarshalBody(r.Body, &m); err != nil {
@@ -54,17 +47,6 @@ func (router *UserRouter) recordSurplus(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if !GetDB().IsUserOwnerOfVehicle(userID, vehicleID) {
-		SendForbidden(w)
-		return
-	}
-
-	vehicle := GetDB().GetVehicleByID(vehicleID)
-	if vehicle == nil {
-		SendInternalServerError(w)
-		return
-	}
-
 	surplus := m.SurplusWatts
 	if surplus == 0 {
 		if m.InverterActivePower != 0 || m.Consumption != 0 {
@@ -72,6 +54,6 @@ func (router *UserRouter) recordSurplus(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	GetDB().RecordSurplus(vehicle.ID, surplus)
+	GetDB().RecordSurplus(userID, surplus)
 	SendJSON(w, true)
 }
