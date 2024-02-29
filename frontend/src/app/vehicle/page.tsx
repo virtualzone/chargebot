@@ -9,7 +9,7 @@ import { Loader as IconLoad } from 'react-feather';
 import Link from "next/link";
 
 export default function PageVehicle() {
-  let vehicleID = 0
+  let vehicleVIN = ""
   const router = useRouter()
   const [vehicle, setVehicle] = useState({} as any)
   const [isLoading, setLoading] = useState(true)
@@ -29,17 +29,16 @@ export default function PageVehicle() {
   const [departTime, setDepartTime] = useState('07:00')
   const [tibberToken, setTibberToken] = useState('')
   const [vehicleState, setVehicleState] = useState({} as any)
-  const [surpluses, setSurpluses] = useState([] as any)
   const [chargingEvents, setChargingEvents] = useState([] as any)
 
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
-    const id = searchParams.get("id");
-    if (!id || window.isNaN(Number(id))) {
+    const vin = searchParams.get("vin");
+    if (!vin) {
       router.push('/authorized')
       return;
     }
-    vehicleID = Number(id);
+    vehicleVIN = vin;
     const fetchData = async () => {
       await checkAuth();
       await loadVehicle();
@@ -48,27 +47,22 @@ export default function PageVehicle() {
     fetchData();
   }, [router]);
 
-  const loadVehicleState = async (vehicleID: number) => {
-    const json = await getAPI("/api/1/tesla/state/" + vehicleID);
+  const loadVehicleState = async (vin: string) => {
+    const json = await getAPI("/api/1/tesla/state/" + vin);
     if (json) {
       setVehicleState(json);
     }
   }
 
-  const loadLatestSurpluses = async (vehicleID: number) => {
-    const json = await getAPI("/api/1/tesla/surplus/" + vehicleID);
-    setSurpluses(json);
-  }
-
-  const loadLatestChargingEvents = async (vehicleID: number) => {
-    const json = await getAPI("/api/1/tesla/events/" + vehicleID);
+  const loadLatestChargingEvents = async (vin: string) => {
+    const json = await getAPI("/api/1/tesla/events/" + vin);
     setChargingEvents(json);
   }
 
   const loadVehicle = async () => {
     const json = await getAPI("/api/1/tesla/my_vehicles");
     (json as any[]).forEach(e => {
-      if (e.id === vehicleID) {
+      if (e.vin === vehicleVIN) {
         setChargingEnabled(e.enabled);
         setTargetSoC(e.target_soc);
         setMaxAmps(e.max_amps);
@@ -83,9 +77,8 @@ export default function PageVehicle() {
         setDepartDays([...e.departDays].map(i => Number(i)));
         setDepartTime(e.departTime);
         setTibberToken(e.tibber_token);
-        loadVehicleState(e.id);
-        loadLatestSurpluses(e.id);
-        loadLatestChargingEvents(e.id);
+        loadVehicleState(e.vin);
+        loadLatestChargingEvents(e.vin);
         setVehicle(e);
       }
     });
@@ -110,7 +103,7 @@ export default function PageVehicle() {
         "max_price": maxPrice,
         "tibber_token": tibberToken
       };
-      await putAPI("/api/1/tesla/vehicle_update/" + vehicle.id, payload);
+      await putAPI("/api/1/tesla/vehicle_update/" + vehicle.vin, payload);
       await loadVehicle();
       setSavingVehicle(false);
     }
@@ -123,7 +116,7 @@ export default function PageVehicle() {
     }
     const fetchData = async () => {
       setLoading(true);
-      await deleteAPI("/api/1/tesla/vehicle_delete/" + vehicle.id);
+      await deleteAPI("/api/1/tesla/vehicle_delete/" + vehicle.vin);
       router.push('/authorized/?removed=1');
     }
     fetchData();
@@ -166,7 +159,7 @@ export default function PageVehicle() {
   }
 
   function manualControlTestDrive() {
-    postAPI("/api/1/ctrl/" + vehicle.id + "/testDrive", null).then(res => {
+    postAPI("/api/1/ctrl/" + vehicle.vin + "/testDrive", null).then(res => {
       window.alert('Charging should start shortly. It will be stopped after 30 seconds. Please check your Tesla App if this automation works.');
     })
   }
@@ -174,31 +167,6 @@ export default function PageVehicle() {
   if (isLoading) {
     return <Loading />
   }
-
-  let surplusRows = <tr><td colSpan={2}>No records founds</td></tr>;
-  if (surpluses && surpluses.length > 0) {
-    surplusRows = surpluses.map((s: any) => {
-      return (
-        <tr key={"surplus-" + s.ts}>
-          <td>{s.ts.replace('T', ' ').replace('Z', '')}</td>
-          <td>{s.surplus_watts} W</td>
-        </tr>
-      );
-    });
-  }
-  let surplusTable = (
-    <Table>
-      <thead>
-        <tr>
-          <th>Time (UTC)</th>
-          <th>Surplus</th>
-        </tr>
-      </thead>
-      <tbody>
-        {surplusRows}
-      </tbody>
-    </Table>
-  );
 
   let eventRows = <tr><td colSpan={3}>No records founds</td></tr>;
   if (chargingEvents && chargingEvents.length > 0) {
@@ -395,17 +363,6 @@ export default function PageVehicle() {
       <Button type="submit" variant="primary" disabled={savingVehicle}>{savingVehicle ? <><IconLoad className="feather-button loader" /> Saving...</> : 'Save'}</Button>
     </Form>
   );
-  let accordionSurpluses = <></>;
-  if (vehicle.api_token) {
-    accordionSurpluses = (
-      <Accordion.Item eventKey="3">
-        <Accordion.Header>Latest recorded surpluses</Accordion.Header>
-        <Accordion.Body>
-          {surplusTable}
-        </Accordion.Body>
-      </Accordion.Item>
-    );
-  }
   let accordionChargingEvents = <></>;
   if (vehicle.api_token) {
     accordionChargingEvents = (
@@ -469,7 +426,6 @@ export default function PageVehicle() {
     <Container fluid="sm" className="pt-5 container-max-width min-height">
       <h2 className="pb-3">{vehicle.display_name}</h2>
       <p>VIN: {vehicle.vin}</p>
-      <p>ID: {vehicle.id}</p>
       <p>Before chargebot.io can control your vehicle's charging process, you need to set up the virtual key:</p>
       <p><a href="https://tesla.com/_ak/chargebot.io" target="_blank">Set Up Virtual Key</a></p>
       <br />
@@ -481,7 +437,6 @@ export default function PageVehicle() {
             {chargePrefs}
           </Accordion.Body>
         </Accordion.Item>
-        {accordionSurpluses}
         {accordionChargingEvents}
         {accordionManualControl}
         <Accordion.Item eventKey="99">

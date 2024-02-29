@@ -3,7 +3,6 @@ package main
 import (
 	"log"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -21,14 +20,14 @@ type GetAPITokenResponse struct {
 func (router *TeslaRouter) SetupRoutes(s *mux.Router) {
 	s.HandleFunc("/vehicles", router.listVehicles).Methods("GET")
 	s.HandleFunc("/my_vehicles", router.myVehicles).Methods("GET")
-	s.HandleFunc("/vehicle_add/{id}", router.addVehicle).Methods("POST")
-	s.HandleFunc("/vehicle_update/{id}", router.updateVehicle).Methods("PUT")
-	s.HandleFunc("/vehicle_delete/{id}", router.deleteVehicle).Methods("DELETE")
+	s.HandleFunc("/vehicle_add/{vin}", router.addVehicle).Methods("POST")
+	s.HandleFunc("/vehicle_update/{vin}", router.updateVehicle).Methods("PUT")
+	s.HandleFunc("/vehicle_delete/{vin}", router.deleteVehicle).Methods("DELETE")
 	s.HandleFunc("/api_token_create", router.createAPIToken).Methods("POST")
 	s.HandleFunc("/api_token_update/{id}", router.updateAPIToken).Methods("POST")
-	s.HandleFunc("/state/{id}", router.getVehicleState).Methods("GET")
-	s.HandleFunc("/surplus/{id}", router.getLatestSurpluses).Methods("GET")
-	s.HandleFunc("/events/{id}", router.getLatestChargingEvents).Methods("GET")
+	s.HandleFunc("/state/{vin}", router.getVehicleState).Methods("GET")
+	s.HandleFunc("/surplus", router.getLatestSurpluses).Methods("GET")
+	s.HandleFunc("/events/{vin}", router.getLatestChargingEvents).Methods("GET")
 }
 
 func (router *TeslaRouter) listVehicles(w http.ResponseWriter, r *http.Request) {
@@ -51,7 +50,7 @@ func (router *TeslaRouter) myVehicles(w http.ResponseWriter, r *http.Request) {
 func (router *TeslaRouter) addVehicle(w http.ResponseWriter, r *http.Request) {
 	userID := GetUserIDFromRequest(r)
 	vars := mux.Vars(r)
-	vehicleId, _ := strconv.Atoi(vars["id"])
+	vin := vars["vin"]
 
 	// Check if vehicle belongs to request user
 	list, err := GetTeslaAPI().ListVehicles(userID)
@@ -62,7 +61,7 @@ func (router *TeslaRouter) addVehicle(w http.ResponseWriter, r *http.Request) {
 	}
 	var vehicle *TeslaAPIVehicleEntity = nil
 	for _, v := range list {
-		if v.VehicleID == vehicleId {
+		if v.VIN == vin {
 			vehicle = &v
 		}
 	}
@@ -73,9 +72,8 @@ func (router *TeslaRouter) addVehicle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	e := &Vehicle{
-		ID:              vehicle.VehicleID,
-		UserID:          userID,
 		VIN:             vehicle.VIN,
+		UserID:          userID,
 		DisplayName:     vehicle.DisplayName,
 		Enabled:         false,
 		TargetSoC:       70,
@@ -95,7 +93,7 @@ func (router *TeslaRouter) addVehicle(w http.ResponseWriter, r *http.Request) {
 	GetDB().CreateUpdateVehicle(e)
 
 	if err := GetTeslaAPI().CreateTelemetryConfig(e); err != nil {
-		log.Printf("Could not enroll vehicle %d in fleet telemetry: %s\n", e.ID, err.Error())
+		log.Printf("Could not enroll vehicle %s in fleet telemetry: %s\n", e.VIN, err.Error())
 	}
 
 	SendJSON(w, true)
@@ -104,7 +102,7 @@ func (router *TeslaRouter) addVehicle(w http.ResponseWriter, r *http.Request) {
 func (router *TeslaRouter) updateVehicle(w http.ResponseWriter, r *http.Request) {
 	userID := GetUserIDFromRequest(r)
 	vars := mux.Vars(r)
-	vehicleId, _ := strconv.Atoi(vars["id"])
+	vin := vars["vin"]
 
 	// Check if vehicle belongs to request user
 	list, err := GetTeslaAPI().ListVehicles(userID)
@@ -115,7 +113,7 @@ func (router *TeslaRouter) updateVehicle(w http.ResponseWriter, r *http.Request)
 	}
 	var vehicle *TeslaAPIVehicleEntity = nil
 	for _, v := range list {
-		if v.VehicleID == vehicleId {
+		if v.VIN == vin {
 			vehicle = &v
 		}
 	}
@@ -128,12 +126,11 @@ func (router *TeslaRouter) updateVehicle(w http.ResponseWriter, r *http.Request)
 	var m *Vehicle
 	UnmarshalValidateBody(r.Body, &m)
 
-	eOld := GetDB().GetVehicleByID(vehicle.VehicleID)
+	eOld := GetDB().GetVehicleByVIN(vehicle.VIN)
 
 	e := &Vehicle{
-		ID:              vehicle.VehicleID,
-		UserID:          userID,
 		VIN:             vehicle.VIN,
+		UserID:          userID,
 		DisplayName:     vehicle.DisplayName,
 		Enabled:         m.Enabled,
 		TargetSoC:       m.TargetSoC,
@@ -157,16 +154,16 @@ func (router *TeslaRouter) updateVehicle(w http.ResponseWriter, r *http.Request)
 		go func() {
 			car, err := GetTeslaAPI().InitSession(e, true)
 			if err != nil {
-				log.Printf("could not init session for vehicle %d on plug in: %s\n", e.ID, err.Error())
+				log.Printf("could not init session for vehicle %s on plug in: %s\n", e.VIN, err.Error())
 				return
 			}
 			UpdateVehicleDataSaveSoC(e)
 			if err := GetTeslaAPI().SetChargeLimit(car, 50); err != nil {
-				log.Printf("could not set charge limit for vehicle %d on plug in: %s\n", e.ID, err.Error())
+				log.Printf("could not set charge limit for vehicle %s on plug in: %s\n", e.VIN, err.Error())
 			}
 			time.Sleep(5 * time.Second)
 			if err := GetTeslaAPI().ChargeStop(car); err != nil {
-				log.Printf("could not stop charging for vehicle %d on plug in: %s\n", e.ID, err.Error())
+				log.Printf("could not stop charging for vehicle %s on plug in: %s\n", e.VIN, err.Error())
 			}
 		}()
 	}
@@ -177,7 +174,7 @@ func (router *TeslaRouter) updateVehicle(w http.ResponseWriter, r *http.Request)
 func (router *TeslaRouter) deleteVehicle(w http.ResponseWriter, r *http.Request) {
 	userID := GetUserIDFromRequest(r)
 	vars := mux.Vars(r)
-	vehicleId, _ := strconv.Atoi(vars["id"])
+	vin := vars["vin"]
 
 	// Check if vehicle belongs to request user
 	list, err := GetTeslaAPI().ListVehicles(userID)
@@ -188,7 +185,7 @@ func (router *TeslaRouter) deleteVehicle(w http.ResponseWriter, r *http.Request)
 	}
 	var vehicle *TeslaAPIVehicleEntity = nil
 	for _, v := range list {
-		if v.VehicleID == vehicleId {
+		if v.VIN == vin {
 			vehicle = &v
 		}
 	}
@@ -198,17 +195,17 @@ func (router *TeslaRouter) deleteVehicle(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	e := GetDB().GetVehicleByID(vehicleId)
+	e := GetDB().GetVehicleByVIN(vin)
 	if e == nil {
 		SendBadRequest(w)
 		return
 	}
 
 	if err := GetTeslaAPI().DeleteTelemetryConfig(e); err != nil {
-		log.Printf("Could not remove vehicle %d from fleet telemetry: %s\n", e.ID, err.Error())
+		log.Printf("Could not remove vehicle %s from fleet telemetry: %s\n", e.VIN, err.Error())
 	}
 
-	GetDB().DeleteVehicle(vehicle.VehicleID)
+	GetDB().DeleteVehicle(vehicle.VIN)
 	SendJSON(w, true)
 }
 
@@ -249,21 +246,16 @@ func (router *TeslaRouter) updateAPIToken(w http.ResponseWriter, r *http.Request
 
 func (router *TeslaRouter) getVehicleState(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	vehicleIDString := vars["id"]
-	vehicleID, err := strconv.Atoi(vehicleIDString)
-	if err != nil {
-		SendBadRequest(w)
-		return
-	}
+	vin := vars["vin"]
 
 	userID := GetUserIDFromRequest(r)
 
-	if !GetDB().IsUserOwnerOfVehicle(userID, vehicleID) {
+	if !GetDB().IsUserOwnerOfVehicle(userID, vin) {
 		SendForbidden(w)
 		return
 	}
 
-	state := GetDB().GetVehicleState(vehicleID)
+	state := GetDB().GetVehicleState(vin)
 	if state == nil {
 		SendNotFound(w)
 		return
@@ -272,42 +264,22 @@ func (router *TeslaRouter) getVehicleState(w http.ResponseWriter, r *http.Reques
 }
 
 func (router *TeslaRouter) getLatestSurpluses(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	vehicleIDString := vars["id"]
-	vehicleID, err := strconv.Atoi(vehicleIDString)
-	if err != nil {
-		SendBadRequest(w)
-		return
-	}
-
 	userID := GetUserIDFromRequest(r)
-
-	if !GetDB().IsUserOwnerOfVehicle(userID, vehicleID) {
-		SendForbidden(w)
-		return
-	}
-
-	res := GetDB().GetLatestSurplusRecords(vehicleID, 50)
+	res := GetDB().GetLatestSurplusRecords(userID, 50)
 	SendJSON(w, res)
 }
 
 func (router *TeslaRouter) getLatestChargingEvents(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	vehicleIDString := vars["id"]
-	vehicleID, err := strconv.Atoi(vehicleIDString)
-	if err != nil {
-		log.Println(err)
-		SendBadRequest(w)
-		return
-	}
+	vin := vars["vin"]
 
 	userID := GetUserIDFromRequest(r)
 
-	if !GetDB().IsUserOwnerOfVehicle(userID, vehicleID) {
+	if !GetDB().IsUserOwnerOfVehicle(userID, vin) {
 		SendForbidden(w)
 		return
 	}
 
-	res := GetDB().GetLatestChargingEvents(vehicleID, 50)
+	res := GetDB().GetLatestChargingEvents(vin, 50)
 	SendJSON(w, res)
 }
