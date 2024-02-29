@@ -486,7 +486,7 @@ func (c *ChargeController) minimumChargeTimeReached(vehicle *Vehicle, state *Veh
 }
 
 func (c *ChargeController) canAdjustSolarAmps(vehicle *Vehicle) bool {
-	surpluses := GetDB().GetLatestSurplusRecords(vehicle.ID, 1)
+	surpluses := GetDB().GetLatestSurplusRecords(vehicle.UserID, 1)
 	if len(surpluses) == 0 {
 		return false
 	}
@@ -500,7 +500,7 @@ func (c *ChargeController) canAdjustSolarAmps(vehicle *Vehicle) bool {
 }
 
 func (c *ChargeController) getActualSurplus(vehicle *Vehicle, state *VehicleState) int {
-	surpluses := GetDB().GetLatestSurplusRecords(vehicle.ID, 2)
+	surpluses := GetDB().GetLatestSurplusRecords(vehicle.UserID, 2)
 	if len(surpluses) == 0 {
 		return -1
 	}

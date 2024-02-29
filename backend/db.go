@@ -168,7 +168,7 @@ create table if not exists auth_codes(id text primary key, ts text);
 create table if not exists users(id text primary key, tesla_refresh_token text, tesla_user_id text default '');
 create table if not exists vehicles(id int primary key, user_id text, vin text, display_name text, enabled int, target_soc int, max_amps int, surplus_charging int, min_surplus int, min_chargetime int, lowcost_charging int, max_price int, tibber_token text, num_phases int default 3, grid_provider text default 'tibber', grid_strategy int default 1, depart_days text default '12345', depart_time text default '07:00');
 create table if not exists api_tokens(token text primary key, user_id text, passhash text);
-create table if not exists surpluses(vehicle_id int, ts text, surplus_watts int);
+create table if not exists surpluses(user_id string, ts text, surplus_watts int);
 create table if not exists logs(vehicle_id int, ts text, event_id int, details text);
 create table if not exists vehicle_states(vehicle_id int primary key, plugged_in int default 0, charging int default 0, soc int default -1, charge_amps int default 0);
 create table if not exists tibber_prices(vehicle_id int not null, hourstamp int not null, price real, primary key(vehicle_id, hourstamp));
@@ -362,9 +362,6 @@ func (db *DB) DeleteVehicle(ID int) {
 	if _, err := db.GetConnection().Exec("delete from vehicles where id = ?", ID); err != nil {
 		log.Panicln(err)
 	}
-	if _, err := db.GetConnection().Exec("delete from surpluses where vehicle_id = ?", ID); err != nil {
-		log.Panicln(err)
-	}
 	if _, err := db.GetConnection().Exec("delete from logs where vehicle_id = ?", ID); err != nil {
 		log.Panicln(err)
 	}
@@ -472,18 +469,18 @@ func (db *DB) SetVehicleStateChargeLimit(vehicleID int, limit int) {
 	}
 }
 
-func (db *DB) RecordSurplus(vehicleID int, surplus int) {
-	_, err := db.GetConnection().Exec("insert into surpluses (vehicle_id, ts, surplus_watts) values (?, ?, ?)", vehicleID, db.formatSqliteDatetime(db.Time.UTCNow()), surplus)
+func (db *DB) RecordSurplus(userID string, surplus int) {
+	_, err := db.GetConnection().Exec("insert into surpluses (user_id, ts, surplus_watts) values (?, ?, ?)", userID, db.formatSqliteDatetime(db.Time.UTCNow()), surplus)
 	if err != nil {
 		log.Panicln(err)
 	}
 }
 
-func (db *DB) GetLatestSurplusRecords(vehicleID int, num int) []*SurplusRecord {
+func (db *DB) GetLatestSurplusRecords(userID string, num int) []*SurplusRecord {
 	result := []*SurplusRecord{}
 	rows, err := db.GetConnection().Query("select ts, surplus_watts "+
-		"from surpluses where vehicle_id = ? order by ts desc limit ?",
-		vehicleID, num)
+		"from surpluses where user_id = ? order by ts desc limit ?",
+		userID, num)
 	if err != nil {
 		log.Println(err)
 		return nil

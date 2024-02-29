@@ -27,7 +27,7 @@ func (router *TeslaRouter) SetupRoutes(s *mux.Router) {
 	s.HandleFunc("/api_token_create", router.createAPIToken).Methods("POST")
 	s.HandleFunc("/api_token_update/{id}", router.updateAPIToken).Methods("POST")
 	s.HandleFunc("/state/{id}", router.getVehicleState).Methods("GET")
-	s.HandleFunc("/surplus/{id}", router.getLatestSurpluses).Methods("GET")
+	s.HandleFunc("/surplus", router.getLatestSurpluses).Methods("GET")
 	s.HandleFunc("/events/{id}", router.getLatestChargingEvents).Methods("GET")
 }
 
@@ -272,22 +272,8 @@ func (router *TeslaRouter) getVehicleState(w http.ResponseWriter, r *http.Reques
 }
 
 func (router *TeslaRouter) getLatestSurpluses(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	vehicleIDString := vars["id"]
-	vehicleID, err := strconv.Atoi(vehicleIDString)
-	if err != nil {
-		SendBadRequest(w)
-		return
-	}
-
 	userID := GetUserIDFromRequest(r)
-
-	if !GetDB().IsUserOwnerOfVehicle(userID, vehicleID) {
-		SendForbidden(w)
-		return
-	}
-
-	res := GetDB().GetLatestSurplusRecords(vehicleID, 50)
+	res := GetDB().GetLatestSurplusRecords(userID, 50)
 	SendJSON(w, res)
 }
 

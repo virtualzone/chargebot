@@ -29,7 +29,6 @@ export default function PageVehicle() {
   const [departTime, setDepartTime] = useState('07:00')
   const [tibberToken, setTibberToken] = useState('')
   const [vehicleState, setVehicleState] = useState({} as any)
-  const [surpluses, setSurpluses] = useState([] as any)
   const [chargingEvents, setChargingEvents] = useState([] as any)
 
   useEffect(() => {
@@ -53,11 +52,6 @@ export default function PageVehicle() {
     if (json) {
       setVehicleState(json);
     }
-  }
-
-  const loadLatestSurpluses = async (vehicleID: number) => {
-    const json = await getAPI("/api/1/tesla/surplus/" + vehicleID);
-    setSurpluses(json);
   }
 
   const loadLatestChargingEvents = async (vehicleID: number) => {
@@ -84,7 +78,6 @@ export default function PageVehicle() {
         setDepartTime(e.departTime);
         setTibberToken(e.tibber_token);
         loadVehicleState(e.id);
-        loadLatestSurpluses(e.id);
         loadLatestChargingEvents(e.id);
         setVehicle(e);
       }
@@ -174,31 +167,6 @@ export default function PageVehicle() {
   if (isLoading) {
     return <Loading />
   }
-
-  let surplusRows = <tr><td colSpan={2}>No records founds</td></tr>;
-  if (surpluses && surpluses.length > 0) {
-    surplusRows = surpluses.map((s: any) => {
-      return (
-        <tr key={"surplus-" + s.ts}>
-          <td>{s.ts.replace('T', ' ').replace('Z', '')}</td>
-          <td>{s.surplus_watts} W</td>
-        </tr>
-      );
-    });
-  }
-  let surplusTable = (
-    <Table>
-      <thead>
-        <tr>
-          <th>Time (UTC)</th>
-          <th>Surplus</th>
-        </tr>
-      </thead>
-      <tbody>
-        {surplusRows}
-      </tbody>
-    </Table>
-  );
 
   let eventRows = <tr><td colSpan={3}>No records founds</td></tr>;
   if (chargingEvents && chargingEvents.length > 0) {
@@ -395,17 +363,6 @@ export default function PageVehicle() {
       <Button type="submit" variant="primary" disabled={savingVehicle}>{savingVehicle ? <><IconLoad className="feather-button loader" /> Saving...</> : 'Save'}</Button>
     </Form>
   );
-  let accordionSurpluses = <></>;
-  if (vehicle.api_token) {
-    accordionSurpluses = (
-      <Accordion.Item eventKey="3">
-        <Accordion.Header>Latest recorded surpluses</Accordion.Header>
-        <Accordion.Body>
-          {surplusTable}
-        </Accordion.Body>
-      </Accordion.Item>
-    );
-  }
   let accordionChargingEvents = <></>;
   if (vehicle.api_token) {
     accordionChargingEvents = (
@@ -481,7 +438,6 @@ export default function PageVehicle() {
             {chargePrefs}
           </Accordion.Body>
         </Accordion.Item>
-        {accordionSurpluses}
         {accordionChargingEvents}
         {accordionManualControl}
         <Accordion.Item eventKey="99">
