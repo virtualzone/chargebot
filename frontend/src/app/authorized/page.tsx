@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { checkAuth, getAPI, getUserDetails, postAPI } from "../util";
+import { checkAuth, getAPI, getUserDetails, postAPI, saveUserDetails } from "../util";
 import { useEffect, useState } from "react";
 import Loading from "../loading";
-import { Alert, Button, Container, ListGroup, Modal } from "react-bootstrap";
+import { Alert, Button, Container, Form, InputGroup, ListGroup, Modal } from "react-bootstrap";
 import { useRouter } from "next/navigation";
 import { CopyBlock } from "react-code-blocks";
-import { Loader as IconLoad } from 'react-feather';
+import { Loader as IconLoad, Navigation as IconLocation } from 'react-feather';
 
 export default function PageAuthorized() {
   const [vehicles, setVehicles] = useState([] as any[])
@@ -20,6 +20,10 @@ export default function PageAuthorized() {
   const [showTokenHelp, setShowTokenHelp] = useState(false)
   const [apiToken, setApiToken] = useState('')
   const [apiTokenPassword, setApiTokenPassword] = useState('')
+  const [homeLatitude, setHomeLatitude] = useState(0.0)
+  const [homeLongitude, setHomeLongitude] = useState(0.0)
+  const [homeRadius, setHomeRadius] = useState(100)
+  const [savingHomeLocation, setSavingHomeLocation] = useState(false)
   const router = useRouter();
 
   const loadVehicles = async () => {
@@ -45,6 +49,9 @@ export default function PageAuthorized() {
       } else {
         setTeslaAccountLinked(false);
       }
+      setHomeLatitude(userDetails.home_lat);
+      setHomeLongitude(userDetails.home_lng);
+      setHomeRadius(userDetails.home_radius);
       setLoading(false);
     }
     fetchData();
@@ -67,6 +74,32 @@ export default function PageAuthorized() {
       await navigator.clipboard.writeText(s);
     } catch (err) {
       console.error('Failed to copy: ', err);
+    }
+  }
+
+  async function saveHomeLocation() {
+    const fetchData = async () => {
+      setSavingHomeLocation(true);
+      let payload = {
+        "lat": homeLatitude,
+        "lng": homeLongitude,
+        "radius": homeRadius
+      };
+      await postAPI("/api/1/auth/home", payload);
+      let user = await getAPI("/api/1/auth/me");
+      saveUserDetails(user);
+      setSavingHomeLocation(false);
+    }
+    fetchData();
+  }
+
+  function getGeoLocation() {
+    const cb = function (position: GeolocationPosition): void {
+      setHomeLatitude(position.coords.latitude);
+      setHomeLongitude(position.coords.longitude);
+    }
+    if ((navigator) && (navigator.geolocation)) {
+      navigator.geolocation.getCurrentPosition(cb);
     }
   }
 
@@ -143,7 +176,7 @@ export default function PageAuthorized() {
         <CopyBlock text={code1} language="bash" wrapLongLines={true} showLineNumbers={false} />
         <p>Alternatively, you can push your current inverter active power and your household&apos;s consumption separately:</p>
         <CopyBlock text={code2} language="bash" wrapLongLines={true} showLineNumbers={false} />
-        <h5 style={{'marginTop': "25px"}}>Update plugged in status</h5>
+        <h5 style={{ 'marginTop': "25px" }}>Update plugged in status</h5>
         <p>If your vehicles gets plugged in:</p>
         <CopyBlock text={code3} language="bash" wrapLongLines={true} showLineNumbers={false} />
         <p>If your vehicles gets unplugged:</p>
@@ -153,34 +186,84 @@ export default function PageAuthorized() {
   );
 
   let token = <>
+    <strong>API Token:</strong>
+    <Button variant="link" onClick={() => copyToClipboard(apiToken)}>Copy</Button>
+    <br />
+    <pre>{apiToken}</pre>
+    <strong>Password:</strong>
+    <Button variant="link" onClick={() => updateAPITokenPassword(apiToken)} disabled={savingApiToken}>{savingApiToken ? <><IconLoad className="feather-button loader" /> Updating...</> : 'Update'}</Button>
+    <br />
+    <pre>****************</pre>
+  </>
+  if (apiTokenPassword) {
+    token = <>
       <strong>API Token:</strong>
       <Button variant="link" onClick={() => copyToClipboard(apiToken)}>Copy</Button>
       <br />
       <pre>{apiToken}</pre>
       <strong>Password:</strong>
-      <Button variant="link" onClick={() => updateAPITokenPassword(apiToken)} disabled={savingApiToken}>{savingApiToken ? <><IconLoad className="feather-button loader" /> Updating...</> : 'Update'}</Button>
+      <Button variant="link" onClick={() => copyToClipboard(apiTokenPassword)}>Copy</Button>
       <br />
-      <pre>****************</pre>
+      <pre>{apiTokenPassword}</pre>
     </>
-    if (apiTokenPassword) {
-      token = <>
-        <strong>API Token:</strong>
-        <Button variant="link" onClick={() => copyToClipboard(apiToken)}>Copy</Button>
-        <br />
-        <pre>{apiToken}</pre>
-        <strong>Password:</strong>
-        <Button variant="link" onClick={() => copyToClipboard(apiTokenPassword)}>Copy</Button>
-        <br />
-        <pre>{apiTokenPassword}</pre>
-      </>
-    }
+  }
   let tokenSection = (
     <>
-      <h2 className="pb-3" style={{'marginTop': '50px'}}>API Token</h2>
+      <h2 className="pb-3" style={{ 'marginTop': '50px' }}>API Token</h2>
       <p>An individual API token is required to send your solar surplus and plug in events to chargebot.io.</p>
       {token}
       {tokenHelp}
       <Button variant="primary" onClick={e => setShowTokenHelp(true)}>How to use</Button>
+    </>
+  );
+
+  let homeLocation = (
+    <>
+      <h2 className="pb-3" style={{ 'marginTop': '50px' }}>Home Location</h2>
+      <p>Your home location is required so that chargebot.io recognizes whether your vehicle is plugged in at home.</p>
+      <Form onSubmit={e => { e.preventDefault(); e.stopPropagation(); saveHomeLocation() }}>
+        <InputGroup className="mb-3">
+          <Form.Control
+            placeholder="Latitude"
+            aria-label="Latitude"
+            type="text"
+            min={0.0}
+            max={100.0}
+            required={true}
+            value={homeLatitude}
+            onChange={e => setHomeLatitude(Number(e.target.value))}
+          />
+        </InputGroup>
+        <InputGroup className="mb-3">
+          <Form.Control
+            placeholder="Longitude"
+            aria-label="Longitude"
+            type="text"
+            min={0.0}
+            max={100.0}
+            required={true}
+            value={homeLongitude}
+            onChange={e => setHomeLongitude(Number(e.target.value))}
+          />
+        </InputGroup>
+        <InputGroup className="mb-3">
+          <Form.Control
+            placeholder="Longitude"
+            aria-label="Longitude"
+            aria-describedby="lng-addon1"
+            type="number"
+            min={5}
+            max={100}
+            step={1}
+            required={true}
+            value={homeRadius}
+            onChange={e => setHomeRadius(Number(e.target.value))}
+          />
+          <InputGroup.Text id="lng-addon1">m</InputGroup.Text>
+        </InputGroup>
+        <Button type="button" variant="secondary" style={{ 'marginRight': '5px' }} onClick={() => { getGeoLocation(); }}><IconLocation className="feather-button" /></Button>
+        <Button type="submit" variant="primary" disabled={savingHomeLocation}>{savingHomeLocation ? <><IconLoad className="feather-button loader" /> Saving...</> : 'Save'}</Button>
+      </Form>
     </>
   );
 
@@ -191,6 +274,7 @@ export default function PageAuthorized() {
       <Alert variant='success' dismissible={true} hidden={!showAlertRemoved}>Vehicle successfully removed from your account.</Alert>
       {vehicleList}
       {tokenSection}
+      {homeLocation}
     </Container>
   )
 }
