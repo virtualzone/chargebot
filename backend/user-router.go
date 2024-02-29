@@ -23,7 +23,7 @@ type PlugInOutRequest struct {
 }
 
 func (router *UserRouter) SetupRoutes(s *mux.Router) {
-	s.HandleFunc("/{token}/{id}/surplus", router.recordSurplus).Methods("POST")
+	s.HandleFunc("/{token}/surplus", router.recordSurplus).Methods("POST")
 }
 
 func (router *UserRouter) recordSurplus(w http.ResponseWriter, r *http.Request) {

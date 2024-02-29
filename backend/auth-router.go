@@ -61,7 +61,10 @@ func (router *AuthRouter) callback(w http.ResponseWriter, r *http.Request) {
 	user := GetDB().GetUser(idToken.Subject)
 	if user == nil {
 		user = &User{
-			ID: idToken.Subject,
+			ID:            idToken.Subject,
+			HomeLatitude:  0.0,
+			HomeLongitude: 0.0,
+			HomeRadius:    100,
 		}
 		GetDB().CreateUpdateUser(user)
 	}

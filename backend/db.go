@@ -30,9 +30,8 @@ type User struct {
 }
 
 type Vehicle struct {
-	ID                  int          `json:"id"`
-	UserID              string       `json:"user_id"`
 	VIN                 string       `json:"vin"`
+	UserID              string       `json:"user_id"`
 	DisplayName         string       `json:"display_name"`
 	APIToken            string       `json:"api_token"`
 	Enabled             bool         `json:"enabled"`
@@ -50,11 +49,6 @@ type Vehicle struct {
 	DepartTime          string       `json:"departTime"`
 	TibberToken         string       `json:"tibber_token"`
 	TelemetryEnrollDate *time.Time   `json:"telemetry_enroll_date"`
-}
-
-type APIToken struct {
-	Token     string `json:"token"`
-	VehicleID string `json:"vehicle_id"`
 }
 
 type SurplusRecord struct {
@@ -85,7 +79,7 @@ const (
 )
 
 type VehicleState struct {
-	VehicleID   int         `json:"vehicle_id"`
+	VIN         string      `json:"vehicle_vin"`
 	PluggedIn   bool        `json:"pluggedIn"`
 	Charging    ChargeState `json:"chargingState"`
 	SoC         int         `json:"soc"`
@@ -166,13 +160,13 @@ func (db *DB) InitDBStructure() {
 	_, err := db.GetConnection().Exec(`
 create table if not exists auth_codes(id text primary key, ts text);
 create table if not exists users(id text primary key, tesla_refresh_token text, tesla_user_id text default '');
-create table if not exists vehicles(id int primary key, user_id text, vin text, display_name text, enabled int, target_soc int, max_amps int, surplus_charging int, min_surplus int, min_chargetime int, lowcost_charging int, max_price int, tibber_token text, num_phases int default 3, grid_provider text default 'tibber', grid_strategy int default 1, depart_days text default '12345', depart_time text default '07:00');
+create table if not exists vehicles(vin text primary key, user_id text, display_name text, enabled int, target_soc int, max_amps int, surplus_charging int, min_surplus int, min_chargetime int, lowcost_charging int, max_price int, tibber_token text, num_phases int default 3, grid_provider text default 'tibber', grid_strategy int default 1, depart_days text default '12345', depart_time text default '07:00');
 create table if not exists api_tokens(token text primary key, user_id text, passhash text);
 create table if not exists surpluses(user_id string, ts text, surplus_watts int);
-create table if not exists logs(vehicle_id int, ts text, event_id int, details text);
-create table if not exists vehicle_states(vehicle_id int primary key, plugged_in int default 0, charging int default 0, soc int default -1, charge_amps int default 0);
-create table if not exists tibber_prices(vehicle_id int not null, hourstamp int not null, price real, primary key(vehicle_id, hourstamp));
-create table if not exists grid_hourblocks(vehicle_id int not null, hourstamp int not null, primary key(vehicle_id, hourstamp));
+create table if not exists logs(vehicle_vin text, ts text, event_id int, details text);
+create table if not exists vehicle_states(vehicle_vin text primary key, plugged_in int default 0, charging int default 0, soc int default -1, charge_amps int default 0);
+create table if not exists tibber_prices(vehicle_vin text not null, hourstamp int not null, price real, primary key(vehicle_vin, hourstamp));
+create table if not exists grid_hourblocks(vehicle_vin int text null, hourstamp int not null, primary key(vehicle_vin, hourstamp));
 `)
 	if err != nil {
 		log.Panicln(err)
@@ -257,45 +251,24 @@ func (db *DB) CreateUpdateVehicle(e *Vehicle) {
 	if e.TelemetryEnrollDate != nil {
 		ts = db.formatSqliteDatetime(*e.TelemetryEnrollDate)
 	}
-	_, err := db.GetConnection().Exec("replace into vehicles values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-		e.ID, e.UserID, e.VIN, e.DisplayName,
+	_, err := db.GetConnection().Exec("replace into vehicles values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		e.VIN, e.UserID, e.DisplayName,
 		e.Enabled, e.TargetSoC, e.MaxAmps, e.SurplusCharging, e.MinSurplus, e.MinChargeTime, e.LowcostCharging, e.MaxPrice, e.TibberToken, e.NumPhases, e.GridProvider, e.GridStrategy, e.DepartDays, e.DepartTime, ts)
 	if err != nil {
 		log.Panicln(err)
 	}
 }
 
-func (db *DB) GetVehicleByID(ID int) *Vehicle {
-	e := &Vehicle{}
-	var ts string
-	err := db.GetConnection().QueryRow("select id, vehicles.user_id, vin, display_name, ifnull(api_tokens.token, ''), "+
-		"enabled, target_soc, max_amps, num_phases, surplus_charging, min_surplus, min_chargetime, lowcost_charging, grid_provider, grid_strategy, depart_days, depart_time, max_price, tibber_token, telemetry_enroll_date "+
-		"from vehicles "+
-		"left join api_tokens on api_tokens.user_id = vehicles.user_id "+
-		"where vehicles.id = ?",
-		ID).
-		Scan(&e.ID, &e.UserID, &e.VIN, &e.DisplayName, &e.APIToken, &e.Enabled, &e.TargetSoC, &e.MaxAmps, &e.NumPhases, &e.SurplusCharging, &e.MinSurplus, &e.MinChargeTime, &e.LowcostCharging, &e.GridProvider, &e.GridStrategy, &e.DepartDays, &e.DepartTime, &e.MaxPrice, &e.TibberToken, &ts)
-	if err != nil {
-		log.Println(err)
-		return nil
-	}
-	if ts != "" {
-		parsedDate, _ := time.Parse(SQLITE_DATETIME_LAYOUT, ts)
-		e.TelemetryEnrollDate = &parsedDate
-	}
-	return e
-}
-
 func (db *DB) GetVehicleByVIN(vin string) *Vehicle {
 	e := &Vehicle{}
 	var ts string
-	err := db.GetConnection().QueryRow("select id, vehicles.user_id, vin, display_name, ifnull(api_tokens.token, ''), "+
+	err := db.GetConnection().QueryRow("select vin, vehicles.user_id, display_name, ifnull(api_tokens.token, ''), "+
 		"enabled, target_soc, max_amps, num_phases, surplus_charging, min_surplus, min_chargetime, lowcost_charging, grid_provider, grid_strategy, depart_days, depart_time, max_price, tibber_token, telemetry_enroll_date "+
 		"from vehicles "+
 		"left join api_tokens on api_tokens.user_id = vehicles.user_id "+
 		"where vehicles.vin = ?",
 		vin).
-		Scan(&e.ID, &e.UserID, &e.VIN, &e.DisplayName, &e.APIToken, &e.Enabled, &e.TargetSoC, &e.MaxAmps, &e.NumPhases, &e.SurplusCharging, &e.MinSurplus, &e.MinChargeTime, &e.LowcostCharging, &e.GridProvider, &e.GridStrategy, &e.DepartDays, &e.DepartTime, &e.MaxPrice, &e.TibberToken, &ts)
+		Scan(&e.VIN, &e.UserID, &e.DisplayName, &e.APIToken, &e.Enabled, &e.TargetSoC, &e.MaxAmps, &e.NumPhases, &e.SurplusCharging, &e.MinSurplus, &e.MinChargeTime, &e.LowcostCharging, &e.GridProvider, &e.GridStrategy, &e.DepartDays, &e.DepartTime, &e.MaxPrice, &e.TibberToken, &ts)
 	if err != nil {
 		log.Println(err)
 		return nil
@@ -309,7 +282,7 @@ func (db *DB) GetVehicleByVIN(vin string) *Vehicle {
 
 func (db *DB) GetVehicles(UserID string) []*Vehicle {
 	result := []*Vehicle{}
-	rows, err := db.GetConnection().Query("select id, vehicles.user_id, vin, display_name, ifnull(api_tokens.token, ''), "+
+	rows, err := db.GetConnection().Query("select vin, vehicles.user_id, display_name, ifnull(api_tokens.token, ''), "+
 		"enabled, target_soc, max_amps, num_phases, surplus_charging, min_surplus, min_chargetime, lowcost_charging, grid_provider, grid_strategy, depart_days, depart_time, max_price, tibber_token, telemetry_enroll_date "+
 		"from vehicles "+
 		"left join api_tokens on api_tokens.user_id = vehicles.user_id "+
@@ -324,7 +297,7 @@ func (db *DB) GetVehicles(UserID string) []*Vehicle {
 	for rows.Next() {
 		var ts string
 		e := &Vehicle{}
-		rows.Scan(&e.ID, &e.UserID, &e.VIN, &e.DisplayName, &e.APIToken, &e.Enabled, &e.TargetSoC, &e.MaxAmps, &e.NumPhases, &e.SurplusCharging, &e.MinSurplus, &e.MinChargeTime, &e.LowcostCharging, &e.GridProvider, &e.GridStrategy, &e.DepartDays, &e.DepartTime, &e.MaxPrice, &e.TibberToken, &ts)
+		rows.Scan(&e.VIN, &e.UserID, &e.DisplayName, &e.APIToken, &e.Enabled, &e.TargetSoC, &e.MaxAmps, &e.NumPhases, &e.SurplusCharging, &e.MinSurplus, &e.MinChargeTime, &e.LowcostCharging, &e.GridProvider, &e.GridStrategy, &e.DepartDays, &e.DepartTime, &e.MaxPrice, &e.TibberToken, &ts)
 		if ts != "" {
 			parsedDate, _ := time.Parse(SQLITE_DATETIME_LAYOUT, ts)
 			e.TelemetryEnrollDate = &parsedDate
@@ -336,7 +309,7 @@ func (db *DB) GetVehicles(UserID string) []*Vehicle {
 
 func (db *DB) GetAllVehicles() []*Vehicle {
 	result := []*Vehicle{}
-	rows, err := db.GetConnection().Query("select id, vehicles.user_id, vin, display_name, ifnull(api_tokens.token, ''), " +
+	rows, err := db.GetConnection().Query("select vin, vehicles.user_id, display_name, ifnull(api_tokens.token, ''), " +
 		"enabled, target_soc, max_amps, num_phases, surplus_charging, min_surplus, min_chargetime, lowcost_charging, grid_provider, grid_strategy, depart_days, depart_time, max_price, tibber_token, telemetry_enroll_date " +
 		"from vehicles " +
 		"left join api_tokens on api_tokens.user_id = vehicles.user_id")
@@ -348,7 +321,7 @@ func (db *DB) GetAllVehicles() []*Vehicle {
 	for rows.Next() {
 		var ts string
 		e := &Vehicle{}
-		rows.Scan(&e.ID, &e.UserID, &e.VIN, &e.DisplayName, &e.APIToken, &e.Enabled, &e.TargetSoC, &e.MaxAmps, &e.NumPhases, &e.SurplusCharging, &e.MinSurplus, &e.MinChargeTime, &e.LowcostCharging, &e.GridProvider, &e.GridStrategy, &e.DepartDays, &e.DepartTime, &e.MaxPrice, &e.TibberToken, &ts)
+		rows.Scan(&e.VIN, &e.UserID, &e.DisplayName, &e.APIToken, &e.Enabled, &e.TargetSoC, &e.MaxAmps, &e.NumPhases, &e.SurplusCharging, &e.MinSurplus, &e.MinChargeTime, &e.LowcostCharging, &e.GridProvider, &e.GridStrategy, &e.DepartDays, &e.DepartTime, &e.MaxPrice, &e.TibberToken, &ts)
 		if ts != "" {
 			parsedDate, _ := time.Parse(SQLITE_DATETIME_LAYOUT, ts)
 			e.TelemetryEnrollDate = &parsedDate
@@ -358,14 +331,14 @@ func (db *DB) GetAllVehicles() []*Vehicle {
 	return result
 }
 
-func (db *DB) DeleteVehicle(ID int) {
-	if _, err := db.GetConnection().Exec("delete from vehicles where id = ?", ID); err != nil {
+func (db *DB) DeleteVehicle(vin string) {
+	if _, err := db.GetConnection().Exec("delete from vehicles where vin = ?", vin); err != nil {
 		log.Panicln(err)
 	}
-	if _, err := db.GetConnection().Exec("delete from logs where vehicle_id = ?", ID); err != nil {
+	if _, err := db.GetConnection().Exec("delete from logs where vehicle_vin = ?", vin); err != nil {
 		log.Panicln(err)
 	}
-	if _, err := db.GetConnection().Exec("delete from vehicle_states where vehicle_id = ?", ID); err != nil {
+	if _, err := db.GetConnection().Exec("delete from vehicle_states where vehicle_vin = ?", vin); err != nil {
 		log.Panicln(err)
 	}
 }
@@ -412,11 +385,11 @@ func (db *DB) GetAPIToken(userID string) string {
 	return token
 }
 
-func (db *DB) GetVehicleState(vehicleID int) *VehicleState {
+func (db *DB) GetVehicleState(vin string) *VehicleState {
 	e := &VehicleState{}
-	err := db.GetConnection().QueryRow("select vehicle_id, plugged_in, charging, soc, charge_amps, charge_limit from vehicle_states where vehicle_id = ?",
-		vehicleID).
-		Scan(&e.VehicleID, &e.PluggedIn, &e.Charging, &e.SoC, &e.Amps, &e.ChargeLimit)
+	err := db.GetConnection().QueryRow("select vehicle_vin, plugged_in, charging, soc, charge_amps, charge_limit from vehicle_states where vehicle_vin = ?",
+		vin).
+		Scan(&e.VIN, &e.PluggedIn, &e.Charging, &e.SoC, &e.Amps, &e.ChargeLimit)
 	if err != nil {
 		log.Println(err)
 		return nil
@@ -424,46 +397,46 @@ func (db *DB) GetVehicleState(vehicleID int) *VehicleState {
 	return e
 }
 
-func (db *DB) SetVehicleStatePluggedIn(vehicleID int, pluggedIn bool) {
-	_, err := db.GetConnection().Exec("insert into vehicle_states (vehicle_id, plugged_in) values(?, ?) "+
-		"on conflict(vehicle_id) do update set plugged_in = ?",
-		vehicleID, pluggedIn, pluggedIn)
+func (db *DB) SetVehicleStatePluggedIn(vin string, pluggedIn bool) {
+	_, err := db.GetConnection().Exec("insert into vehicle_states (vehicle_vin, plugged_in) values(?, ?) "+
+		"on conflict(vehicle_vin) do update set plugged_in = ?",
+		vin, pluggedIn, pluggedIn)
 	if err != nil {
 		log.Fatalln(err)
 	}
 }
 
-func (db *DB) SetVehicleStateCharging(vehicleID int, charging ChargeState) {
-	_, err := db.GetConnection().Exec("insert into vehicle_states (vehicle_id, charging) values(?, ?) "+
-		"on conflict(vehicle_id) do update set charging = ?",
-		vehicleID, charging, charging)
+func (db *DB) SetVehicleStateCharging(vin string, charging ChargeState) {
+	_, err := db.GetConnection().Exec("insert into vehicle_states (vehicle_vin, charging) values(?, ?) "+
+		"on conflict(vehicle_vin) do update set charging = ?",
+		vin, charging, charging)
 	if err != nil {
 		log.Fatalln(err)
 	}
 }
 
-func (db *DB) SetVehicleStateSoC(vehicleID int, soc int) {
-	_, err := db.GetConnection().Exec("insert into vehicle_states (vehicle_id, soc) values(?, ?) "+
-		"on conflict(vehicle_id) do update set soc = ?",
-		vehicleID, soc, soc)
+func (db *DB) SetVehicleStateSoC(vin string, soc int) {
+	_, err := db.GetConnection().Exec("insert into vehicle_states (vehicle_vin, soc) values(?, ?) "+
+		"on conflict(vehicle_vin) do update set soc = ?",
+		vin, soc, soc)
 	if err != nil {
 		log.Fatalln(err)
 	}
 }
 
-func (db *DB) SetVehicleStateAmps(vehicleID int, amps int) {
-	_, err := db.GetConnection().Exec("insert into vehicle_states (vehicle_id, charge_amps) values(?, ?) "+
-		"on conflict(vehicle_id) do update set charge_amps = ?",
-		vehicleID, amps, amps)
+func (db *DB) SetVehicleStateAmps(vin string, amps int) {
+	_, err := db.GetConnection().Exec("insert into vehicle_states (vehicle_vin, charge_amps) values(?, ?) "+
+		"on conflict(vehicle_vin) do update set charge_amps = ?",
+		vin, amps, amps)
 	if err != nil {
 		log.Fatalln(err)
 	}
 }
 
-func (db *DB) SetVehicleStateChargeLimit(vehicleID int, limit int) {
-	_, err := db.GetConnection().Exec("insert into vehicle_states (vehicle_id, charge_limit) values(?, ?) "+
-		"on conflict(vehicle_id) do update set charge_limit = ?",
-		vehicleID, limit, limit)
+func (db *DB) SetVehicleStateChargeLimit(vin string, limit int) {
+	_, err := db.GetConnection().Exec("insert into vehicle_states (vehicle_vin, charge_limit) values(?, ?) "+
+		"on conflict(vehicle_vin) do update set charge_limit = ?",
+		vin, limit, limit)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -500,20 +473,20 @@ func (db *DB) GetLatestSurplusRecords(userID string, num int) []*SurplusRecord {
 	return result
 }
 
-func (db *DB) RecordSelectedGridHourblock(vehicleID int, year int, month int, day int, hour int) {
+func (db *DB) RecordSelectedGridHourblock(vin string, year int, month int, day int, hour int) {
 	hourstamp := GetHourstamp(year, month, day, hour)
-	_, err := db.GetConnection().Exec("replace into grid_hourblocks (vehicle_id, hourstamp) values(?, ?)",
-		vehicleID, hourstamp)
+	_, err := db.GetConnection().Exec("replace into grid_hourblocks (vehicle_vin, hourstamp) values(?, ?)",
+		vin, hourstamp)
 	if err != nil {
 		log.Fatalln(err)
 	}
 }
 
-func (db *DB) IsSelectedGridHourblock(vehicleID int, year int, month int, day int, hour int) bool {
+func (db *DB) IsSelectedGridHourblock(vin string, year int, month int, day int, hour int) bool {
 	hourstamp := GetHourstamp(year, month, day, hour)
 	var num int
-	err := db.GetConnection().QueryRow("select count(*) from grid_hourblocks where vehicle_id = ? and hourstamp = ?",
-		vehicleID, hourstamp).Scan(&num)
+	err := db.GetConnection().QueryRow("select count(*) from grid_hourblocks where vehicle_vin = ? and hourstamp = ?",
+		vin, hourstamp).Scan(&num)
 	if err != nil {
 		log.Fatalln(err)
 		return false
@@ -522,16 +495,16 @@ func (db *DB) IsSelectedGridHourblock(vehicleID int, year int, month int, day in
 
 }
 
-func (db *DB) SetTibberPrice(vehicleID int, year int, month int, day int, hour int, price float32) {
+func (db *DB) SetTibberPrice(vin string, year int, month int, day int, hour int, price float32) {
 	hourstamp := GetHourstamp(year, month, day, hour)
-	_, err := db.GetConnection().Exec("replace into tibber_prices (vehicle_id, hourstamp, price) values(?, ?, ?)",
-		vehicleID, hourstamp, price)
+	_, err := db.GetConnection().Exec("replace into tibber_prices (vehicle_vin, hourstamp, price) values(?, ?, ?)",
+		vin, hourstamp, price)
 	if err != nil {
 		log.Fatalln(err)
 	}
 }
 
-func (db *DB) GetUpcomingTibberPrices(vehicleID int, sortByPriceAsc bool) []*GridPrice {
+func (db *DB) GetUpcomingTibberPrices(vin string, sortByPriceAsc bool) []*GridPrice {
 	now := db.Time.UTCNow()
 	hourstampStart := GetHourstamp(now.Year(), int(now.Month()), now.Day(), now.Hour())
 	result := []*GridPrice{}
@@ -541,9 +514,9 @@ func (db *DB) GetUpcomingTibberPrices(vehicleID int, sortByPriceAsc bool) []*Gri
 	}
 	rows, err := db.GetConnection().Query("select hourstamp, price "+
 		"from tibber_prices "+
-		"where vehicle_id = ? and hourstamp >= ?"+
+		"where vehicle_vin = ? and hourstamp >= ?"+
 		"order by "+order,
-		vehicleID, hourstampStart)
+		vin, hourstampStart)
 	if err != nil {
 		log.Println(err)
 		return nil
@@ -570,12 +543,12 @@ func (db *DB) GetUpcomingTibberPrices(vehicleID int, sortByPriceAsc bool) []*Gri
 	return result
 }
 
-func (db *DB) GetVehicleIDsWithTibberTokenWithoutPricesForStarttime(startTime time.Time, limit int) []int {
+func (db *DB) GetVehicleVINsWithTibberTokenWithoutPricesForStarttime(startTime time.Time, limit int) []string {
 	hourstampStart := GetHourstamp(startTime.Year(), int(startTime.Month()), startTime.Day(), 0)
-	result := []int{}
-	rows, err := db.GetConnection().Query("select vehicles.id "+
+	result := []string{}
+	rows, err := db.GetConnection().Query("select vehicles.vin "+
 		"from vehicles "+
-		"where vehicles.grid_provider = 'tibber' and ifnull(vehicles.tibber_token, '') != '' and (select count(*) from tibber_prices where tibber_prices.vehicle_id = vehicles.id and hourstamp >= ?) = 0 "+
+		"where vehicles.grid_provider = 'tibber' and ifnull(vehicles.tibber_token, '') != '' and (select count(*) from tibber_prices where tibber_prices.vehicle_vin = vehicles.vin and hourstamp >= ?) = 0 "+
 		"limit ?",
 		hourstampStart, limit)
 	if err != nil {
@@ -584,27 +557,27 @@ func (db *DB) GetVehicleIDsWithTibberTokenWithoutPricesForStarttime(startTime ti
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var vehicleID int
-		rows.Scan(&vehicleID)
-		result = append(result, vehicleID)
+		var vin string
+		rows.Scan(&vin)
+		result = append(result, vin)
 	}
 	return result
 }
 
-func (db *DB) GetVehicleIDsWithTibberTokenWithoutPricesForTomorrow(limit int) []int {
+func (db *DB) GetVehicleVINsWithTibberTokenWithoutPricesForTomorrow(limit int) []string {
 	startTime := db.Time.UTCNow().AddDate(0, 0, 1)
-	return db.GetVehicleIDsWithTibberTokenWithoutPricesForStarttime(startTime, limit)
+	return db.GetVehicleVINsWithTibberTokenWithoutPricesForStarttime(startTime, limit)
 }
 
-func (db *DB) GetVehicleIDsWithTibberTokenWithoutPricesForToday(limit int) []int {
+func (db *DB) GetVehicleVINsWithTibberTokenWithoutPricesForToday(limit int) []string {
 	startTime := db.Time.UTCNow()
-	return db.GetVehicleIDsWithTibberTokenWithoutPricesForStarttime(startTime, limit)
+	return db.GetVehicleVINsWithTibberTokenWithoutPricesForStarttime(startTime, limit)
 }
 
-func (db *DB) IsUserOwnerOfVehicle(userID string, vehicleID int) bool {
+func (db *DB) IsUserOwnerOfVehicle(userID string, vin string) bool {
 	list := db.GetVehicles(userID)
 	for _, e := range list {
-		if e.ID == vehicleID {
+		if e.VIN == vin {
 			return true
 		}
 	}
@@ -624,21 +597,21 @@ func (db *DB) IsTokenPasswordValid(token string, password string) bool {
 	return IsValidHash(password, passhash)
 }
 
-func (db *DB) LogChargingEvent(vehicleID int, eventType int, text string) {
-	log.Printf("charging event %d for vehicle id %d with data: %s\n", eventType, vehicleID, text)
-	_, err := db.GetConnection().Exec("insert into logs values(?, ?, ?, ?)", vehicleID, db.formatSqliteDatetime(db.Time.UTCNow()), eventType, text)
+func (db *DB) LogChargingEvent(vin string, eventType int, text string) {
+	log.Printf("charging event %d for vehicle id %s with data: %s\n", eventType, vin, text)
+	_, err := db.GetConnection().Exec("insert into logs values(?, ?, ?, ?)", vin, db.formatSqliteDatetime(db.Time.UTCNow()), eventType, text)
 	if err != nil {
 		log.Panicln(err)
 	}
 }
 
-func (db *DB) GetLatestChargingEvent(vehicleID int, eventType int) *ChargingEvent {
+func (db *DB) GetLatestChargingEvent(vin string, eventType int) *ChargingEvent {
 	var ts string
 	var eventId int
 	var details string
 	err := db.GetConnection().QueryRow("select ts, event_id, details "+
-		"from logs where vehicle_id = ? and event_id = ? order by ts desc limit 1",
-		vehicleID, eventType).
+		"from logs where vehicle_vin = ? and event_id = ? order by ts desc limit 1",
+		vin, eventType).
 		Scan(&ts, &eventId, &details)
 	if err != nil {
 		log.Println(err)
@@ -653,11 +626,11 @@ func (db *DB) GetLatestChargingEvent(vehicleID int, eventType int) *ChargingEven
 	return e
 }
 
-func (db *DB) GetLatestChargingEvents(vehicleID int, num int) []*ChargingEvent {
+func (db *DB) GetLatestChargingEvents(vin string, num int) []*ChargingEvent {
 	result := []*ChargingEvent{}
 	rows, err := db.GetConnection().Query("select ts, event_id, details "+
-		"from logs where vehicle_id = ? order by ts desc limit ?",
-		vehicleID, num)
+		"from logs where vehicle_vin = ? order by ts desc limit ?",
+		vin, num)
 	if err != nil {
 		log.Println(err)
 		return nil
@@ -682,13 +655,6 @@ func (db *DB) GetLatestChargingEvents(vehicleID int, num int) []*ChargingEvent {
 func (db *DB) formatSqliteDatetime(ts time.Time) string {
 	return ts.Format(SQLITE_DATETIME_LAYOUT)
 }
-
-/*
-func (db *DB) parseSqliteDatetime(ts string) *time.Time {
-	parsedTime, _ := time.Parse(SQLITE_DATETIME_LAYOUT, ts)
-	return &parsedTime
-}
-*/
 
 func (db *DB) encrypt(s string) string {
 	aes, err := aes.NewCipher([]byte(GetConfig().CryptKey))
