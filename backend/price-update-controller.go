@@ -24,20 +24,20 @@ func PeriodicPriceUpdateControl() {
 func PeriodicPriceUpdateControl_Tibber() {
 	// First, care about the vehicles that don't even have prices for today
 	// Limit to 45 vehicles so we don't exceed the API limits
-	l := GetDB().GetVehicleIDsWithTibberTokenWithoutPricesForToday(45)
-	for _, vehicleID := range l {
-		vehicle := GetDB().GetVehicleByID(vehicleID)
-		log.Printf("Updating today's Tibber prices for vehicle ID %d ...\n", vehicleID)
+	l := GetDB().GetVehicleVINsWithTibberTokenWithoutPricesForToday(45)
+	for _, vin := range l {
+		vehicle := GetDB().GetVehicleByVIN(vin)
+		log.Printf("Updating today's Tibber prices for vehicle %s ...\n", vin)
 		PeriodicPriceUpdateControlProcessVehicle_Tibber(vehicle)
 	}
 
 	now := time.Now().UTC()
 	if now.Hour() > 12 {
 		// Next, if it's past 13:00 GMT, handle the vehicle's without prices for tomorrow
-		l := GetDB().GetVehicleIDsWithTibberTokenWithoutPricesForTomorrow(45)
-		for _, vehicleID := range l {
-			vehicle := GetDB().GetVehicleByID(vehicleID)
-			log.Printf("Updating tomorrow's Tibber prices for vehicle ID %d ...\n", vehicleID)
+		l := GetDB().GetVehicleVINsWithTibberTokenWithoutPricesForTomorrow(45)
+		for _, vin := range l {
+			vehicle := GetDB().GetVehicleByVIN(vin)
+			log.Printf("Updating tomorrow's Tibber prices for vehicle %s ...\n", vin)
 			PeriodicPriceUpdateControlProcessVehicle_Tibber(vehicle)
 		}
 	}
@@ -59,5 +59,5 @@ func PeriodicPriceUpdateControlProcessVehicle_Tibber(vehicle *Vehicle) {
 
 func PeriodicPriceUpdateControlProcessPriceInfo_Tibber(vehicle *Vehicle, price *GridPrice) {
 	ts := price.StartsAt.UTC()
-	GetDB().SetTibberPrice(vehicle.ID, ts.Year(), int(ts.Month()), ts.Day(), ts.Hour(), price.Total)
+	GetDB().SetTibberPrice(vehicle.VIN, ts.Year(), int(ts.Month()), ts.Day(), ts.Hour(), price.Total)
 }

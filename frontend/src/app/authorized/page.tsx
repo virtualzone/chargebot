@@ -5,7 +5,7 @@ import Image from "next/image";
 import { checkAuth, getAPI, getUserDetails, postAPI, saveUserDetails } from "../util";
 import { useEffect, useState } from "react";
 import Loading from "../loading";
-import { Alert, Button, Container, Form, InputGroup, ListGroup, Modal } from "react-bootstrap";
+import { Alert, Button, Container, Form, InputGroup, ListGroup, Modal, Table } from "react-bootstrap";
 import { useRouter } from "next/navigation";
 import { CopyBlock } from "react-code-blocks";
 import { Loader as IconLoad, Navigation as IconLocation } from 'react-feather';
@@ -24,11 +24,17 @@ export default function PageAuthorized() {
   const [homeLongitude, setHomeLongitude] = useState(0.0)
   const [homeRadius, setHomeRadius] = useState(100)
   const [savingHomeLocation, setSavingHomeLocation] = useState(false)
+  const [surpluses, setSurpluses] = useState([] as any)
   const router = useRouter();
 
   const loadVehicles = async () => {
     const json = await getAPI("/api/1/tesla/my_vehicles");
     setVehicles(json);
+  }
+
+  const loadLatestSurpluses = async () => {
+    const json = await getAPI("/api/1/tesla/surplus");
+    setSurpluses(json);
   }
 
   useEffect(() => {
@@ -52,14 +58,15 @@ export default function PageAuthorized() {
       setHomeLatitude(userDetails.home_lat);
       setHomeLongitude(userDetails.home_lng);
       setHomeRadius(userDetails.home_radius);
+      loadLatestSurpluses();
       setLoading(false);
     }
     fetchData();
   }, []);
 
-  function selectVehicle(id: number) {
-    console.log("/vehicle/?id=" + id);
-    router.push("/vehicle/?id=" + id);
+  function selectVehicle(vin: string) {
+    console.log("/vehicle/?vin=" + vin);
+    router.push("/vehicle/?vin=" + vin);
   }
 
   async function linkTeslaAccount() {
@@ -145,7 +152,7 @@ export default function PageAuthorized() {
         <ListGroup className="mb-5">
           {(vehicles as any[]).map(e => {
             return (
-              <ListGroup.Item action={true} onClick={() => selectVehicle(e.id)} key={e.id}>
+              <ListGroup.Item action={true} onClick={() => selectVehicle(e.vin)} key={e.id}>
                 <strong>{e.display_name}</strong>
                 <br />
                 {e.vin}
@@ -160,10 +167,8 @@ export default function PageAuthorized() {
   }
 
 
-  let code1 = "curl --header 'Content-Type: application/json' --data '{\"password\": \"\", \"surplus_watts\": 1500}' https://chargebot.io/api/1/user/" + apiToken + "/{vehicleID}/surplus";
-  let code2 = "curl --header 'Content-Type: application/json' --data '{\"password\": \"\", \"inverter_active_power_watts\": 2000, \"consumption_watts\": 200}' https://chargebot.io/api/1/user/" + apiToken + "/{vehicleID}/surplus";
-  let code3 = "curl --header 'Content-Type: application/json' --data '{\"password\": \"\"}' https://chargebot.io/api/1/user/" + apiToken + "/{vehicleID}/plugged_in";
-  let code4 = "curl --header 'Content-Type: application/json' --data '{\"password\": \"\"}' https://chargebot.io/api/1/user/" + apiToken + "/{vehicleID}/unplugged";
+  let code1 = "curl --header 'Content-Type: application/json' --data '{\"password\": \"\", \"surplus_watts\": 1500}' https://chargebot.io/api/1/user/" + apiToken + "/surplus";
+  let code2 = "curl --header 'Content-Type: application/json' --data '{\"password\": \"\", \"inverter_active_power_watts\": 2000, \"consumption_watts\": 200}' https://chargebot.io/api/1/user/" + apiToken + "/surplus";
   let tokenHelp = (
     <Modal show={showTokenHelp} onHide={() => setShowTokenHelp(false)}>
       <Modal.Header closeButton>
@@ -176,11 +181,6 @@ export default function PageAuthorized() {
         <CopyBlock text={code1} language="bash" wrapLongLines={true} showLineNumbers={false} />
         <p>Alternatively, you can push your current inverter active power and your household&apos;s consumption separately:</p>
         <CopyBlock text={code2} language="bash" wrapLongLines={true} showLineNumbers={false} />
-        <h5 style={{ 'marginTop': "25px" }}>Update plugged in status</h5>
-        <p>If your vehicles gets plugged in:</p>
-        <CopyBlock text={code3} language="bash" wrapLongLines={true} showLineNumbers={false} />
-        <p>If your vehicles gets unplugged:</p>
-        <CopyBlock text={code4} language="bash" wrapLongLines={true} showLineNumbers={false} />
       </Modal.Body>
     </Modal>
   );
@@ -267,6 +267,37 @@ export default function PageAuthorized() {
     </>
   );
 
+  let surplusRows = <tr><td colSpan={2}>No records founds</td></tr>;
+  if (surpluses && surpluses.length > 0) {
+    surplusRows = surpluses.map((s: any) => {
+      return (
+        <tr key={"surplus-" + s.ts}>
+          <td>{s.ts.replace('T', ' ').replace('Z', '')}</td>
+          <td>{s.surplus_watts} W</td>
+        </tr>
+      );
+    });
+  }
+  let surplusTable = (
+    <Table>
+      <thead>
+        <tr>
+          <th>Time (UTC)</th>
+          <th>Surplus</th>
+        </tr>
+      </thead>
+      <tbody>
+        {surplusRows}
+      </tbody>
+    </Table>
+  );
+  let surplusSection = (
+    <>
+      <h2 className="pb-3" style={{ 'marginTop': '50px' }}>Latest recorded surpluses</h2>
+      {surplusTable}
+    </>
+  );
+
   return (
     <Container fluid="sm" className="pt-5 container-max-width min-height">
       <h2 className="pb-3">My vehicles</h2>
@@ -275,6 +306,7 @@ export default function PageAuthorized() {
       {vehicleList}
       {tokenSection}
       {homeLocation}
+      {surplusSection}
     </Container>
   )
 }

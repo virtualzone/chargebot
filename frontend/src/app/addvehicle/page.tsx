@@ -35,10 +35,10 @@ export default function PageAddVehicle() {
     fetchData();
   }, []);
 
-  function selectVehicle(id: string) {
+  function selectVehicle(vin: string) {
     const fetchData = async () => {
       setLoading(true);
-      await postAPI("/api/1/tesla/vehicle_add/" + id, {});
+      await postAPI("/api/1/tesla/vehicle_add/" + vin, {});
       setLoading(false);
       router.push("/authorized/?added=1")
     };
@@ -66,7 +66,7 @@ export default function PageAddVehicle() {
       <ListGroup className="mb-5">
         {(vehicles as any[]).map(e => {
           return (
-            <ListGroup.Item action={true} onClick={() => selectVehicle(e.vehicle_id)} key={e.vehicle_id}>
+            <ListGroup.Item action={true} onClick={() => selectVehicle(e.vin)} key={e.vin}>
               <strong>{e.display_name}</strong>
               <br />
               {e.vin}

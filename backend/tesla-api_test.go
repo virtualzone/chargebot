@@ -103,11 +103,11 @@ func (a *TeslaAPIMock) DeleteTelemetryConfig(vehicle *Vehicle) error {
 	return args.Error(0)
 }
 
-func UpdateTeslaAPIMockData(api *TeslaAPIMock, vehicleID int, batteryLevel int, chargingState string) {
-	GetDB().SetVehicleStateSoC(vehicleID, batteryLevel)
+func UpdateTeslaAPIMockData(api *TeslaAPIMock, vin string, batteryLevel int, chargingState string) {
+	GetDB().SetVehicleStateSoC(vin, batteryLevel)
 	//GetDB().SetVehicleStateCharging(vehicleID, chargingState)
 	vData := &TeslaAPIVehicleData{
-		VehicleID: vehicleID,
+		VIN: vin,
 		ChargeState: TeslaAPIChargeState{
 			BatteryLevel:  batteryLevel,
 			ChargingState: chargingState,

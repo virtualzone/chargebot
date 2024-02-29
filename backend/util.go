@@ -25,11 +25,11 @@ func UpdateVehicleDataSaveSoC(vehicle *Vehicle) (int, *TeslaAPIVehicleData) {
 	data, err := GetTeslaAPI().GetVehicleData(vehicle)
 	if err != nil {
 		log.Println(err)
-		GetDB().LogChargingEvent(vehicle.ID, LogEventVehicleUpdateData, err.Error())
+		GetDB().LogChargingEvent(vehicle.VIN, LogEventVehicleUpdateData, err.Error())
 		return 0, nil
 	} else {
-		GetDB().SetVehicleStateSoC(vehicle.ID, data.ChargeState.BatteryLevel)
-		GetDB().LogChargingEvent(vehicle.ID, LogEventVehicleUpdateData, fmt.Sprintf("vehicle SoC updated: %d", data.ChargeState.BatteryLevel))
+		GetDB().SetVehicleStateSoC(vehicle.VIN, data.ChargeState.BatteryLevel)
+		GetDB().LogChargingEvent(vehicle.VIN, LogEventVehicleUpdateData, fmt.Sprintf("vehicle SoC updated: %d", data.ChargeState.BatteryLevel))
 		return data.ChargeState.BatteryLevel, data
 	}
 }

@@ -54,8 +54,8 @@ func NewTestChargeController() *ChargeController {
 	return cc
 }
 
-func SetTibberTestPrice(vehicleID int, ts time.Time, price float32) {
-	GetDB().SetTibberPrice(vehicleID, ts.Year(), int(ts.Month()), ts.Day(), ts.Hour(), price)
+func SetTibberTestPrice(vin string, ts time.Time, price float32) {
+	GetDB().SetTibberPrice(vin, ts.Year(), int(ts.Month()), ts.Day(), ts.Hour(), price)
 }
 
 func GetNextMondayMidnight() time.Time {
