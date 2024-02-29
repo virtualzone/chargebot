@@ -159,32 +159,17 @@ func (db *DB) InitDBStructure() {
 	log.Println("Initializing database structure...")
 	_, err := db.GetConnection().Exec(`
 create table if not exists auth_codes(id text primary key, ts text);
-create table if not exists users(id text primary key, tesla_refresh_token text, tesla_user_id text default '');
-create table if not exists vehicles(vin text primary key, user_id text, display_name text, enabled int, target_soc int, max_amps int, surplus_charging int, min_surplus int, min_chargetime int, lowcost_charging int, max_price int, tibber_token text, num_phases int default 3, grid_provider text default 'tibber', grid_strategy int default 1, depart_days text default '12345', depart_time text default '07:00');
+create table if not exists users(id text primary key, tesla_refresh_token text, tesla_user_id text default '', home_lat real default 0.0, home_lng real default 0.0, home_radius real default 100);
+create table if not exists vehicles(vin text primary key, user_id text, display_name text, enabled int, target_soc int, max_amps int, surplus_charging int, min_surplus int, min_chargetime int, lowcost_charging int, max_price int, tibber_token text, num_phases int default 3, grid_provider text default 'tibber', grid_strategy int default 1, depart_days text default '12345', depart_time text default '07:00', telemetry_enroll_date string default '');
 create table if not exists api_tokens(token text primary key, user_id text, passhash text);
 create table if not exists surpluses(user_id string, ts text, surplus_watts int);
 create table if not exists logs(vehicle_vin text, ts text, event_id int, details text);
-create table if not exists vehicle_states(vehicle_vin text primary key, plugged_in int default 0, charging int default 0, soc int default -1, charge_amps int default 0);
+create table if not exists vehicle_states(vehicle_vin text primary key, plugged_in int default 0, charging int default 0, soc int default -1, charge_amps int default 0, charge_limit int default 0);
 create table if not exists tibber_prices(vehicle_vin text not null, hourstamp int not null, price real, primary key(vehicle_vin, hourstamp));
 create table if not exists grid_hourblocks(vehicle_vin int text null, hourstamp int not null, primary key(vehicle_vin, hourstamp));
 `)
 	if err != nil {
 		log.Panicln(err)
-	}
-	if _, err := db.GetConnection().Exec(`alter table vehicles add column telemetry_enroll_date string default ''`); err != nil {
-		log.Println(err)
-	}
-	if _, err := db.GetConnection().Exec(`alter table users add column home_lat real default 0.0`); err != nil {
-		log.Println(err)
-	}
-	if _, err := db.GetConnection().Exec(`alter table users add column home_lng real default 0.0`); err != nil {
-		log.Println(err)
-	}
-	if _, err := db.GetConnection().Exec(`alter table users add column home_radius real default 100`); err != nil {
-		log.Println(err)
-	}
-	if _, err := db.GetConnection().Exec(`alter table vehicle_states add column charge_limit int default 0`); err != nil {
-		log.Println(err)
 	}
 }
 
