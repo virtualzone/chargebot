@@ -31,7 +31,7 @@ func (t *VehicleStateTelemetry) updateVehicleState(telemetryState *TelemetryStat
 		log.Printf("could not find vehicle by vin for telemetry data: %s\n", telemetryState.VIN)
 		return
 	}
-	oldState := GetDB().GetVehicleState(vehicle.ID)
+	oldState := GetDB().GetVehicleState(vehicle.VIN)
 	if oldState == nil {
 		oldState = &VehicleState{
 			PluggedIn: false,
@@ -44,16 +44,16 @@ func (t *VehicleStateTelemetry) updateVehicleState(telemetryState *TelemetryStat
 	user := GetDB().GetUser(vehicle.UserID)
 
 	if oldState.Amps != telemetryState.Amps {
-		GetDB().SetVehicleStateAmps(vehicle.ID, telemetryState.Amps)
+		GetDB().SetVehicleStateAmps(vehicle.VIN, telemetryState.Amps)
 	}
 	if oldState.SoC != telemetryState.SoC {
-		GetDB().SetVehicleStateSoC(vehicle.ID, telemetryState.Amps)
+		GetDB().SetVehicleStateSoC(vehicle.VIN, telemetryState.Amps)
 	}
 	if oldState.ChargeLimit != telemetryState.ChargeLimit {
-		GetDB().SetVehicleStateChargeLimit(vehicle.ID, telemetryState.ChargeLimit)
+		GetDB().SetVehicleStateChargeLimit(vehicle.VIN, telemetryState.ChargeLimit)
 	}
 	if oldState.Charging != ChargeStateNotCharging && !telemetryState.Charging {
-		GetDB().SetVehicleStateCharging(vehicle.ID, ChargeStateNotCharging)
+		GetDB().SetVehicleStateCharging(vehicle.VIN, ChargeStateNotCharging)
 	}
 	if oldState.PluggedIn && !telemetryState.PluggedIn {
 		t.onVehicleUnplugged(vehicle, oldState)
@@ -65,31 +65,31 @@ func (t *VehicleStateTelemetry) updateVehicleState(telemetryState *TelemetryStat
 
 func (t *VehicleStateTelemetry) onVehicleUnplugged(vehicle *Vehicle, oldState *VehicleState) {
 	// vehicle got plugged out
-	GetDB().SetVehicleStatePluggedIn(vehicle.ID, false)
-	GetDB().LogChargingEvent(vehicle.ID, LogEventVehicleUnplug, "")
+	GetDB().SetVehicleStatePluggedIn(vehicle.VIN, false)
+	GetDB().LogChargingEvent(vehicle.VIN, LogEventVehicleUnplug, "")
 	if oldState != nil && oldState.Charging != ChargeStateNotCharging {
 		// Vehicle got unplugged while charging
-		GetDB().SetVehicleStateCharging(vehicle.ID, ChargeStateNotCharging)
-		GetDB().SetVehicleStateAmps(vehicle.ID, 0)
+		GetDB().SetVehicleStateCharging(vehicle.VIN, ChargeStateNotCharging)
+		GetDB().SetVehicleStateAmps(vehicle.VIN, 0)
 	}
 }
 
 func (t *VehicleStateTelemetry) onVehiclePluggedIn(vehicle *Vehicle) {
 	// vehicle got plugged in at home
-	GetDB().SetVehicleStatePluggedIn(vehicle.ID, true)
-	GetDB().LogChargingEvent(vehicle.ID, LogEventVehiclePlugIn, "")
+	GetDB().SetVehicleStatePluggedIn(vehicle.VIN, true)
+	GetDB().LogChargingEvent(vehicle.VIN, LogEventVehiclePlugIn, "")
 	if vehicle.Enabled {
 		go func() {
 			// wait a few moments to ensure vehicle is online
 			time.Sleep(10 * time.Second)
 			car, err := GetTeslaAPI().InitSession(vehicle, false)
 			if err != nil {
-				log.Printf("could not init session for vehicle %d on plug in: %s\n", vehicle.ID, err.Error())
+				log.Printf("could not init session for vehicle %s on plug in: %s\n", vehicle.VIN, err.Error())
 				return
 			}
 			time.Sleep(5 * time.Second)
 			if err := GetTeslaAPI().ChargeStop(car); err != nil {
-				log.Printf("could not stop charging for vehicle %d on plug in: %s\n", vehicle.ID, err.Error())
+				log.Printf("could not stop charging for vehicle %s on plug in: %s\n", vehicle.VIN, err.Error())
 			}
 		}()
 	}

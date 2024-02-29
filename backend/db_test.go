@@ -10,12 +10,12 @@ import (
 func TestDB_SetVehicleStates(t *testing.T) {
 	t.Cleanup(ResetTestDB)
 
-	GetDB().SetVehicleStateCharging(123, ChargeStateChargingOnSolar)
-	GetDB().SetVehicleStateAmps(123, 5)
-	GetDB().SetVehicleStatePluggedIn(123, true)
-	GetDB().SetVehicleStateSoC(123, 55)
+	GetDB().SetVehicleStateCharging("123", ChargeStateChargingOnSolar)
+	GetDB().SetVehicleStateAmps("123", 5)
+	GetDB().SetVehicleStatePluggedIn("123", true)
+	GetDB().SetVehicleStateSoC("123", 55)
 
-	state := GetDB().GetVehicleState(123)
+	state := GetDB().GetVehicleState("123")
 	assert.NotNil(t, state)
 	assert.Equal(t, ChargeStateChargingOnSolar, state.Charging)
 	assert.Equal(t, 5, state.Amps)
@@ -58,9 +58,8 @@ func TestDB_CRUDVehicle(t *testing.T) {
 	t.Cleanup(ResetTestDB)
 
 	vehicle := &Vehicle{
-		ID:              123,
-		UserID:          "456",
 		VIN:             "789",
+		UserID:          "456",
 		DisplayName:     "Model S",
 		APIToken:        "",
 		Enabled:         true,
@@ -80,12 +79,12 @@ func TestDB_CRUDVehicle(t *testing.T) {
 	}
 	GetDB().CreateUpdateVehicle(vehicle)
 
-	vehicle2 := GetDB().GetVehicleByID(vehicle.ID)
+	vehicle2 := GetDB().GetVehicleByVIN(vehicle.VIN)
 	assert.NotNil(t, vehicle2)
 	assert.EqualValues(t, vehicle, vehicle2)
 
 	token := GetDB().CreateAPIToken(vehicle.UserID, "pass1234")
-	vehicle2 = GetDB().GetVehicleByID(vehicle.ID)
+	vehicle2 = GetDB().GetVehicleByVIN(vehicle.VIN)
 	assert.Equal(t, token, vehicle2.APIToken)
 
 	assert.True(t, GetDB().IsTokenPasswordValid(token, "pass1234"))
@@ -98,17 +97,17 @@ func TestDB_CRUDVehicle(t *testing.T) {
 	userID := GetDB().GetAPITokenUserID(token)
 	assert.Equal(t, vehicle.UserID, userID)
 
-	GetDB().DeleteVehicle(vehicle.ID)
-	vehicle2 = GetDB().GetVehicleByID(vehicle.ID)
+	GetDB().DeleteVehicle(vehicle.VIN)
+	vehicle2 = GetDB().GetVehicleByVIN(vehicle.VIN)
 	assert.Nil(t, vehicle2)
 }
 
 func TestDB_GetVehicles(t *testing.T) {
 	t.Cleanup(ResetTestDB)
 
-	v1 := &Vehicle{ID: 1, UserID: "a", DisplayName: "V 1"}
-	v2 := &Vehicle{ID: 2, UserID: "a", DisplayName: "V 2"}
-	v3 := &Vehicle{ID: 3, UserID: "b", DisplayName: "V 3"}
+	v1 := &Vehicle{VIN: "1", UserID: "a", DisplayName: "V 1"}
+	v2 := &Vehicle{VIN: "2", UserID: "a", DisplayName: "V 2"}
+	v3 := &Vehicle{VIN: "3", UserID: "b", DisplayName: "V 3"}
 
 	GetDB().CreateUpdateVehicle(v1)
 	GetDB().CreateUpdateVehicle(v2)
@@ -122,19 +121,19 @@ func TestDB_GetVehicles(t *testing.T) {
 	assert.Len(t, l2, 1)
 	assert.Len(t, l3, 3)
 
-	assert.Equal(t, v1.ID, l1[0].ID)
-	assert.Equal(t, v2.ID, l1[1].ID)
+	assert.Equal(t, v1.VIN, l1[0].VIN)
+	assert.Equal(t, v2.VIN, l1[1].VIN)
 
-	assert.Equal(t, v3.ID, l2[0].ID)
+	assert.Equal(t, v3.VIN, l2[0].VIN)
 
-	assert.Equal(t, v1.ID, l3[0].ID)
-	assert.Equal(t, v2.ID, l3[1].ID)
-	assert.Equal(t, v3.ID, l3[2].ID)
+	assert.Equal(t, v1.VIN, l3[0].VIN)
+	assert.Equal(t, v2.VIN, l3[1].VIN)
+	assert.Equal(t, v3.VIN, l3[2].VIN)
 }
 
 func TestDB_CRUDVehicleState(t *testing.T) {
 	t.Cleanup(ResetTestDB)
-	vehicleID := 123
+	vehicleID := "123"
 
 	state := GetDB().GetVehicleState(vehicleID)
 	assert.Nil(t, state)
@@ -146,7 +145,7 @@ func TestDB_CRUDVehicleState(t *testing.T) {
 
 	state = GetDB().GetVehicleState(vehicleID)
 	assert.NotNil(t, state)
-	assert.Equal(t, vehicleID, state.VehicleID)
+	assert.Equal(t, vehicleID, state.VIN)
 	assert.Equal(t, true, state.PluggedIn)
 	assert.Equal(t, ChargeStateChargingOnGrid, state.Charging)
 	assert.Equal(t, 22, state.SoC)
@@ -159,7 +158,7 @@ func TestDB_CRUDVehicleState(t *testing.T) {
 
 	state = GetDB().GetVehicleState(vehicleID)
 	assert.NotNil(t, state)
-	assert.Equal(t, vehicleID, state.VehicleID)
+	assert.Equal(t, vehicleID, state.VIN)
 	assert.Equal(t, false, state.PluggedIn)
 	assert.Equal(t, ChargeStateNotCharging, state.Charging)
 	assert.Equal(t, 23, state.SoC)
@@ -169,28 +168,28 @@ func TestDB_CRUDVehicleState(t *testing.T) {
 func TestDB_IsUserOwnerOfVehicle(t *testing.T) {
 	t.Cleanup(ResetTestDB)
 
-	v1 := &Vehicle{ID: 1, UserID: "a", DisplayName: "V 1"}
-	v2 := &Vehicle{ID: 2, UserID: "a", DisplayName: "V 2"}
-	v3 := &Vehicle{ID: 3, UserID: "b", DisplayName: "V 3"}
+	v1 := &Vehicle{VIN: "1", UserID: "a", DisplayName: "V 1"}
+	v2 := &Vehicle{VIN: "2", UserID: "a", DisplayName: "V 2"}
+	v3 := &Vehicle{VIN: "3", UserID: "b", DisplayName: "V 3"}
 
 	GetDB().CreateUpdateVehicle(v1)
 	GetDB().CreateUpdateVehicle(v2)
 	GetDB().CreateUpdateVehicle(v3)
 
-	assert.True(t, GetDB().IsUserOwnerOfVehicle("a", 1))
-	assert.True(t, GetDB().IsUserOwnerOfVehicle("a", 2))
-	assert.True(t, GetDB().IsUserOwnerOfVehicle("b", 3))
+	assert.True(t, GetDB().IsUserOwnerOfVehicle("a", "1"))
+	assert.True(t, GetDB().IsUserOwnerOfVehicle("a", "2"))
+	assert.True(t, GetDB().IsUserOwnerOfVehicle("b", "3"))
 
-	assert.False(t, GetDB().IsUserOwnerOfVehicle("b", 1))
-	assert.False(t, GetDB().IsUserOwnerOfVehicle("b", 2))
-	assert.False(t, GetDB().IsUserOwnerOfVehicle("a", 3))
+	assert.False(t, GetDB().IsUserOwnerOfVehicle("b", "1"))
+	assert.False(t, GetDB().IsUserOwnerOfVehicle("b", "2"))
+	assert.False(t, GetDB().IsUserOwnerOfVehicle("a", "3"))
 }
 
 func TestDB_GetVehicleIDsWithTibberTokenWithoutPricesForTomorrow(t *testing.T) {
 	t.Cleanup(ResetTestDB)
 
 	v := &Vehicle{
-		ID:           1,
+		VIN:          "1",
 		UserID:       "a",
 		DisplayName:  "V 1",
 		GridProvider: GridProviderTibber,
@@ -201,13 +200,13 @@ func TestDB_GetVehicleIDsWithTibberTokenWithoutPricesForTomorrow(t *testing.T) {
 	now := time.Now().UTC()
 	now = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 	for i := 0; i <= 22; i++ {
-		SetTibberTestPrice(v.ID, now.Add(time.Hour*time.Duration(i)), 0.32) // 00:00
+		SetTibberTestPrice(v.VIN, now.Add(time.Hour*time.Duration(i)), 0.32) // 00:00
 	}
 
-	l := GetDB().GetVehicleIDsWithTibberTokenWithoutPricesForTomorrow(45)
+	l := GetDB().GetVehicleVINsWithTibberTokenWithoutPricesForTomorrow(45)
 	assert.NotNil(t, l)
 	assert.Len(t, l, 1)
-	assert.Equal(t, v.ID, l[0])
+	assert.Equal(t, v.VIN, l[0])
 }
 
 func TestDB_encrypt(t *testing.T) {

@@ -48,7 +48,7 @@ func (c *ChargeController) OnTick() {
 }
 
 func (c *ChargeController) processVehicle(vehicle *Vehicle) {
-	state := GetDB().GetVehicleState(vehicle.ID)
+	state := GetDB().GetVehicleState(vehicle.VIN)
 	if state == nil {
 		// no state yet, so nothing to do
 		return
@@ -85,20 +85,20 @@ func (c *ChargeController) processVehicle(vehicle *Vehicle) {
 func (c *ChargeController) stopCharging(vehicle *Vehicle) {
 	car, err := GetTeslaAPI().InitSession(vehicle, true)
 	if err != nil {
-		GetDB().LogChargingEvent(vehicle.ID, LogEventChargeStop, fmt.Sprintf("could not init session with car: %s", err.Error()))
+		GetDB().LogChargingEvent(vehicle.VIN, LogEventChargeStop, fmt.Sprintf("could not init session with car: %s", err.Error()))
 		return
 	}
 
 	time.Sleep(DelayBetweenAPICommands) // delay
 
 	if err := GetTeslaAPI().ChargeStop(car); err != nil {
-		GetDB().LogChargingEvent(vehicle.ID, LogEventChargeStop, fmt.Sprintf("could not stop charging: %s", err.Error()))
+		GetDB().LogChargingEvent(vehicle.VIN, LogEventChargeStop, fmt.Sprintf("could not stop charging: %s", err.Error()))
 		return
 	}
 
-	GetDB().SetVehicleStateCharging(vehicle.ID, ChargeStateNotCharging)
-	GetDB().SetVehicleStateAmps(vehicle.ID, 0)
-	GetDB().LogChargingEvent(vehicle.ID, LogEventChargeStop, "charging stopped")
+	GetDB().SetVehicleStateCharging(vehicle.VIN, ChargeStateNotCharging)
+	GetDB().SetVehicleStateAmps(vehicle.VIN, 0)
+	GetDB().LogChargingEvent(vehicle.VIN, LogEventChargeStop, "charging stopped")
 }
 
 func (c *ChargeController) checkTargetState(vehicle *Vehicle, state *VehicleState) (ChargeState, int) {
@@ -135,41 +135,41 @@ func (c *ChargeController) checkStartCharging(vehicle *Vehicle, state *VehicleSt
 func (c *ChargeController) activateCharging(vehicle *Vehicle, state *VehicleState, amps int, source ChargeState) bool {
 	car, err := GetTeslaAPI().InitSession(vehicle, true)
 	if err != nil {
-		GetDB().LogChargingEvent(vehicle.ID, LogEventWakeVehicle, "could not wake vehicle: "+err.Error())
+		GetDB().LogChargingEvent(vehicle.VIN, LogEventWakeVehicle, "could not wake vehicle: "+err.Error())
 		return false
 	}
-	GetDB().LogChargingEvent(vehicle.ID, LogEventWakeVehicle, "")
+	GetDB().LogChargingEvent(vehicle.VIN, LogEventWakeVehicle, "")
 
 	time.Sleep(DelayBetweenAPICommands) // delay
 
 	// set the charge limit
 	if state.ChargeLimit != vehicle.TargetSoC {
 		if err := GetTeslaAPI().SetChargeLimit(car, vehicle.TargetSoC); err != nil {
-			GetDB().LogChargingEvent(vehicle.ID, LogEventSetTargetSoC, "could not set target SoC: "+err.Error())
+			GetDB().LogChargingEvent(vehicle.VIN, LogEventSetTargetSoC, "could not set target SoC: "+err.Error())
 			return false
 		}
-		GetDB().LogChargingEvent(vehicle.ID, LogEventSetTargetSoC, fmt.Sprintf("target SoC set to %d", vehicle.TargetSoC))
+		GetDB().LogChargingEvent(vehicle.VIN, LogEventSetTargetSoC, fmt.Sprintf("target SoC set to %d", vehicle.TargetSoC))
 		time.Sleep(DelayBetweenAPICommands) // delay
 	}
 
 	// set amps to charge
 	if state.Amps != amps {
 		if err := GetTeslaAPI().SetChargeAmps(car, amps); err != nil {
-			GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, "could not set charge amps: "+err.Error())
+			GetDB().LogChargingEvent(vehicle.VIN, LogEventSetChargingAmps, "could not set charge amps: "+err.Error())
 			return false
 		}
-		GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, fmt.Sprintf("charge amps set to %d", amps))
+		GetDB().LogChargingEvent(vehicle.VIN, LogEventSetChargingAmps, fmt.Sprintf("charge amps set to %d", amps))
 		time.Sleep(DelayBetweenAPICommands) // delay
 	}
 
 	if err := GetTeslaAPI().ChargeStart(car); err != nil {
-		GetDB().LogChargingEvent(vehicle.ID, LogEventChargeStart, "could not start charging: "+err.Error())
+		GetDB().LogChargingEvent(vehicle.VIN, LogEventChargeStart, "could not start charging: "+err.Error())
 		return false
 	}
-	GetDB().LogChargingEvent(vehicle.ID, LogEventChargeStart, "")
+	GetDB().LogChargingEvent(vehicle.VIN, LogEventChargeStart, "")
 
-	GetDB().SetVehicleStateAmps(vehicle.ID, amps)
-	GetDB().SetVehicleStateCharging(vehicle.ID, source)
+	GetDB().SetVehicleStateAmps(vehicle.VIN, amps)
+	GetDB().SetVehicleStateCharging(vehicle.VIN, source)
 
 	// charging should start now
 	return true
@@ -182,13 +182,13 @@ func (c *ChargeController) checkStartOnSolar(vehicle *Vehicle, state *VehicleSta
 
 	surplus := c.getActualSurplus(vehicle, state)
 	if surplus <= 0 {
-		LogDebug(fmt.Sprintf("checkStartOnSolar() - no current surplus for vehicle %d", vehicle.ID))
+		LogDebug(fmt.Sprintf("checkStartOnSolar() - no current surplus for vehicle %s", vehicle.VIN))
 		return false, 0
 	}
 
 	// check if surplus minimum is reached
 	if surplus < vehicle.MinSurplus {
-		LogDebug(fmt.Sprintf("checkStartOnSolar() - too low surplus %d for vehicle %d", surplus, vehicle.ID))
+		LogDebug(fmt.Sprintf("checkStartOnSolar() - too low surplus %d for vehicle %s", surplus, vehicle.VIN))
 		return false, 0
 	}
 
@@ -200,7 +200,7 @@ func (c *ChargeController) checkStartOnSolar(vehicle *Vehicle, state *VehicleSta
 	if amps > vehicle.MaxAmps {
 		amps = vehicle.MaxAmps
 	}
-	LogDebug(fmt.Sprintf("checkStartOnSolar() - encourage %d amps for vehicle %d", amps, vehicle.ID))
+	LogDebug(fmt.Sprintf("checkStartOnSolar() - encourage %d amps for vehicle %s", amps, vehicle.VIN))
 
 	return true, amps
 }
@@ -219,7 +219,7 @@ func (c *ChargeController) getEstimatedChargeDurationMinutes(vehicle *Vehicle, s
 
 func (c *ChargeController) getUpcomingGridPrices(vehicle *Vehicle) []*GridPrice {
 	if vehicle.GridProvider == GridProviderTibber {
-		prices := GetDB().GetUpcomingTibberPrices(vehicle.ID, true)
+		prices := GetDB().GetUpcomingTibberPrices(vehicle.VIN, true)
 		return prices
 	}
 	return []*GridPrice{}
@@ -227,7 +227,7 @@ func (c *ChargeController) getUpcomingGridPrices(vehicle *Vehicle) []*GridPrice 
 
 func (c *ChargeController) checkStartOnGrid_NoDeparturePriceLimit(vehicle *Vehicle, state *VehicleState, prices []*GridPrice) bool {
 	now := c.Time.UTCNow()
-	if GetDB().IsSelectedGridHourblock(vehicle.ID, now.Year(), int(now.Month()), now.Day(), now.Hour()) {
+	if GetDB().IsSelectedGridHourblock(vehicle.VIN, now.Year(), int(now.Month()), now.Day(), now.Hour()) {
 		return true
 	}
 
@@ -258,7 +258,7 @@ func (c *ChargeController) checkStartOnGrid_NoDeparturePriceLimit(vehicle *Vehic
 			now := c.Time.UTCNow()
 			if IsCurrentHourUTC(&now, &price.StartsAt) {
 				if price.Total*100 <= float32(vehicle.MaxPrice) {
-					GetDB().RecordSelectedGridHourblock(vehicle.ID, now.Year(), int(now.Month()), now.Day(), now.Hour())
+					GetDB().RecordSelectedGridHourblock(vehicle.VIN, now.Year(), int(now.Month()), now.Day(), now.Hour())
 					return true
 				}
 			}
@@ -310,12 +310,12 @@ func (c *ChargeController) getNextDeparture(vehicle *Vehicle) (*time.Time, error
 func (c *ChargeController) checkStartOnGrid_DepartureNoPriceLimit(vehicle *Vehicle, state *VehicleState, prices []*GridPrice) bool {
 	departure, err := c.getNextDeparture(vehicle)
 	if err != nil {
-		log.Printf("could not get next departure date for vehicle %d: %s\n", vehicle.ID, err.Error())
+		log.Printf("could not get next departure date for vehicle %s: %s\n", vehicle.VIN, err.Error())
 		return false
 	}
 
 	now := c.Time.UTCNow()
-	if GetDB().IsSelectedGridHourblock(vehicle.ID, now.Year(), int(now.Month()), now.Day(), now.Hour()) {
+	if GetDB().IsSelectedGridHourblock(vehicle.VIN, now.Year(), int(now.Month()), now.Day(), now.Hour()) {
 		return true
 	}
 
@@ -335,7 +335,7 @@ func (c *ChargeController) checkStartOnGrid_DepartureNoPriceLimit(vehicle *Vehic
 	for i, price := range pricesFiltered {
 		if i+1 <= requiredHourBlocks {
 			if IsCurrentHourUTC(&now, &price.StartsAt) {
-				GetDB().RecordSelectedGridHourblock(vehicle.ID, now.Year(), int(now.Month()), now.Day(), now.Hour())
+				GetDB().RecordSelectedGridHourblock(vehicle.VIN, now.Year(), int(now.Month()), now.Day(), now.Hour())
 				return true
 			}
 		}
@@ -347,12 +347,12 @@ func (c *ChargeController) checkStartOnGrid_DepartureNoPriceLimit(vehicle *Vehic
 func (c *ChargeController) checkStartOnGrid_DepartureWithPriceLimit(vehicle *Vehicle, state *VehicleState, prices []*GridPrice) bool {
 	departure, err := c.getNextDeparture(vehicle)
 	if err != nil {
-		log.Printf("could not get next departure date for vehicle %d: %s\n", vehicle.ID, err.Error())
+		log.Printf("could not get next departure date for vehicle %s: %s\n", vehicle.VIN, err.Error())
 		return false
 	}
 
 	now := c.Time.UTCNow()
-	if GetDB().IsSelectedGridHourblock(vehicle.ID, now.Year(), int(now.Month()), now.Day(), now.Hour()) {
+	if GetDB().IsSelectedGridHourblock(vehicle.VIN, now.Year(), int(now.Month()), now.Day(), now.Hour()) {
 		return true
 	}
 
@@ -385,7 +385,7 @@ func (c *ChargeController) checkStartOnGrid_DepartureWithPriceLimit(vehicle *Veh
 		if i+1 <= requiredHourBlocks {
 			if IsCurrentHourUTC(&now, &price.StartsAt) {
 				if price.Total*100 <= float32(vehicle.MaxPrice) {
-					GetDB().RecordSelectedGridHourblock(vehicle.ID, now.Year(), int(now.Month()), now.Day(), now.Hour())
+					GetDB().RecordSelectedGridHourblock(vehicle.VIN, now.Year(), int(now.Month()), now.Day(), now.Hour())
 					return true
 				}
 			}
@@ -395,7 +395,7 @@ func (c *ChargeController) checkStartOnGrid_DepartureWithPriceLimit(vehicle *Veh
 	for i, price := range pricesFiltered {
 		if i+1 <= requiredHourBlocks {
 			if IsCurrentHourUTC(&now, &price.StartsAt) {
-				GetDB().RecordSelectedGridHourblock(vehicle.ID, now.Year(), int(now.Month()), now.Day(), now.Hour())
+				GetDB().RecordSelectedGridHourblock(vehicle.VIN, now.Year(), int(now.Month()), now.Day(), now.Hour())
 				return true
 			}
 		}
@@ -462,19 +462,8 @@ func (c *ChargeController) getCurrentGridPrice(prices []*GridPrice) *GridPrice {
 	return nil
 }
 
-/*
-func (c *ChargeController) canUpdateVehicleData(vehicleID int) bool {
-	event := GetDB().GetLatestChargingEvent(vehicleID, LogEventVehicleUpdateData)
-	if event == nil {
-		return true
-	}
-	limit := c.Time.UTCNow().Add(time.Minute * time.Duration(MaxVehicleDataUpdateIntervalMinutes) * -1)
-	return event.Timestamp.Before(limit)
-}
-*/
-
 func (c *ChargeController) minimumChargeTimeReached(vehicle *Vehicle, state *VehicleState) bool {
-	event := GetDB().GetLatestChargingEvent(vehicle.ID, LogEventChargeStart)
+	event := GetDB().GetLatestChargingEvent(vehicle.VIN, LogEventChargeStart)
 	if event == nil {
 		return true
 	}
@@ -491,7 +480,7 @@ func (c *ChargeController) canAdjustSolarAmps(vehicle *Vehicle) bool {
 		return false
 	}
 	surplus := surpluses[0]
-	ampsEvent := GetDB().GetLatestChargingEvent(vehicle.ID, LogEventSetChargingAmps)
+	ampsEvent := GetDB().GetLatestChargingEvent(vehicle.VIN, LogEventSetChargingAmps)
 	if ampsEvent == nil {
 		return false
 	}
@@ -528,13 +517,13 @@ func (c *ChargeController) chargeProcessAdjustSolarAmps(vehicle *Vehicle, state 
 		if c.canAdjustSolarAmps(vehicle) {
 			car, err := GetTeslaAPI().InitSession(vehicle, true)
 			if err != nil {
-				GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, fmt.Sprintf("could not init session with car: %s", err.Error()))
+				GetDB().LogChargingEvent(vehicle.VIN, LogEventSetChargingAmps, fmt.Sprintf("could not init session with car: %s", err.Error()))
 			} else {
 				if err := GetTeslaAPI().SetChargeAmps(car, targetAmps); err != nil {
-					GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, "could not set charge amps: "+err.Error())
+					GetDB().LogChargingEvent(vehicle.VIN, LogEventSetChargingAmps, "could not set charge amps: "+err.Error())
 				} else {
-					GetDB().SetVehicleStateAmps(vehicle.ID, targetAmps)
-					GetDB().LogChargingEvent(vehicle.ID, LogEventSetChargingAmps, fmt.Sprintf("charge amps set to %d", targetAmps))
+					GetDB().SetVehicleStateAmps(vehicle.VIN, targetAmps)
+					GetDB().LogChargingEvent(vehicle.VIN, LogEventSetChargingAmps, fmt.Sprintf("charge amps set to %d", targetAmps))
 				}
 			}
 		}
@@ -550,13 +539,13 @@ func (c *ChargeController) checkChargeProcess(vehicle *Vehicle, state *VehicleSt
 
 	// check how the new charging state should be
 	targetState, targetAmps := c.checkTargetState(vehicle, state)
-	LogDebug(fmt.Sprintf("checkChargeProcess() - target state %d with %d amps for vehicle %d", targetState, targetAmps, vehicle.ID))
+	LogDebug(fmt.Sprintf("checkChargeProcess() - target state %d with %d amps for vehicle %s", targetState, targetAmps, vehicle.VIN))
 
 	c.chargeProcessAdjustSolarAmps(vehicle, state, targetAmps)
 
 	// if minimum charge time is not reached, do nothing
 	if !c.minimumChargeTimeReached(vehicle, state) {
-		LogDebug(fmt.Sprintf("checkChargeProcess() - min charge time not reached for vehicle %d", vehicle.ID))
+		LogDebug(fmt.Sprintf("checkChargeProcess() - min charge time not reached for vehicle %s", vehicle.VIN))
 		return
 	}
 

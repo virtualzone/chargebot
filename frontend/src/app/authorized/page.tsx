@@ -64,9 +64,9 @@ export default function PageAuthorized() {
     fetchData();
   }, []);
 
-  function selectVehicle(id: number) {
-    console.log("/vehicle/?id=" + id);
-    router.push("/vehicle/?id=" + id);
+  function selectVehicle(vin: string) {
+    console.log("/vehicle/?vin=" + vin);
+    router.push("/vehicle/?vin=" + vin);
   }
 
   async function linkTeslaAccount() {
@@ -152,7 +152,7 @@ export default function PageAuthorized() {
         <ListGroup className="mb-5">
           {(vehicles as any[]).map(e => {
             return (
-              <ListGroup.Item action={true} onClick={() => selectVehicle(e.id)} key={e.id}>
+              <ListGroup.Item action={true} onClick={() => selectVehicle(e.vin)} key={e.id}>
                 <strong>{e.display_name}</strong>
                 <br />
                 {e.vin}
@@ -167,10 +167,8 @@ export default function PageAuthorized() {
   }
 
 
-  let code1 = "curl --header 'Content-Type: application/json' --data '{\"password\": \"\", \"surplus_watts\": 1500}' https://chargebot.io/api/1/user/" + apiToken + "/{vehicleID}/surplus";
-  let code2 = "curl --header 'Content-Type: application/json' --data '{\"password\": \"\", \"inverter_active_power_watts\": 2000, \"consumption_watts\": 200}' https://chargebot.io/api/1/user/" + apiToken + "/{vehicleID}/surplus";
-  let code3 = "curl --header 'Content-Type: application/json' --data '{\"password\": \"\"}' https://chargebot.io/api/1/user/" + apiToken + "/{vehicleID}/plugged_in";
-  let code4 = "curl --header 'Content-Type: application/json' --data '{\"password\": \"\"}' https://chargebot.io/api/1/user/" + apiToken + "/{vehicleID}/unplugged";
+  let code1 = "curl --header 'Content-Type: application/json' --data '{\"password\": \"\", \"surplus_watts\": 1500}' https://chargebot.io/api/1/user/" + apiToken + "/surplus";
+  let code2 = "curl --header 'Content-Type: application/json' --data '{\"password\": \"\", \"inverter_active_power_watts\": 2000, \"consumption_watts\": 200}' https://chargebot.io/api/1/user/" + apiToken + "/surplus";
   let tokenHelp = (
     <Modal show={showTokenHelp} onHide={() => setShowTokenHelp(false)}>
       <Modal.Header closeButton>
@@ -183,11 +181,6 @@ export default function PageAuthorized() {
         <CopyBlock text={code1} language="bash" wrapLongLines={true} showLineNumbers={false} />
         <p>Alternatively, you can push your current inverter active power and your household&apos;s consumption separately:</p>
         <CopyBlock text={code2} language="bash" wrapLongLines={true} showLineNumbers={false} />
-        <h5 style={{ 'marginTop': "25px" }}>Update plugged in status</h5>
-        <p>If your vehicles gets plugged in:</p>
-        <CopyBlock text={code3} language="bash" wrapLongLines={true} showLineNumbers={false} />
-        <p>If your vehicles gets unplugged:</p>
-        <CopyBlock text={code4} language="bash" wrapLongLines={true} showLineNumbers={false} />
       </Modal.Body>
     </Modal>
   );

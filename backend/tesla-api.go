@@ -65,7 +65,7 @@ type TeslaAPIChargeState struct {
 }
 
 type TeslaAPIVehicleData struct {
-	VehicleID   int                 `json:"vehicle_id"`
+	VIN         string              `json:"vin"`
 	ChargeState TeslaAPIChargeState `json:"charge_state"`
 }
 
