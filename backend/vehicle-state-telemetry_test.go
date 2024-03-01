@@ -13,8 +13,7 @@ func TestVehicleStateTelemetry_getDistanceFromLatLonInMeters(t *testing.T) {
 	lat2 := 50.10953
 	lon2 := 8.67398
 
-	s := new(VehicleStateTelemetry)
-	res := s.getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2)
+	res := getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2)
 	assert.Equal(t, 135, res)
 }
 
@@ -25,7 +24,6 @@ func TestVehicleStateTelemetry_getDistanceFromLatLonInMeters_reverse(t *testing.
 	lat2 := 50.10953
 	lon2 := 8.67398
 
-	s := new(VehicleStateTelemetry)
-	res := s.getDistanceFromLatLonInMeters(lat2, lon2, lat1, lon1)
+	res := getDistanceFromLatLonInMeters(lat2, lon2, lat1, lon1)
 	assert.Equal(t, 135, res)
 }

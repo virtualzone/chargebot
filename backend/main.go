@@ -27,6 +27,11 @@ func main() {
 	NewChargeController().Init()
 	InitPeriodicPriceUpdateControl()
 	InitHTTPRouter()
+	/*
+		GetTeslaAPI().CreateTelemetryConfig(GetDB().GetVehicleByVIN("LRWYGCEKXNC461719"))
+			time.Sleep(5 * time.Second)
+			GetTeslaAPI().GetTelemetryConfig(GetDB().GetVehicleByVIN("LRWYGCEKXNC461719"))
+	*/
 	ServeRPC()
 	ServeHTTP()
 	os.Exit(0)
