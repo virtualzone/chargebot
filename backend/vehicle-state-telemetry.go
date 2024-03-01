@@ -47,7 +47,7 @@ func (t *VehicleStateTelemetry) updateVehicleState(telemetryState *TelemetryStat
 		GetDB().SetVehicleStateAmps(vehicle.VIN, telemetryState.Amps)
 	}
 	if oldState.SoC != telemetryState.SoC {
-		GetDB().SetVehicleStateSoC(vehicle.VIN, telemetryState.Amps)
+		GetDB().SetVehicleStateSoC(vehicle.VIN, telemetryState.SoC)
 	}
 	if oldState.ChargeLimit != telemetryState.ChargeLimit {
 		GetDB().SetVehicleStateChargeLimit(vehicle.VIN, telemetryState.ChargeLimit)
