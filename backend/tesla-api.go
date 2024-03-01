@@ -366,6 +366,8 @@ func (a *TeslaAPIImpl) CreateTelemetryConfig(vehicle *Vehicle) error {
 				"Location":       {IntervalSeconds: 60},
 				"ChargeLimitSoc": {IntervalSeconds: 60},
 				"ChargeAmps":     {IntervalSeconds: 60},
+				"ChargeEnableRequest":     {IntervalSeconds: 60},
+				"BMSState": {IntervalSeconds: 60},
 			},
 			AlertTypes: []string{"service"},
 		},
