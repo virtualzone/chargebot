@@ -158,9 +158,6 @@ func (router *TeslaRouter) updateVehicle(w http.ResponseWriter, r *http.Request)
 				return
 			}
 			UpdateVehicleDataSaveSoC(e)
-			if err := GetTeslaAPI().SetChargeLimit(car, 50); err != nil {
-				log.Printf("could not set charge limit for vehicle %s on plug in: %s\n", e.VIN, err.Error())
-			}
 			time.Sleep(5 * time.Second)
 			if err := GetTeslaAPI().ChargeStop(car); err != nil {
 				log.Printf("could not stop charging for vehicle %s on plug in: %s\n", e.VIN, err.Error())
