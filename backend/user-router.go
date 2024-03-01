@@ -24,6 +24,8 @@ type PlugInOutRequest struct {
 
 func (router *UserRouter) SetupRoutes(s *mux.Router) {
 	s.HandleFunc("/{token}/surplus", router.recordSurplus).Methods("POST")
+	s.HandleFunc("/{token}/{vin}/plugged_in", router.vehiclePluggedIn).Methods("POST")
+	s.HandleFunc("/{token}/{vin}/unplugged", router.vehicleUnplugged).Methods("POST")
 }
 
 func (router *UserRouter) recordSurplus(w http.ResponseWriter, r *http.Request) {
@@ -56,4 +58,50 @@ func (router *UserRouter) recordSurplus(w http.ResponseWriter, r *http.Request) 
 
 	GetDB().RecordSurplus(userID, surplus)
 	SendJSON(w, true)
+}
+
+func (router *UserRouter) updateVehiclePlugState(w http.ResponseWriter, r *http.Request, pluggedIn bool) {
+	vars := mux.Vars(r)
+	token := vars["token"]
+	vin := vars["vin"]
+
+	var m *SurplusRecordingRequest
+	if err := UnmarshalBody(r.Body, &m); err != nil {
+		SendBadRequest(w)
+		return
+	}
+
+	if !GetDB().IsTokenPasswordValid(token, m.Password) {
+		SendUnauthorized(w)
+		return
+	}
+
+	userID := GetDB().GetAPITokenUserID(token)
+	if userID == "" {
+		SendBadRequest(w)
+		return
+	}
+
+	if !GetDB().IsUserOwnerOfVehicle(userID, vin) {
+		SendForbidden(w)
+		return
+	}
+
+	vehicle := GetDB().GetVehicleByVIN(vin)
+
+	if pluggedIn && vehicle.Enabled {
+		OnVehiclePluggedIn(vehicle)
+	}
+	if !pluggedIn && vehicle.Enabled {
+		state := GetDB().GetVehicleState(vehicle.VIN)
+		OnVehicleUnplugged(vehicle, state)
+	}
+}
+
+func (router *UserRouter) vehiclePluggedIn(w http.ResponseWriter, r *http.Request) {
+	router.updateVehiclePlugState(w, r, true)
+}
+
+func (router *UserRouter) vehicleUnplugged(w http.ResponseWriter, r *http.Request) {
+	router.updateVehiclePlugState(w, r, false)
 }

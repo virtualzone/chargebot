@@ -361,15 +361,12 @@ func (a *TeslaAPIImpl) CreateTelemetryConfig(vehicle *Vehicle) error {
 			CA:         GetConfig().TeslaTelemetryCA,
 			Expiration: time.Now().UTC().AddDate(0, 10, 0).Unix(),
 			Fields: map[string]TeslaAPITelemetryField{
-				"ChargeState":    {IntervalSeconds: 60},
-				"Soc":            {IntervalSeconds: 60},
-				"Location":       {IntervalSeconds: 60},
-				"ChargeLimitSoc": {IntervalSeconds: 60},
-				"ChargeAmps":     {IntervalSeconds: 60},
-				"ChargeEnableRequest":     {IntervalSeconds: 60},
-				"BMSState": {IntervalSeconds: 60},
+				"ChargeState":     {IntervalSeconds: 60},
+				"Soc":             {IntervalSeconds: 60},
+				"Location":        {IntervalSeconds: 60},
+				"ChargeLimitSoc":  {IntervalSeconds: 60},
+				"ChargeAmps":      {IntervalSeconds: 60},
 				"ChargePortLatch": {IntervalSeconds: 60},
-    "ChargerPhases": {IntervalSeconds: 60},
 			},
 			AlertTypes: []string{"service"},
 		},
@@ -383,11 +380,14 @@ func (a *TeslaAPIImpl) CreateTelemetryConfig(vehicle *Vehicle) error {
 	target := GetConfig().TeslaAudience + "/api/1/vehicles/fleet_telemetry_config"
 	r, _ := http.NewRequest("POST", target, bytes.NewReader(json))
 
-	_, err = RetryHTTPJSONRequest(r, authToken)
+	resp, err := RetryHTTPJSONRequest(r, authToken)
 	if err != nil {
 		log.Println(err)
 		return err
 	}
+
+	s, _ := DebugGetResponseBody(resp.Body)
+	log.Println(s)
 
 	return nil
 }
@@ -402,6 +402,23 @@ func (a *TeslaAPIImpl) DeleteTelemetryConfig(vehicle *Vehicle) error {
 		log.Println(err)
 		return err
 	}
+
+	return nil
+}
+
+func (a *TeslaAPIImpl) GetTelemetryConfig(vehicle *Vehicle) error {
+	authToken := a.GetOrRefreshAccessToken(vehicle.UserID)
+	target := GetConfig().TeslaAudience + "/api/1/vehicles/" + vehicle.VIN + "/fleet_telemetry_config"
+	r, _ := http.NewRequest("GET", target, nil)
+
+	resp, err := RetryHTTPJSONRequest(r, authToken)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	s, _ := DebugGetResponseBody(resp.Body)
+	log.Println(s)
 
 	return nil
 }

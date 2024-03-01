@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"log"
+	"math"
 	"math/rand"
 	"net/http"
 	"slices"
@@ -112,4 +113,58 @@ func GetHourstamp(year int, month int, day int, hour int) int {
 
 func LogDebug(s string) {
 	log.Println("DEBUG: " + s)
+}
+
+func OnVehicleUnplugged(vehicle *Vehicle, oldState *VehicleState) {
+	// vehicle got plugged out
+	GetDB().SetVehicleStatePluggedIn(vehicle.VIN, false)
+	GetDB().LogChargingEvent(vehicle.VIN, LogEventVehicleUnplug, "")
+	if oldState != nil && oldState.Charging != ChargeStateNotCharging {
+		// Vehicle got unplugged while charging
+		GetDB().SetVehicleStateCharging(vehicle.VIN, ChargeStateNotCharging)
+		GetDB().SetVehicleStateAmps(vehicle.VIN, 0)
+	}
+}
+
+func OnVehiclePluggedIn(vehicle *Vehicle) {
+	// vehicle got plugged in at home
+	GetDB().SetVehicleStatePluggedIn(vehicle.VIN, true)
+	GetDB().LogChargingEvent(vehicle.VIN, LogEventVehiclePlugIn, "")
+	if vehicle.Enabled {
+		go func() {
+			// wait a few moments to ensure vehicle is online
+			time.Sleep(10 * time.Second)
+			car, err := GetTeslaAPI().InitSession(vehicle, false)
+			if err != nil {
+				log.Printf("could not init session for vehicle %s on plug in: %s\n", vehicle.VIN, err.Error())
+				return
+			}
+			time.Sleep(5 * time.Second)
+			if err := GetTeslaAPI().ChargeStop(car); err != nil {
+				log.Printf("could not stop charging for vehicle %s on plug in: %s\n", vehicle.VIN, err.Error())
+			}
+		}()
+	}
+}
+
+func IsVehicleHome(telemetryState *TelemetryState, user *User) bool {
+	dist := getDistanceFromLatLonInMeters(user.HomeLatitude, user.HomeLongitude, telemetryState.Latitude, telemetryState.Longitude)
+	return dist <= user.HomeRadius
+}
+
+func getDistanceFromLatLonInMeters(lat1 float64, lon1 float64, lat2 float64, lon2 float64) int {
+	r := 6371 * 1000.0           // Radius of the earth in meters
+	dLat := deg2rad(lat2 - lat1) // deg2rad below
+	dLon := deg2rad(lon2 - lon1)
+	a := math.Sin(dLat/2)*math.Sin(dLat/2) +
+		math.Cos(deg2rad(lat1))*math.Cos(deg2rad(lat2))*
+			math.Sin(dLon/2)*math.Sin(dLon/2)
+
+	c := 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
+	d := r * c // Distance in meters
+	return int(d)
+}
+
+func deg2rad(deg float64) float64 {
+	return deg * (math.Pi / 180)
 }
