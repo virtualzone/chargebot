@@ -70,6 +70,7 @@ func (t *VehicleStateTelemetry) updateVehicleState(telemetryState *TelemetryStat
 		data, err := GetTeslaAPI().GetVehicleData(vehicle)
 		if err != nil {
 			log.Println(err)
+			return
 		}
 		GetDB().LogChargingEvent(vehicle.VIN, LogEventVehicleUpdateData, "")
 		cableConnected := (strings.ToLower(data.ChargeState.ConnectedChargeCable) == "iec" || strings.ToLower(data.ChargeState.ConnectedChargeCable) == "sae")
