@@ -57,11 +57,14 @@ type TeslaAPIListVehiclesResponse struct {
 }
 
 type TeslaAPIChargeState struct {
-	BatteryLevel   int    `json:"battery_level"`
-	ChargeAmps     int    `json:"charge_amps"`
-	ChargeLimitSoC int    `json:"charge_limit_soc"`
-	ChargingState  string `json:"charging_state"`
-	Timestamp      int    `json:"timestamp"`
+	BatteryLevel         int    `json:"battery_level"`
+	ChargeAmps           int    `json:"charge_amps"`
+	ChargeLimitSoC       int    `json:"charge_limit_soc"`
+	ChargingState        string `json:"charging_state"`
+	Timestamp            int    `json:"timestamp"`
+	ConnectedChargeCable string `json:"conn_charge_cable"`
+	ChargePortLatch      string `json:"charge_port_latch"`
+	ChargePortDoorOpen   bool   `json:"charge_port_door_open"`
 }
 
 type TeslaAPIVehicleData struct {
@@ -275,7 +278,7 @@ func (a *TeslaAPIImpl) ChargeStart(car *vehicle.Vehicle) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	err := car.ChargeStart(ctx)
-	if err != nil && strings.Contains(err.Error(), "already_started") {
+	if err != nil && (strings.Contains(err.Error(), "already_started") || strings.Contains(err.Error(), "is_charging")) {
 		return nil
 	}
 	return err

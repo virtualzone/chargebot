@@ -151,6 +151,15 @@ func IsVehicleHome(telemetryState *TelemetryState, user *User) bool {
 	return dist <= user.HomeRadius
 }
 
+func CanUpdateVehicleData(vin string, now *time.Time) bool {
+	event := GetDB().GetLatestChargingEvent(vin, LogEventVehicleUpdateData)
+	if event == nil {
+		return true
+	}
+	limit := now.Add(time.Minute * time.Duration(MaxVehicleDataUpdateIntervalMinutes) * -1)
+	return event.Timestamp.Before(limit)
+}
+
 func getDistanceFromLatLonInMeters(lat1 float64, lon1 float64, lat2 float64, lon2 float64) int {
 	r := 6371 * 1000.0           // Radius of the earth in meters
 	dLat := deg2rad(lat2 - lat1) // deg2rad below
