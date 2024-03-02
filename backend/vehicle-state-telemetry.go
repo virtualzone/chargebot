@@ -53,6 +53,10 @@ func (t *VehicleStateTelemetry) updateVehicleState(telemetryState *TelemetryStat
 	if oldState.Charging != ChargeStateNotCharging && !telemetryState.Charging {
 		GetDB().SetVehicleStateCharging(vehicle.VIN, ChargeStateNotCharging)
 	}
+	// Handle anomaly where chargebot stopped charging but vehicle is still charging
+	if vehicle.Enabled && oldState.Charging == ChargeStateNotCharging && telemetryState.Charging {
+		GetChargeController().stopCharging(vehicle)
+	}
 	// Workarounds for incorrect ChargeState in telemetry data
 	// https://github.com/teslamotors/fleet-telemetry/issues/123
 	user := GetDB().GetUser(vehicle.UserID)
