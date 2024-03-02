@@ -39,8 +39,6 @@ func (t *VehicleStateTelemetry) updateVehicleState(telemetryState *TelemetryStat
 		}
 	}
 
-	//user := GetDB().GetUser(vehicle.UserID)
-
 	if oldState.Amps != telemetryState.Amps {
 		GetDB().SetVehicleStateAmps(vehicle.VIN, telemetryState.Amps)
 	}
@@ -53,6 +51,23 @@ func (t *VehicleStateTelemetry) updateVehicleState(telemetryState *TelemetryStat
 	if oldState.Charging != ChargeStateNotCharging && !telemetryState.Charging {
 		GetDB().SetVehicleStateCharging(vehicle.VIN, ChargeStateNotCharging)
 	}
+	// Workarounds for incorrect ChargeState in telemetry data
+	user := GetDB().GetUser(vehicle.UserID)
+	if oldState.PluggedIn && !IsVehicleHome(telemetryState, user) {
+		// If vehicle was plugged in but is not home anymore, it is obiously not plugged in anymore
+		OnVehicleUnplugged(vehicle, oldState)
+		return
+	}
+	// Try to get data from vehicle, but do NOT wake it
+	/*
+		if CanUpdateVehicleData(vehicle.VIN, time.Now().UTC()) {
+
+		}
+		data, err := GetTeslaAPI().GetVehicleData(vehicle)
+		if err != nil {
+		}
+	*/
+
 	/*
 		if oldState.PluggedIn && !telemetryState.PluggedIn {
 			t.onVehicleUnplugged(vehicle, oldState)
