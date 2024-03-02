@@ -55,6 +55,7 @@ func (t *VehicleStateTelemetry) updateVehicleState(telemetryState *TelemetryStat
 	}
 	// Handle anomaly where chargebot stopped charging but vehicle is still charging
 	if vehicle.Enabled && oldState.Charging == ChargeStateNotCharging && telemetryState.Charging {
+		log.Printf("Anomaly detected: Vehicle %s was assumed to be not charging, but actually is - stopping it\n", vehicle.VIN)
 		GetChargeController().stopCharging(vehicle)
 	}
 	// Workarounds for incorrect ChargeState in telemetry data
