@@ -1251,10 +1251,10 @@ func TestChargeControl_getActualSurplus_notCharging(t *testing.T) {
 	assert.Equal(t, 2000, surplus)
 }
 
-func TestChargeControl_getActualSurplus_multipleRecords(t *testing.T) {
+func TestChargeControl_getActualSurplus_notCharging_multipleRecords(t *testing.T) {
 	t.Cleanup(ResetTestDB)
 
-	v := &Vehicle{VIN: "123", NumPhases: 3, UserID: "abc"}
+	v := &Vehicle{VIN: "123", NumPhases: 3, UserID: "abc", MinSurplus: 2000}
 	s := &VehicleState{Charging: ChargeStateNotCharging, Amps: 0}
 	GetDB().GetConnection().Exec("insert into surpluses (user_id, ts, surplus_watts) values (?, ?, ?)", v.UserID, GetDB().formatSqliteDatetime(GetDB().Time.UTCNow().Add(-2*time.Minute)), 1000)
 	GetDB().GetConnection().Exec("insert into surpluses (user_id, ts, surplus_watts) values (?, ?, ?)", v.UserID, GetDB().formatSqliteDatetime(GetDB().Time.UTCNow().Add(-1*time.Minute)), 2000)
@@ -1262,7 +1262,49 @@ func TestChargeControl_getActualSurplus_multipleRecords(t *testing.T) {
 	cc := NewTestChargeController()
 	surplus := cc.getActualSurplus(v, s)
 	assert.NotNil(t, surplus)
-	assert.Equal(t, 2500, surplus)
+	assert.Equal(t, 3000, surplus)
+}
+
+func TestChargeControl_getActualSurplus_notCharging_multipleRecords_sampleBelowThreshold(t *testing.T) {
+	t.Cleanup(ResetTestDB)
+
+	v := &Vehicle{VIN: "123", NumPhases: 3, UserID: "abc", MinSurplus: 2000}
+	s := &VehicleState{Charging: ChargeStateNotCharging, Amps: 0}
+	GetDB().GetConnection().Exec("insert into surpluses (user_id, ts, surplus_watts) values (?, ?, ?)", v.UserID, GetDB().formatSqliteDatetime(GetDB().Time.UTCNow().Add(-2*time.Minute)), 1000)
+	GetDB().GetConnection().Exec("insert into surpluses (user_id, ts, surplus_watts) values (?, ?, ?)", v.UserID, GetDB().formatSqliteDatetime(GetDB().Time.UTCNow().Add(-1*time.Minute)), 1999)
+	GetDB().GetConnection().Exec("insert into surpluses (user_id, ts, surplus_watts) values (?, ?, ?)", v.UserID, GetDB().formatSqliteDatetime(GetDB().Time.UTCNow().Add(-0*time.Minute)), 3000)
+	cc := NewTestChargeController()
+	surplus := cc.getActualSurplus(v, s)
+	assert.NotNil(t, surplus)
+	assert.Equal(t, 1999, surplus)
+}
+
+func TestChargeControl_getActualSurplus_charging_multipleRecords(t *testing.T) {
+	t.Cleanup(ResetTestDB)
+
+	v := &Vehicle{VIN: "123", NumPhases: 3, UserID: "abc", MinSurplus: 2000}
+	s := &VehicleState{Charging: ChargeStateChargingOnSolar, Amps: 0}
+	GetDB().GetConnection().Exec("insert into surpluses (user_id, ts, surplus_watts) values (?, ?, ?)", v.UserID, GetDB().formatSqliteDatetime(GetDB().Time.UTCNow().Add(-2*time.Minute)), 1000)
+	GetDB().GetConnection().Exec("insert into surpluses (user_id, ts, surplus_watts) values (?, ?, ?)", v.UserID, GetDB().formatSqliteDatetime(GetDB().Time.UTCNow().Add(-1*time.Minute)), 2000)
+	GetDB().GetConnection().Exec("insert into surpluses (user_id, ts, surplus_watts) values (?, ?, ?)", v.UserID, GetDB().formatSqliteDatetime(GetDB().Time.UTCNow().Add(-0*time.Minute)), 3000)
+	cc := NewTestChargeController()
+	surplus := cc.getActualSurplus(v, s)
+	assert.NotNil(t, surplus)
+	assert.Equal(t, 3000, surplus)
+}
+
+func TestChargeControl_getActualSurplus_charging_multipleRecords_sampleBelowThreshold(t *testing.T) {
+	t.Cleanup(ResetTestDB)
+
+	v := &Vehicle{VIN: "123", NumPhases: 3, UserID: "abc", MinSurplus: 2000}
+	s := &VehicleState{Charging: ChargeStateChargingOnSolar, Amps: 0}
+	GetDB().GetConnection().Exec("insert into surpluses (user_id, ts, surplus_watts) values (?, ?, ?)", v.UserID, GetDB().formatSqliteDatetime(GetDB().Time.UTCNow().Add(-2*time.Minute)), 1000)
+	GetDB().GetConnection().Exec("insert into surpluses (user_id, ts, surplus_watts) values (?, ?, ?)", v.UserID, GetDB().formatSqliteDatetime(GetDB().Time.UTCNow().Add(-1*time.Minute)), 1999)
+	GetDB().GetConnection().Exec("insert into surpluses (user_id, ts, surplus_watts) values (?, ?, ?)", v.UserID, GetDB().formatSqliteDatetime(GetDB().Time.UTCNow().Add(-0*time.Minute)), 3000)
+	cc := NewTestChargeController()
+	surplus := cc.getActualSurplus(v, s)
+	assert.NotNil(t, surplus)
+	assert.Equal(t, 3000, surplus)
 }
 
 func TestChargeControl_getActualSurplus_oldRecords(t *testing.T) {
