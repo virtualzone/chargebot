@@ -97,7 +97,6 @@ func (c *ChargeController) stopCharging(vehicle *Vehicle) {
 	}
 
 	GetDB().SetVehicleStateCharging(vehicle.VIN, ChargeStateNotCharging)
-	GetDB().SetVehicleStateAmps(vehicle.VIN, 0)
 	GetDB().LogChargingEvent(vehicle.VIN, LogEventChargeStop, "charging stopped")
 }
 

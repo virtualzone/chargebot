@@ -96,7 +96,6 @@ func zmqLoop(s *zmq.Socket) {
 					res.SoC = int(v)
 				}
 			case protos.Field_ChargeState:
-				log.Println(e.Value.GetChargingValue())
 				s := strings.ToLower(e.Value.GetStringValue())
 				if s == "idle" {
 					res.PluggedIn = true
@@ -120,7 +119,9 @@ func zmqLoop(s *zmq.Socket) {
 			return
 		}
 		log.Println(data)
-		log.Println(res)
-		log.Println(reply)
+		/*
+			log.Println(res)
+			log.Println(reply)
+		*/
 	}
 }

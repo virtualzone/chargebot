@@ -122,7 +122,6 @@ func OnVehicleUnplugged(vehicle *Vehicle, oldState *VehicleState) {
 	if oldState != nil && oldState.Charging != ChargeStateNotCharging {
 		// Vehicle got unplugged while charging
 		GetDB().SetVehicleStateCharging(vehicle.VIN, ChargeStateNotCharging)
-		GetDB().SetVehicleStateAmps(vehicle.VIN, 0)
 	}
 }
 
