@@ -88,11 +88,14 @@ func (router *UserRouter) updateVehiclePlugState(w http.ResponseWriter, r *http.
 	}
 
 	vehicle := GetDB().GetVehicleByVIN(vin)
-
-	if pluggedIn && vehicle.Enabled {
-		OnVehiclePluggedIn(vehicle)
+	if vehicle == nil {
+		SendNotFound(w)
+		return
 	}
-	if !pluggedIn && vehicle.Enabled {
+
+	if pluggedIn {
+		OnVehiclePluggedIn(vehicle)
+	} else {
 		state := GetDB().GetVehicleState(vehicle.VIN)
 		OnVehicleUnplugged(vehicle, state)
 	}

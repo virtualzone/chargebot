@@ -3,7 +3,6 @@ package main
 import (
 	"log"
 	"net/http"
-	"time"
 
 	"github.com/gorilla/mux"
 )
@@ -126,7 +125,7 @@ func (router *TeslaRouter) updateVehicle(w http.ResponseWriter, r *http.Request)
 	var m *Vehicle
 	UnmarshalValidateBody(r.Body, &m)
 
-	eOld := GetDB().GetVehicleByVIN(vehicle.VIN)
+	//eOld := GetDB().GetVehicleByVIN(vehicle.VIN)
 
 	e := &Vehicle{
 		VIN:             vehicle.VIN,
@@ -150,20 +149,22 @@ func (router *TeslaRouter) updateVehicle(w http.ResponseWriter, r *http.Request)
 	GetDB().CreateUpdateVehicle(e)
 
 	// If vehicle was not enabled, but is enabled now, update current SoC
-	if (eOld != nil) && (e.Enabled) && (!eOld.Enabled) {
-		go func() {
-			car, err := GetTeslaAPI().InitSession(e, true)
-			if err != nil {
-				log.Printf("could not init session for vehicle %s on plug in: %s\n", e.VIN, err.Error())
-				return
-			}
-			UpdateVehicleDataSaveSoC(e)
-			time.Sleep(5 * time.Second)
-			if err := GetTeslaAPI().ChargeStop(car); err != nil {
-				log.Printf("could not stop charging for vehicle %s on plug in: %s\n", e.VIN, err.Error())
-			}
-		}()
-	}
+	/*
+		if (eOld != nil) && (e.Enabled) && (!eOld.Enabled) {
+			state := GetDB().GetVehicleState(e.VIN)
+			go func() {
+				car, err := GetTeslaAPI().InitSession(e, true)
+				if err != nil {
+					log.Printf("could not init session for vehicle %s on plug in: %s\n", e.VIN, err.Error())
+					return
+				}
+				time.Sleep(5 * time.Second)
+				if err := GetTeslaAPI().ChargeStop(car); err != nil {
+					log.Printf("could not stop charging for vehicle %s on plug in: %s\n", e.VIN, err.Error())
+				}
+			}()
+		}
+	*/
 
 	SendJSON(w, true)
 }
