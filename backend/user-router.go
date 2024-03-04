@@ -8,11 +8,15 @@ import (
 
 type UserRouter struct{}
 
+type PasswordProtectedRequest struct {
+	Password string `json:"password"`
+}
+
 type SurplusRecordingRequest struct {
-	Password            string `json:"password"`
-	SurplusWatts        int    `json:"surplus_watts"`
-	InverterActivePower int    `json:"inverter_active_power_watts"`
-	Consumption         int    `json:"consumption_watts"`
+	PasswordProtectedRequest
+	SurplusWatts        int `json:"surplus_watts"`
+	InverterActivePower int `json:"inverter_active_power_watts"`
+	Consumption         int `json:"consumption_watts"`
 }
 
 type SurplusRecordingResponse struct {
@@ -65,7 +69,7 @@ func (router *UserRouter) updateVehiclePlugState(w http.ResponseWriter, r *http.
 	token := vars["token"]
 	vin := vars["vin"]
 
-	var m *SurplusRecordingRequest
+	var m *PasswordProtectedRequest
 	if err := UnmarshalBody(r.Body, &m); err != nil {
 		SendBadRequest(w)
 		return
