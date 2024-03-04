@@ -63,8 +63,13 @@ func (t *VehicleStateTelemetry) updateVehicleState(telemetryState *TelemetryStat
 			return
 		} else {
 			// otherwise, this is an anomaly where chargebot stopped charging but vehicle is still charging
-			log.Printf("Anomaly detected: Vehicle %s was assumed to be not charging, but actually is - stopping it\n", vehicle.VIN)
-			GetChargeController().stopCharging(vehicle)
+			// check if charging was actually stopped within the last minutes (else, it might just be the A/C)
+			event := GetDB().GetLatestChargingEvent(vehicle.VIN, LogEventChargeStop)
+			now := time.Now().UTC()
+			if event.Timestamp.After(now.Add(-5 * time.Minute)) {
+				log.Printf("Anomaly detected: Vehicle %s was assumed to be not charging, but actually is - stopping it\n", vehicle.VIN)
+				GetChargeController().stopCharging(vehicle)
+			}
 		}
 	}
 	// Workarounds for incorrect ChargeState in telemetry data
