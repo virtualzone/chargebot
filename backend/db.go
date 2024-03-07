@@ -85,6 +85,7 @@ type VehicleState struct {
 	SoC         int         `json:"soc"`
 	Amps        int         `json:"amps"`
 	ChargeLimit int         `json:"chargeLimit"`
+	IsHome      bool        `json:"is_home"`
 }
 
 type ChargingEvent struct {
@@ -170,6 +171,9 @@ create table if not exists grid_hourblocks(vehicle_vin int text null, hourstamp 
 `)
 	if err != nil {
 		log.Panicln(err)
+	}
+	if _, err := db.GetConnection().Exec(`alter table vehicle_states add column is_home int default 0;`); err != nil {
+		log.Println(err)
 	}
 }
 
@@ -372,9 +376,9 @@ func (db *DB) GetAPIToken(userID string) string {
 
 func (db *DB) GetVehicleState(vin string) *VehicleState {
 	e := &VehicleState{}
-	err := db.GetConnection().QueryRow("select vehicle_vin, plugged_in, charging, soc, charge_amps, charge_limit from vehicle_states where vehicle_vin = ?",
+	err := db.GetConnection().QueryRow("select vehicle_vin, plugged_in, charging, soc, charge_amps, charge_limit, is_home from vehicle_states where vehicle_vin = ?",
 		vin).
-		Scan(&e.VIN, &e.PluggedIn, &e.Charging, &e.SoC, &e.Amps, &e.ChargeLimit)
+		Scan(&e.VIN, &e.PluggedIn, &e.Charging, &e.SoC, &e.Amps, &e.ChargeLimit, &e.IsHome)
 	if err != nil {
 		log.Println(err)
 		return nil
@@ -422,6 +426,15 @@ func (db *DB) SetVehicleStateChargeLimit(vin string, limit int) {
 	_, err := db.GetConnection().Exec("insert into vehicle_states (vehicle_vin, charge_limit) values(?, ?) "+
 		"on conflict(vehicle_vin) do update set charge_limit = ?",
 		vin, limit, limit)
+	if err != nil {
+		log.Fatalln(err)
+	}
+}
+
+func (db *DB) SetVehicleStateIsHome(vin string, isHome bool) {
+	_, err := db.GetConnection().Exec("insert into vehicle_states (vehicle_vin, is_home) values(?, ?) "+
+		"on conflict(vehicle_vin) do update set is_home = ?",
+		vin, isHome, isHome)
 	if err != nil {
 		log.Fatalln(err)
 	}

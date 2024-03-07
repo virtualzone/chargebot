@@ -53,9 +53,12 @@ func (t *VehicleStateTelemetry) updateVehicleState(telemetryState *TelemetryStat
 	if oldState.Charging != ChargeStateNotCharging && !telemetryState.Charging {
 		GetDB().SetVehicleStateCharging(vehicle.VIN, ChargeStateNotCharging)
 	}
-
 	user := GetDB().GetUser(vehicle.UserID)
 	isVehicleHome := IsVehicleHome(telemetryState, user)
+	if oldState.IsHome != isVehicleHome {
+		GetDB().SetVehicleStateIsHome(vehicle.VIN, isVehicleHome)
+	}
+
 	if vehicle.Enabled && oldState.Charging == ChargeStateNotCharging && telemetryState.Charging {
 		// if vehicle is charging although assumed not to, it could be that it has been plugged in recently
 		if !oldState.PluggedIn && isVehicleHome {
