@@ -142,6 +142,8 @@ func TestDB_CRUDVehicleState(t *testing.T) {
 	GetDB().SetVehicleStateCharging(vehicleID, ChargeStateChargingOnGrid)
 	GetDB().SetVehicleStateSoC(vehicleID, 22)
 	GetDB().SetVehicleStateAmps(vehicleID, 5)
+	GetDB().SetVehicleStateChargeLimit(vehicleID, 80)
+	GetDB().SetVehicleStateIsHome(vehicleID, false)
 
 	state = GetDB().GetVehicleState(vehicleID)
 	assert.NotNil(t, state)
@@ -150,11 +152,15 @@ func TestDB_CRUDVehicleState(t *testing.T) {
 	assert.Equal(t, ChargeStateChargingOnGrid, state.Charging)
 	assert.Equal(t, 22, state.SoC)
 	assert.Equal(t, 5, state.Amps)
+	assert.Equal(t, 80, state.ChargeLimit)
+	assert.Equal(t, false, state.IsHome)
 
 	GetDB().SetVehicleStatePluggedIn(vehicleID, false)
 	GetDB().SetVehicleStateCharging(vehicleID, ChargeStateNotCharging)
 	GetDB().SetVehicleStateSoC(vehicleID, 23)
 	GetDB().SetVehicleStateAmps(vehicleID, 6)
+	GetDB().SetVehicleStateChargeLimit(vehicleID, 79)
+	GetDB().SetVehicleStateIsHome(vehicleID, true)
 
 	state = GetDB().GetVehicleState(vehicleID)
 	assert.NotNil(t, state)
@@ -163,6 +169,8 @@ func TestDB_CRUDVehicleState(t *testing.T) {
 	assert.Equal(t, ChargeStateNotCharging, state.Charging)
 	assert.Equal(t, 23, state.SoC)
 	assert.Equal(t, 6, state.Amps)
+	assert.Equal(t, 79, state.ChargeLimit)
+	assert.Equal(t, true, state.IsHome)
 }
 
 func TestDB_IsUserOwnerOfVehicle(t *testing.T) {
