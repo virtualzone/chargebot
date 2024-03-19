@@ -54,7 +54,7 @@ func TestTeslaAuthRouter_callback_invalidState(t *testing.T) {
 func TestTeslaAuthRouter_callback_invalidCode(t *testing.T) {
 	t.Cleanup(ResetTestDB)
 	TeslaAPIInstance = &TeslaAPIImpl{}
-	TeslaAPIInstance.InitTokenCache()
+	//TeslaAPIInstance.InitTokenCache()
 
 	bearer := getTestJWT("abc")
 	req := newHTTPRequest("GET", "/api/1/auth/tesla/init3rdparty", bearer, nil)

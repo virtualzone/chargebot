@@ -2,27 +2,9 @@ package main
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 )
-
-func TestDB_SetVehicleStates(t *testing.T) {
-	t.Cleanup(ResetTestDB)
-
-	GetDB().SetVehicleStateCharging("123", ChargeStateChargingOnSolar)
-	GetDB().SetVehicleStateAmps("123", 5)
-	GetDB().SetVehicleStatePluggedIn("123", true)
-	GetDB().SetVehicleStateSoC("123", 55)
-
-	state := GetDB().GetVehicleState("123")
-	assert.NotNil(t, state)
-	assert.Equal(t, ChargeStateChargingOnSolar, state.Charging)
-	assert.Equal(t, 5, state.Amps)
-	assert.Equal(t, 55, state.SoC)
-	assert.Equal(t, true, state.PluggedIn)
-
-}
 
 func TestDB_CRUDAuthCode(t *testing.T) {
 	t.Cleanup(ResetTestDB)
@@ -58,24 +40,9 @@ func TestDB_CRUDVehicle(t *testing.T) {
 	t.Cleanup(ResetTestDB)
 
 	vehicle := &Vehicle{
-		VIN:             "789",
-		UserID:          "456",
-		DisplayName:     "Model S",
-		APIToken:        "",
-		Enabled:         true,
-		TargetSoC:       65,
-		MaxAmps:         8,
-		NumPhases:       3,
-		SurplusCharging: true,
-		MinSurplus:      1250,
-		MinChargeTime:   25,
-		LowcostCharging: true,
-		MaxPrice:        22,
-		GridProvider:    "tibber",
-		GridStrategy:    2,
-		DepartDays:      "1357",
-		DepartTime:      "07:15:00",
-		TibberToken:     "def",
+		VIN:      "789",
+		UserID:   "456",
+		APIToken: "",
 	}
 	GetDB().CreateUpdateVehicle(vehicle)
 
@@ -105,9 +72,9 @@ func TestDB_CRUDVehicle(t *testing.T) {
 func TestDB_GetVehicles(t *testing.T) {
 	t.Cleanup(ResetTestDB)
 
-	v1 := &Vehicle{VIN: "1", UserID: "a", DisplayName: "V 1"}
-	v2 := &Vehicle{VIN: "2", UserID: "a", DisplayName: "V 2"}
-	v3 := &Vehicle{VIN: "3", UserID: "b", DisplayName: "V 3"}
+	v1 := &Vehicle{VIN: "1", UserID: "a"}
+	v2 := &Vehicle{VIN: "2", UserID: "a"}
+	v3 := &Vehicle{VIN: "3", UserID: "b"}
 
 	GetDB().CreateUpdateVehicle(v1)
 	GetDB().CreateUpdateVehicle(v2)
@@ -131,54 +98,12 @@ func TestDB_GetVehicles(t *testing.T) {
 	assert.Equal(t, v3.VIN, l3[2].VIN)
 }
 
-func TestDB_CRUDVehicleState(t *testing.T) {
-	t.Cleanup(ResetTestDB)
-	vehicleID := "123"
-
-	state := GetDB().GetVehicleState(vehicleID)
-	assert.Nil(t, state)
-
-	GetDB().SetVehicleStatePluggedIn(vehicleID, true)
-	GetDB().SetVehicleStateCharging(vehicleID, ChargeStateChargingOnGrid)
-	GetDB().SetVehicleStateSoC(vehicleID, 22)
-	GetDB().SetVehicleStateAmps(vehicleID, 5)
-	GetDB().SetVehicleStateChargeLimit(vehicleID, 80)
-	GetDB().SetVehicleStateIsHome(vehicleID, false)
-
-	state = GetDB().GetVehicleState(vehicleID)
-	assert.NotNil(t, state)
-	assert.Equal(t, vehicleID, state.VIN)
-	assert.Equal(t, true, state.PluggedIn)
-	assert.Equal(t, ChargeStateChargingOnGrid, state.Charging)
-	assert.Equal(t, 22, state.SoC)
-	assert.Equal(t, 5, state.Amps)
-	assert.Equal(t, 80, state.ChargeLimit)
-	assert.Equal(t, false, state.IsHome)
-
-	GetDB().SetVehicleStatePluggedIn(vehicleID, false)
-	GetDB().SetVehicleStateCharging(vehicleID, ChargeStateNotCharging)
-	GetDB().SetVehicleStateSoC(vehicleID, 23)
-	GetDB().SetVehicleStateAmps(vehicleID, 6)
-	GetDB().SetVehicleStateChargeLimit(vehicleID, 79)
-	GetDB().SetVehicleStateIsHome(vehicleID, true)
-
-	state = GetDB().GetVehicleState(vehicleID)
-	assert.NotNil(t, state)
-	assert.Equal(t, vehicleID, state.VIN)
-	assert.Equal(t, false, state.PluggedIn)
-	assert.Equal(t, ChargeStateNotCharging, state.Charging)
-	assert.Equal(t, 23, state.SoC)
-	assert.Equal(t, 6, state.Amps)
-	assert.Equal(t, 79, state.ChargeLimit)
-	assert.Equal(t, true, state.IsHome)
-}
-
 func TestDB_IsUserOwnerOfVehicle(t *testing.T) {
 	t.Cleanup(ResetTestDB)
 
-	v1 := &Vehicle{VIN: "1", UserID: "a", DisplayName: "V 1"}
-	v2 := &Vehicle{VIN: "2", UserID: "a", DisplayName: "V 2"}
-	v3 := &Vehicle{VIN: "3", UserID: "b", DisplayName: "V 3"}
+	v1 := &Vehicle{VIN: "1", UserID: "a"}
+	v2 := &Vehicle{VIN: "2", UserID: "a"}
+	v3 := &Vehicle{VIN: "3", UserID: "b"}
 
 	GetDB().CreateUpdateVehicle(v1)
 	GetDB().CreateUpdateVehicle(v2)
@@ -191,51 +116,4 @@ func TestDB_IsUserOwnerOfVehicle(t *testing.T) {
 	assert.False(t, GetDB().IsUserOwnerOfVehicle("b", "1"))
 	assert.False(t, GetDB().IsUserOwnerOfVehicle("b", "2"))
 	assert.False(t, GetDB().IsUserOwnerOfVehicle("a", "3"))
-}
-
-func TestDB_GetVehicleIDsWithTibberTokenWithoutPricesForTomorrow(t *testing.T) {
-	t.Cleanup(ResetTestDB)
-
-	v := &Vehicle{
-		VIN:          "1",
-		UserID:       "a",
-		DisplayName:  "V 1",
-		GridProvider: GridProviderTibber,
-		TibberToken:  "123",
-	}
-	GetDB().CreateUpdateVehicle(v)
-
-	now := time.Now().UTC()
-	now = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-	for i := 0; i <= 22; i++ {
-		SetTibberTestPrice(v.VIN, now.Add(time.Hour*time.Duration(i)), 0.32) // 00:00
-	}
-
-	l := GetDB().GetVehicleVINsWithTibberTokenWithoutPricesForTomorrow(45)
-	assert.NotNil(t, l)
-	assert.Len(t, l, 1)
-	assert.Equal(t, v.VIN, l[0])
-}
-
-func TestDB_encrypt(t *testing.T) {
-	plaintext := "this is a test"
-	in := GetDB().encrypt(plaintext)
-	out := GetDB().decrypt(in)
-	assert.Equal(t, plaintext, out)
-}
-
-func TestDB_UpgradeRefreshTokenEncryption(t *testing.T) {
-	t.Cleanup(ResetTestDB)
-
-	userID := "1234abcd"
-	GetDB().GetConnection().Exec("replace into users values(?, ?, ?, ?, ?, ?)", userID, "", "", 0.0, 0.0, 100)
-	user := GetDB().GetUser(userID)
-
-	user.TeslaRefreshToken = "xyzabc"
-	user.TeslaUserID = "009988"
-	GetDB().CreateUpdateUser(user)
-
-	user = GetDB().GetUser(userID)
-	assert.Equal(t, "xyzabc", user.TeslaRefreshToken)
-	assert.Equal(t, "009988", user.TeslaUserID)
 }

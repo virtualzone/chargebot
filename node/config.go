@@ -9,8 +9,13 @@ import (
 )
 
 type Config struct {
+	TeslaClientID     string
+	DBFile            string
 	Token             string
 	TelemetryEndpoint string
+	CmdEndpoint       string
+	DevProxy          bool
+	CryptKey          string
 }
 
 var _configInstance *Config
@@ -25,9 +30,18 @@ func GetConfig() *Config {
 }
 
 func (c *Config) ReadConfig() {
+	c.TeslaClientID = c.getEnv("TESLA_CLIENT_ID", "e9941f08e0d6-4c2f-b8ee-291060ec648a")
+	c.DBFile = c.getEnv("DB_FILE", "/tmp/chargebot_node.db")
 	c.Token = c.getEnv("TOKEN", "")
 	c.TelemetryEndpoint = c.getEnv("TELEMETRY_ENDPOINT", "wss://chargebot.io/api/1/user/{token}/ws")
+	c.CmdEndpoint = c.getEnv("CMD_ENDPOINT", "https://chargebot.io/api/1/user/{token}")
 	c.TelemetryEndpoint = strings.ReplaceAll(c.TelemetryEndpoint, "{token}", c.Token)
+	c.CmdEndpoint = strings.ReplaceAll(c.CmdEndpoint, "{token}", c.Token)
+	c.DevProxy = (c.getEnv("DEV_PROXY", "0") == "1")
+	c.CryptKey = c.getEnv("CRYPT_KEY", "")
+	if len(c.CryptKey) != 32 {
+		log.Panicln("CRYPT_KEY must be 32 bytes long")
+	}
 }
 
 func (c *Config) Print() {

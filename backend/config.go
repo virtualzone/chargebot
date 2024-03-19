@@ -23,7 +23,6 @@ type Config struct {
 	TeslaPrivateKey    protocol.ECDHPrivateKey
 	ZMQPublisher       string
 	DebugLog           bool
-	CryptKey           string
 	AuthURL            string
 	AuthClientID       string
 	AuthClientSecret   string
@@ -56,7 +55,7 @@ func (c *Config) ReadConfig() {
 		}
 		c.TeslaTelemetryCA = strings.ReplaceAll(string(ca), "\r", "")
 	}
-	c.DBFile = c.getEnv("DB_FILE", "/tmp/tgc.db")
+	c.DBFile = c.getEnv("DB_FILE", "/tmp/chargebot.db")
 	c.Hostname = c.getEnv("DOMAIN", "chargebot.io")
 	c.DevProxy = (c.getEnv("DEV_PROXY", "0") == "1")
 	c.Reset = (c.getEnv("RESET", "0") == "1")
@@ -70,10 +69,6 @@ func (c *Config) ReadConfig() {
 	}
 	c.ZMQPublisher = c.getEnv("ZMQ_PUB", "")
 	c.DebugLog = (c.getEnv("DEBUG_LOG", "0") == "1")
-	c.CryptKey = c.getEnv("CRYPT_KEY", "")
-	if len(c.CryptKey) != 32 {
-		log.Panicln("CRYPT_KEY must be 32 bytes long")
-	}
 	c.AuthURL = c.getEnv("AUTH_URL", "https://auth.chargebot.io/realms/chargebot")
 	c.AuthClientID = c.getEnv("AUTH_CLIENT_ID", "chargebot.io-website")
 	c.AuthClientSecret = c.getEnv("AUTH_CLIENT_SECRET", "")

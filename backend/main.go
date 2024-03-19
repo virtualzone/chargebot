@@ -6,14 +6,9 @@ import (
 )
 
 var TeslaAPIInstance TeslaAPI
-var ChargeControllerInstance *ChargeController
 
 func GetTeslaAPI() TeslaAPI {
 	return TeslaAPIInstance
-}
-
-func GetChargeController() *ChargeController {
-	return ChargeControllerInstance
 }
 
 func main() {
@@ -27,12 +22,8 @@ func main() {
 	GetOIDCProvider().Init()
 
 	TeslaAPIInstance = &TeslaAPIImpl{}
-	TeslaAPIInstance.InitTokenCache()
+	//TeslaAPIInstance.InitTokenCache()
 
-	ChargeControllerInstance = NewChargeController()
-	GetChargeController().Init()
-
-	InitPeriodicPriceUpdateControl()
 	InitHTTPRouter()
 	/*
 		GetTeslaAPI().CreateTelemetryConfig(GetDB().GetVehicleByVIN("LRWYGCEKXNC461719"))
