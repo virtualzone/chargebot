@@ -80,7 +80,6 @@ func (router *TeslaAuthRouter) callback(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	user.TeslaRefreshToken = tokens.RefreshToken
 	user.TeslaUserID = sub
 	GetDB().CreateUpdateUser(user)
 

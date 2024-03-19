@@ -28,6 +28,7 @@ func TestMain(m *testing.M) {
 	os.Setenv("TESLA_PRIVATE_KEY", ":none:")
 	os.Setenv("CRYPT_KEY", "12345678901234567890123456789012")
 	GetConfig().ReadConfig()
+	DelayBetweenAPICommands = time.Second * 0
 	GlobalMockTime = &MockTime{
 		CurTime: time.Now().UTC(),
 	}
@@ -44,6 +45,17 @@ func ResetTestDB() {
 	GetDB().InitDBStructure()
 	TeslaAPIInstance = &TeslaAPIMock{}
 	GlobalMockTime.CurTime = time.Now().UTC()
+}
+
+func NewTestChargeController() *ChargeController {
+	cc := new(ChargeController)
+	cc.Time = GlobalMockTime
+	cc.Async = false
+	return cc
+}
+
+func SetTibberTestPrice(vin string, ts time.Time, price float32) {
+	GetDB().SetTibberPrice(vin, ts.Year(), int(ts.Month()), ts.Day(), ts.Hour(), price)
 }
 
 func GetNextMondayMidnight() time.Time {

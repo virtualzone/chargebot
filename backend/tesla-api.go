@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/allegro/bigcache/v3"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/teslamotors/vehicle-command/pkg/account"
 	"github.com/teslamotors/vehicle-command/pkg/protocol/protobuf/universalmessage"
@@ -96,27 +95,28 @@ type TeslaAPITelemetryConfigCreate struct {
 }
 
 type TeslaAPI interface {
-	InitTokenCache()
+	//InitTokenCache()
 	GetTokens(userID string, code string, redirectURI string) (*TeslaAPITokenReponse, error)
 	RefreshToken(userID string, refreshToken string) (*TeslaAPITokenReponse, error)
-	GetOrRefreshAccessToken(userID string) string
-	GetCachedAccessToken(userID string) string
-	InitSession(vehicle *Vehicle, wakeUp bool) (*vehicle.Vehicle, error)
-	ListVehicles(userID string) ([]TeslaAPIVehicleEntity, error)
+	//GetOrRefreshAccessToken(userID string) string
+	//GetCachedAccessToken(userID string) string
+	InitSession(accessToken string, vin string) (*vehicle.Vehicle, error)
+	ListVehicles(accessToken string) ([]TeslaAPIVehicleEntity, error)
 	ChargeStart(car *vehicle.Vehicle) error
 	ChargeStop(car *vehicle.Vehicle) error
 	SetChargeLimit(car *vehicle.Vehicle, limitPercent int) error
 	SetChargeAmps(car *vehicle.Vehicle, amps int) error
-	GetVehicleData(vehicle *Vehicle) (*TeslaAPIVehicleData, error)
-	Wakeup(vehicle *Vehicle) error
-	CreateTelemetryConfig(vehicle *Vehicle) error
-	DeleteTelemetryConfig(vehicle *Vehicle) error
+	GetVehicleData(accessToken string, vin string) (*TeslaAPIVehicleData, error)
+	Wakeup(accessToken string, vin string) error
+	CreateTelemetryConfig(accessToken string, vin string) error
+	DeleteTelemetryConfig(accessToken string, vin string) error
 }
 
 type TeslaAPIImpl struct {
-	UserIDToTokenCache *bigcache.BigCache
+	//UserIDToTokenCache *bigcache.BigCache
 }
 
+/*
 func (a *TeslaAPIImpl) InitTokenCache() {
 	config := bigcache.DefaultConfig(8 * time.Hour)
 	config.CleanWindow = 1 * time.Minute
@@ -128,6 +128,7 @@ func (a *TeslaAPIImpl) InitTokenCache() {
 	}
 	a.UserIDToTokenCache = cache2
 }
+*/
 
 func (a *TeslaAPIImpl) GetTokens(userID string, code string, redirectURI string) (*TeslaAPITokenReponse, error) {
 	target := "https://auth.tesla.com/oauth2/v3/token"
@@ -159,7 +160,7 @@ func (a *TeslaAPIImpl) GetTokens(userID string, code string, redirectURI string)
 	}
 
 	// Cache token
-	a.UserIDToTokenCache.Set(userID, []byte(m.AccessToken))
+	//a.UserIDToTokenCache.Set(userID, []byte(m.AccessToken))
 
 	return &m, nil
 }
@@ -191,11 +192,12 @@ func (a *TeslaAPIImpl) RefreshToken(userID string, refreshToken string) (*TeslaA
 	}
 
 	// Cache token
-	a.UserIDToTokenCache.Set(userID, []byte(m.AccessToken))
+	//a.UserIDToTokenCache.Set(userID, []byte(m.AccessToken))
 
 	return &m, nil
 }
 
+/*
 func (a *TeslaAPIImpl) GetOrRefreshAccessToken(userID string) string {
 	//log.Printf("GetOrRefreshAccessToken() with userID %s\n", userID)
 	//debug.PrintStack()
@@ -225,21 +227,16 @@ func (a *TeslaAPIImpl) GetCachedAccessToken(userID string) string {
 	}
 	return string(token)
 }
+*/
 
-func (a *TeslaAPIImpl) InitSession(vehicle *Vehicle, wakeUp bool) (*vehicle.Vehicle, error) {
-	authToken := a.GetOrRefreshAccessToken(vehicle.UserID)
-
-	if wakeUp {
-		a.Wakeup(vehicle)
-	}
-
+func (a *TeslaAPIImpl) InitSession(accessToken string, vin string) (*vehicle.Vehicle, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-	acct, err := account.New(authToken, "chargebot.io/0.0.1")
+	acct, err := account.New(accessToken, "chargebot.io/0.0.1")
 	if err != nil {
 		return nil, err
 	}
-	car, err := acct.GetVehicle(ctx, vehicle.VIN, GetConfig().TeslaPrivateKey, nil)
+	car, err := acct.GetVehicle(ctx, vin, GetConfig().TeslaPrivateKey, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -252,11 +249,10 @@ func (a *TeslaAPIImpl) InitSession(vehicle *Vehicle, wakeUp bool) (*vehicle.Vehi
 	return car, nil
 }
 
-func (a *TeslaAPIImpl) ListVehicles(userID string) ([]TeslaAPIVehicleEntity, error) {
-	authToken := a.GetOrRefreshAccessToken(userID)
+func (a *TeslaAPIImpl) ListVehicles(accessToken string) ([]TeslaAPIVehicleEntity, error) {
 	r, _ := http.NewRequest("GET", _configInstance.TeslaAudience+"/api/1/vehicles", nil)
 
-	resp, err := RetryHTTPJSONRequest(r, authToken)
+	resp, err := RetryHTTPJSONRequest(r, accessToken)
 	if err != nil {
 		log.Println(err)
 		return nil, err
@@ -314,12 +310,11 @@ func (a *TeslaAPIImpl) SetChargeAmps(car *vehicle.Vehicle, amps int) error {
 	return err
 }
 
-func (a *TeslaAPIImpl) GetVehicleData(vehicle *Vehicle) (*TeslaAPIVehicleData, error) {
-	authToken := a.GetOrRefreshAccessToken(vehicle.UserID)
-	target := GetConfig().TeslaAudience + "/api/1/vehicles/" + vehicle.VIN + "/vehicle_data"
+func (a *TeslaAPIImpl) GetVehicleData(accessToken string, vin string) (*TeslaAPIVehicleData, error) {
+	target := GetConfig().TeslaAudience + "/api/1/vehicles/" + vin + "/vehicle_data"
 	r, _ := http.NewRequest("GET", target, nil)
 
-	resp, err := RetryHTTPJSONRequest(r, authToken)
+	resp, err := RetryHTTPJSONRequest(r, accessToken)
 	if err != nil {
 		log.Println(err)
 		return nil, err
@@ -337,12 +332,11 @@ func (a *TeslaAPIImpl) GetVehicleData(vehicle *Vehicle) (*TeslaAPIVehicleData, e
 	return &m.Response, nil
 }
 
-func (a *TeslaAPIImpl) Wakeup(vehicle *Vehicle) error {
-	authToken := a.GetOrRefreshAccessToken(vehicle.UserID)
-	target := GetConfig().TeslaAudience + "/api/1/vehicles/" + vehicle.VIN + "/wake_up"
+func (a *TeslaAPIImpl) Wakeup(accessToken string, vin string) error {
+	target := GetConfig().TeslaAudience + "/api/1/vehicles/" + vin + "/wake_up"
 	r, _ := http.NewRequest("POST", target, nil)
 
-	_, err := RetryHTTPJSONRequest(r, authToken)
+	_, err := RetryHTTPJSONRequest(r, accessToken)
 	if err != nil {
 		// TODO
 		log.Println(err)
@@ -355,9 +349,9 @@ func (a *TeslaAPIImpl) Wakeup(vehicle *Vehicle) error {
 	return nil
 }
 
-func (a *TeslaAPIImpl) CreateTelemetryConfig(vehicle *Vehicle) error {
+func (a *TeslaAPIImpl) CreateTelemetryConfig(accessToken string, vin string) error {
 	config := TeslaAPITelemetryConfigCreate{
-		VINs: []string{vehicle.VIN},
+		VINs: []string{vin},
 		Config: TeslaAPITelemetryConfig{
 			Hostname:   GetConfig().TeslaTelemetryHost,
 			Port:       443,
@@ -379,11 +373,10 @@ func (a *TeslaAPIImpl) CreateTelemetryConfig(vehicle *Vehicle) error {
 		return err
 	}
 
-	authToken := a.GetOrRefreshAccessToken(vehicle.UserID)
 	target := GetConfig().TeslaAudience + "/api/1/vehicles/fleet_telemetry_config"
 	r, _ := http.NewRequest("POST", target, bytes.NewReader(json))
 
-	resp, err := RetryHTTPJSONRequest(r, authToken)
+	resp, err := RetryHTTPJSONRequest(r, accessToken)
 	if err != nil {
 		log.Println(err)
 		return err
@@ -395,12 +388,11 @@ func (a *TeslaAPIImpl) CreateTelemetryConfig(vehicle *Vehicle) error {
 	return nil
 }
 
-func (a *TeslaAPIImpl) DeleteTelemetryConfig(vehicle *Vehicle) error {
-	authToken := a.GetOrRefreshAccessToken(vehicle.UserID)
-	target := GetConfig().TeslaAudience + "/api/1/vehicles/" + vehicle.VIN + "/fleet_telemetry_config"
+func (a *TeslaAPIImpl) DeleteTelemetryConfig(accessToken string, vin string) error {
+	target := GetConfig().TeslaAudience + "/api/1/vehicles/" + vin + "/fleet_telemetry_config"
 	r, _ := http.NewRequest("DELETE", target, nil)
 
-	_, err := RetryHTTPJSONRequest(r, authToken)
+	_, err := RetryHTTPJSONRequest(r, accessToken)
 	if err != nil {
 		log.Println(err)
 		return err
@@ -409,12 +401,11 @@ func (a *TeslaAPIImpl) DeleteTelemetryConfig(vehicle *Vehicle) error {
 	return nil
 }
 
-func (a *TeslaAPIImpl) GetTelemetryConfig(vehicle *Vehicle) error {
-	authToken := a.GetOrRefreshAccessToken(vehicle.UserID)
-	target := GetConfig().TeslaAudience + "/api/1/vehicles/" + vehicle.VIN + "/fleet_telemetry_config"
+func (a *TeslaAPIImpl) GetTelemetryConfig(accessToken string, vin string) error {
+	target := GetConfig().TeslaAudience + "/api/1/vehicles/" + vin + "/fleet_telemetry_config"
 	r, _ := http.NewRequest("GET", target, nil)
 
-	resp, err := RetryHTTPJSONRequest(r, authToken)
+	resp, err := RetryHTTPJSONRequest(r, accessToken)
 	if err != nil {
 		log.Println(err)
 		return err

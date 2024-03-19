@@ -19,7 +19,7 @@ func TestTeslaRouter_listVehicles_noBearer(t *testing.T) {
 func TestTeslaRouter_listVehicles_unknownBearer(t *testing.T) {
 	t.Cleanup(ResetTestDB)
 	TeslaAPIInstance = &TeslaAPIImpl{}
-	TeslaAPIInstance.InitTokenCache()
+	//TeslaAPIInstance.InitTokenCache()
 
 	bearer := getTestJWT("12345")
 	req := newHTTPRequest("GET", "/api/1/tesla/vehicles", bearer, nil)
