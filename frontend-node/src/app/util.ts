@@ -106,14 +106,6 @@ export async function putAPI(endpoint: string, data: any): Promise<any> {
   return json;
 }
 
-export async function copyToClipboard(s: string) {
-  try {
-    await navigator.clipboard.writeText(s);
-  } catch (err) {
-    console.error('Failed to copy: ', err);
-  }
-}
-
 export async function checkAuth() {
   return new Promise<void>((resolve, reject) => {
     if (!getAccessToken()) {
