@@ -1,12 +1,13 @@
 'use client'
 
 import React, { useEffect, useState } from "react";
-import { checkAuth, copyToClipboard, getAccessToken, getBaseUrl, saveUserDetails } from "../util";
-import { Alert, Button, Container } from "react-bootstrap";
+import { checkAuth, getAccessToken, getBaseUrl, saveUserDetails } from "../util";
+import { Alert, Container } from "react-bootstrap";
 import Loading from "../loading";
 import Link from "next/link";
 
 export default function TeslaCallbackPage() {
+  const [accessToken, setAccessToken] = useState("")
   const [refreshToken, setRefreshToken] = useState("")
   const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -27,6 +28,7 @@ export default function TeslaCallbackPage() {
         .then(res => res.json())
         .then(json => {
           if (json.access_token) {
+            setAccessToken(json.access_token);
             setRefreshToken(json.refresh_token);
             saveUserDetails(json.user);
             setSuccess(true);
@@ -57,11 +59,6 @@ export default function TeslaCallbackPage() {
     return (
       <Container fluid="sm" className="pt-5 container-max-width min-height">
         <Alert variant='success' dismissible={false}>Success! Your Tesla Account has been linked succcessfully.</Alert>
-        <p>Please copy the the Token shown below. It is required for setting up your remote controller node. The Token will NOT be saved at chargebot.io.</p>
-        <strong>Refresh Token:</strong>
-        <Button variant="link" onClick={() => copyToClipboard(refreshToken)}>Copy</Button>
-        <br />
-        <pre>{refreshToken}</pre>
         <p>
           <Link href="/authorized" className="btn btn-link">&lt; Back</Link>
         </p>
