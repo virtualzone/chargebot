@@ -54,7 +54,7 @@ func (t *VehicleStateTelemetry) updateVehicleState(telemetryState *TelemetryStat
 		// Only change if charging was not recently started
 		event := GetDB().GetLatestChargingEvent(vehicle.VIN, LogEventChargeStart)
 		now := time.Now().UTC()
-		if event.Timestamp.After(now.Add(-5 * time.Minute)) {
+		if event.Timestamp.Before(now.Add(-5 * time.Minute)) {
 			GetDB().SetVehicleStateCharging(vehicle.VIN, ChargeStateNotCharging)
 		}
 	}
