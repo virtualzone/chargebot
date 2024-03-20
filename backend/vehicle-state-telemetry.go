@@ -51,7 +51,12 @@ func (t *VehicleStateTelemetry) updateVehicleState(telemetryState *TelemetryStat
 		GetDB().SetVehicleStateChargeLimit(vehicle.VIN, telemetryState.ChargeLimit)
 	}
 	if oldState.Charging != ChargeStateNotCharging && !telemetryState.Charging {
-		GetDB().SetVehicleStateCharging(vehicle.VIN, ChargeStateNotCharging)
+		// Only change if charging was not recently started
+		event := GetDB().GetLatestChargingEvent(vehicle.VIN, LogEventChargeStart)
+		now := time.Now().UTC()
+		if event.Timestamp.After(now.Add(-5 * time.Minute)) {
+			GetDB().SetVehicleStateCharging(vehicle.VIN, ChargeStateNotCharging)
+		}
 	}
 	user := GetDB().GetUser(vehicle.UserID)
 	isVehicleHome := IsVehicleHome(telemetryState, user)
