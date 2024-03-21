@@ -37,7 +37,7 @@ func (c *ChargeController) Init() {
 }
 
 func (c *ChargeController) OnTick() {
-	vehicles := GetDB().GetAllVehicles()
+	vehicles := GetDB().GetVehicles()
 	for _, vehicle := range vehicles {
 		if c.Async {
 			go c.processVehicle(vehicle)
@@ -83,7 +83,7 @@ func (c *ChargeController) processVehicle(vehicle *Vehicle) {
 }
 
 func (c *ChargeController) stopCharging(vehicle *Vehicle) {
-	car, err := GetTeslaAPI().InitSession(vehicle, true)
+	err := GetTeslaAPI().Wakeup(vehicle.VIN)
 	if err != nil {
 		GetDB().LogChargingEvent(vehicle.VIN, LogEventChargeStop, fmt.Sprintf("could not init session with car: %s", err.Error()))
 		return
@@ -91,7 +91,7 @@ func (c *ChargeController) stopCharging(vehicle *Vehicle) {
 
 	time.Sleep(DelayBetweenAPICommands) // delay
 
-	if err := GetTeslaAPI().ChargeStop(car); err != nil {
+	if err := GetTeslaAPI().ChargeStop(vehicle.VIN); err != nil {
 		GetDB().LogChargingEvent(vehicle.VIN, LogEventChargeStop, fmt.Sprintf("could not stop charging: %s", err.Error()))
 		return
 	}
@@ -132,7 +132,7 @@ func (c *ChargeController) checkStartCharging(vehicle *Vehicle, state *VehicleSt
 }
 
 func (c *ChargeController) activateCharging(vehicle *Vehicle, state *VehicleState, amps int, source ChargeState) bool {
-	car, err := GetTeslaAPI().InitSession(vehicle, true)
+	err := GetTeslaAPI().Wakeup(vehicle.VIN)
 	if err != nil {
 		GetDB().LogChargingEvent(vehicle.VIN, LogEventWakeVehicle, "could not wake vehicle: "+err.Error())
 		return false
@@ -143,7 +143,7 @@ func (c *ChargeController) activateCharging(vehicle *Vehicle, state *VehicleStat
 
 	// set the charge limit
 	if state.ChargeLimit != vehicle.TargetSoC {
-		if err := GetTeslaAPI().SetChargeLimit(car, vehicle.TargetSoC); err != nil {
+		if err := GetTeslaAPI().SetChargeLimit(vehicle.VIN, vehicle.TargetSoC); err != nil {
 			GetDB().LogChargingEvent(vehicle.VIN, LogEventSetTargetSoC, "could not set target SoC: "+err.Error())
 			return false
 		}
@@ -153,7 +153,7 @@ func (c *ChargeController) activateCharging(vehicle *Vehicle, state *VehicleStat
 
 	// set amps to charge
 	if state.Amps != amps {
-		if err := GetTeslaAPI().SetChargeAmps(car, amps); err != nil {
+		if err := GetTeslaAPI().SetChargeAmps(vehicle.VIN, amps); err != nil {
 			GetDB().LogChargingEvent(vehicle.VIN, LogEventSetChargingAmps, "could not set charge amps: "+err.Error())
 			return false
 		}
@@ -161,7 +161,7 @@ func (c *ChargeController) activateCharging(vehicle *Vehicle, state *VehicleStat
 		time.Sleep(DelayBetweenAPICommands) // delay
 	}
 
-	if err := GetTeslaAPI().ChargeStart(car); err != nil {
+	if err := GetTeslaAPI().ChargeStart(vehicle.VIN); err != nil {
 		GetDB().LogChargingEvent(vehicle.VIN, LogEventChargeStart, "could not start charging: "+err.Error())
 		return false
 	}
@@ -474,7 +474,7 @@ func (c *ChargeController) minimumChargeTimeReached(vehicle *Vehicle, state *Veh
 }
 
 func (c *ChargeController) canAdjustSolarAmps(vehicle *Vehicle) bool {
-	surpluses := GetDB().GetLatestSurplusRecords(vehicle.UserID, 1)
+	surpluses := GetDB().GetLatestSurplusRecords(1)
 	if len(surpluses) == 0 {
 		return false
 	}
@@ -490,7 +490,7 @@ func (c *ChargeController) canAdjustSolarAmps(vehicle *Vehicle) bool {
 func (c *ChargeController) getActualSurplus(vehicle *Vehicle, state *VehicleState) int {
 	numSamples := 2
 	now := c.Time.UTCNow()
-	surpluses := GetDB().GetLatestSurplusRecords(vehicle.UserID, numSamples)
+	surpluses := GetDB().GetLatestSurplusRecords(numSamples)
 	if len(surpluses) == 0 {
 		return -1
 	}
@@ -534,11 +534,11 @@ func (c *ChargeController) chargeProcessAdjustSolarAmps(vehicle *Vehicle, state 
 	if state.Charging == ChargeStateChargingOnSolar && targetAmps > 0 && targetAmps != state.Amps {
 		// ...and only if the last amps adjustment occured before the latest surplus data came in
 		if c.canAdjustSolarAmps(vehicle) {
-			car, err := GetTeslaAPI().InitSession(vehicle, true)
+			err := GetTeslaAPI().Wakeup(vehicle.VIN)
 			if err != nil {
 				GetDB().LogChargingEvent(vehicle.VIN, LogEventSetChargingAmps, fmt.Sprintf("could not init session with car: %s", err.Error()))
 			} else {
-				if err := GetTeslaAPI().SetChargeAmps(car, targetAmps); err != nil {
+				if err := GetTeslaAPI().SetChargeAmps(vehicle.VIN, targetAmps); err != nil {
 					GetDB().LogChargingEvent(vehicle.VIN, LogEventSetChargingAmps, "could not set charge amps: "+err.Error())
 				} else {
 					GetDB().SetVehicleStateAmps(vehicle.VIN, targetAmps)

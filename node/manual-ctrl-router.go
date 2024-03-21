@@ -46,7 +46,7 @@ func (router *ManualControlRouter) getVehicleFromRequest(r *http.Request) *Vehic
 	vin := vars["vin"]
 
 	vehicle := GetDB().GetVehicleByVIN(vin)
-	if vehicle == nil || vehicle.UserID != GetUserIDFromRequest(r) {
+	if vehicle == nil {
 		return nil
 	}
 	return vehicle

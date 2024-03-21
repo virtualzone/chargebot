@@ -1,6 +1,6 @@
 module chargebot.io/node
 
-go 1.22.0
+go 1.22.1
 
 require (
 	github.com/go-playground/validator v9.31.0+incompatible
@@ -25,6 +25,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/stretchr/objx v0.5.0 // indirect
+	github.com/virtualzone/chargebot/goshared v0.0.0-00010101000000-000000000000 // indirect
 	golang.org/x/net v0.22.0 // indirect
 	golang.org/x/sys v0.18.0 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
@@ -37,3 +38,5 @@ require (
 	modernc.org/strutil v1.2.0 // indirect
 	modernc.org/token v1.1.0 // indirect
 )
+
+replace github.com/virtualzone/chargebot/goshared => ../goshared

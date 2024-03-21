@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/stretchr/testify/mock"
 	"github.com/teslamotors/vehicle-command/pkg/vehicle"
+	. "github.com/virtualzone/chargebot/goshared"
 )
 
 type TeslaAPIMock struct {

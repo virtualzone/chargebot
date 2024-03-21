@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
@@ -9,25 +11,28 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	. "github.com/virtualzone/chargebot/goshared"
 )
 
-type TeslaAPI struct {
+type TeslaAPI interface {
+	RefreshToken(refreshToken string) (*TeslaAPITokenReponse, error)
+	ListVehicles() ([]TeslaAPIVehicleEntity, error)
+	ChargeStart(vin string) error
+	ChargeStop(vin string) error
+	SetChargeLimit(vin string, limitPercent int) error
+	SetChargeAmps(vin string, amps int) error
+	GetVehicleData(vin string) (*TeslaAPIVehicleData, error)
+	Wakeup(vin string) error
+	CreateTelemetryConfig(vin string) error
+	DeleteTelemetryConfig(vin string) error
+}
+
+type TeslaAPIProxy struct {
 	accessToken string
 	expiry      int64
 }
 
-type TeslaAPIVehicleEntity struct {
-	VehicleID   int    `json:"vehicle_id"`
-	VIN         string `json:"vin"`
-	DisplayName string `json:"display_name"`
-}
-
-type TeslaAPITokenReponse struct {
-	RefreshToken string `json:"refresh_token"`
-	AccessToken  string `json:"access_token"`
-}
-
-func (a *TeslaAPI) RefreshToken(refreshToken string) (*TeslaAPITokenReponse, error) {
+func (a *TeslaAPIProxy) RefreshToken(refreshToken string) (*TeslaAPITokenReponse, error) {
 	target := "https://auth.tesla.com/oauth2/v3/token"
 	data := url.Values{}
 	data.Set("grant_type", "refresh_token")
@@ -63,7 +68,7 @@ func (a *TeslaAPI) RefreshToken(refreshToken string) (*TeslaAPITokenReponse, err
 	return &m, nil
 }
 
-func (a *TeslaAPI) GetOrRefreshAccessToken() string {
+func (a *TeslaAPIProxy) GetOrRefreshAccessToken() string {
 	accessToken := a.GetCachedAccessToken()
 	if accessToken == "" {
 		refreshToken := GetDB().GetSetting(SettingRefreshToken)
@@ -77,7 +82,7 @@ func (a *TeslaAPI) GetOrRefreshAccessToken() string {
 	return accessToken
 }
 
-func (a *TeslaAPI) GetCachedAccessToken() string {
+func (a *TeslaAPIProxy) GetCachedAccessToken() string {
 	if a.accessToken == "" {
 		return ""
 	}
@@ -88,9 +93,21 @@ func (a *TeslaAPI) GetCachedAccessToken() string {
 	return a.accessToken
 }
 
-func (a *TeslaAPI) ListVehicles() ([]TeslaAPIVehicleEntity, error) {
+func (a *TeslaAPIProxy) ListVehicles() ([]TeslaAPIVehicleEntity, error) {
+	token := a.GetOrRefreshAccessToken()
+	payload := AccessTokenRequest{
+		PasswordProtectedRequest: PasswordProtectedRequest{
+			Password: "",
+		},
+		AccessToken: token,
+	}
+	json, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+
 	target := GetConfig().CmdEndpoint + "/list_vehicles"
-	r, _ := http.NewRequest("POST", target, nil)
+	r, _ := http.NewRequest("POST", target, bytes.NewReader(json))
 
 	resp, err := RetryHTTPJSONRequest(r, a.GetOrRefreshAccessToken())
 	if err != nil {
@@ -104,4 +121,44 @@ func (a *TeslaAPI) ListVehicles() ([]TeslaAPIVehicleEntity, error) {
 	}
 
 	return m, nil
+}
+
+func (a *TeslaAPIProxy) ChargeStart(vin string) error {
+	// TODO
+	return nil
+}
+
+func (a *TeslaAPIProxy) ChargeStop(vin string) error {
+	// TODO
+	return nil
+}
+
+func (a *TeslaAPIProxy) SetChargeLimit(vin string, limitPercent int) error {
+	// TODO
+	return nil
+}
+
+func (a *TeslaAPIProxy) SetChargeAmps(vin string, amps int) error {
+	// TODO
+	return nil
+}
+
+func (a *TeslaAPIProxy) GetVehicleData(vin string) (*TeslaAPIVehicleData, error) {
+	// TODO
+	return nil, nil
+}
+
+func (a *TeslaAPIProxy) Wakeup(vin string) error {
+	// TODO
+	return nil
+}
+
+func (a *TeslaAPIProxy) CreateTelemetryConfig(vin string) error {
+	// TODO
+	return nil
+}
+
+func (a *TeslaAPIProxy) DeleteTelemetryConfig(vin string) error {
+	// TODO
+	return nil
 }

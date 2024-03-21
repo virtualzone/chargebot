@@ -243,29 +243,6 @@ func (db *DB) GetVehicles() []*Vehicle {
 	return result
 }
 
-func (db *DB) GetAllVehicles() []*Vehicle {
-	result := []*Vehicle{}
-	rows, err := db.GetConnection().Query("select vin, display_name, " +
-		"enabled, target_soc, max_amps, num_phases, surplus_charging, min_surplus, min_chargetime, lowcost_charging, grid_provider, grid_strategy, depart_days, depart_time, max_price, tibber_token, telemetry_enroll_date " +
-		"from vehicles")
-	if err != nil {
-		log.Println(err)
-		return nil
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var ts string
-		e := &Vehicle{}
-		rows.Scan(&e.VIN, &e.DisplayName, &e.Enabled, &e.TargetSoC, &e.MaxAmps, &e.NumPhases, &e.SurplusCharging, &e.MinSurplus, &e.MinChargeTime, &e.LowcostCharging, &e.GridProvider, &e.GridStrategy, &e.DepartDays, &e.DepartTime, &e.MaxPrice, &e.TibberToken, &ts)
-		if ts != "" {
-			parsedDate, _ := time.Parse(SQLITE_DATETIME_LAYOUT, ts)
-			e.TelemetryEnrollDate = &parsedDate
-		}
-		result = append(result, e)
-	}
-	return result
-}
-
 func (db *DB) DeleteVehicle(vin string) {
 	if _, err := db.GetConnection().Exec("delete from vehicles where vin = ?", vin); err != nil {
 		log.Panicln(err)
@@ -345,7 +322,7 @@ func (db *DB) SetVehicleStateIsHome(vin string, isHome bool) {
 }
 
 func (db *DB) RecordSurplus(surplus int) {
-	_, err := db.GetConnection().Exec("insert into surpluses (ts, surplus_watts) values (?, ?, ?)", db.formatSqliteDatetime(db.Time.UTCNow()), surplus)
+	_, err := db.GetConnection().Exec("insert into surpluses (ts, surplus_watts) values (?, ?)", db.formatSqliteDatetime(db.Time.UTCNow()), surplus)
 	if err != nil {
 		log.Panicln(err)
 	}
@@ -354,7 +331,7 @@ func (db *DB) RecordSurplus(surplus int) {
 func (db *DB) GetLatestSurplusRecords(num int) []*SurplusRecord {
 	result := []*SurplusRecord{}
 	rows, err := db.GetConnection().Query("select ts, surplus_watts "+
-		"from surpluses where user_id = ? order by ts desc limit ?",
+		"from surpluses order by ts desc limit ?",
 		num)
 	if err != nil {
 		log.Println(err)

@@ -8,6 +8,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	"github.com/teslamotors/vehicle-command/pkg/vehicle"
+	. "github.com/virtualzone/chargebot/goshared"
 )
 
 type UserRouter struct {
@@ -20,41 +21,8 @@ type AuthenticatedUserRequest struct {
 	UserID  string
 }
 
-type PasswordProtectedRequest struct {
-	Password string `json:"password"`
-}
-
-type SurplusRecordingRequest struct {
-	PasswordProtectedRequest
-	SurplusWatts        int `json:"surplus_watts"`
-	InverterActivePower int `json:"inverter_active_power_watts"`
-	Consumption         int `json:"consumption_watts"`
-}
-
-type AccessTokenRequest struct {
-	PasswordProtectedRequest
-	AccessToken string `json:"access_token" validate:"required"`
-}
-
-type SetChargeLimitRequest struct {
-	AccessTokenRequest
-	ChargeLimit int `json:"limit" validate:"min:0,max:100,required"`
-}
-
-type SetChargeAmpsRequest struct {
-	AccessTokenRequest
-	Amps int `json:"limit" validate:"min:0,max:16,required"`
-}
-
 type ErrorResponse struct {
 	Error string `json:"error"`
-}
-
-type SurplusRecordingResponse struct {
-}
-
-type PlugInOutRequest struct {
-	Password string `json:"password"`
 }
 
 func (router *UserRouter) SetupRoutes(s *mux.Router) {
