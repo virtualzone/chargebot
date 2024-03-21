@@ -45,3 +45,18 @@ type TeslaAPIVehicleData struct {
 	VIN         string              `json:"vin"`
 	ChargeState TeslaAPIChargeState `json:"charge_state"`
 }
+
+type ErrorResponse struct {
+	Error string `json:"error"`
+}
+
+type PersistedTelemetryState struct {
+	VIN         string `json:"vehicle_vin"`
+	PluggedIn   bool   `json:"pluggedIn"`
+	Charging    bool   `json:"charging"`
+	SoC         int    `json:"soc"`
+	Amps        int    `json:"amps"`
+	ChargeLimit int    `json:"chargeLimit"`
+	IsHome      bool   `json:"is_home"`
+	UTC         int64  `json:"ts"`
+}

@@ -1,12 +1,14 @@
 package main
 
 import (
+	"encoding/json"
 	"log"
 	"net/url"
 	"os"
 	"time"
 
 	"github.com/gorilla/websocket"
+	. "github.com/virtualzone/chargebot/goshared"
 )
 
 type TelemetryPoller struct {
@@ -25,6 +27,17 @@ func (t *TelemetryPoller) Poll() {
 			time.Sleep(5 * time.Second)
 		}
 	}()
+}
+
+func (t *TelemetryPoller) sendAuth(c *websocket.Conn) error {
+	payload := PasswordProtectedRequest{
+		Password: GetConfig().TokenPassword,
+	}
+	json, _ := json.Marshal(payload)
+	if err := c.WriteMessage(websocket.TextMessage, json); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (t *TelemetryPoller) connectAndListen() bool {
@@ -53,19 +66,26 @@ func (t *TelemetryPoller) connectAndListen() bool {
 	}()
 
 	// TEST
-	ticker := time.NewTicker(time.Second * 1)
-	defer ticker.Stop()
+	//ticker := time.NewTicker(time.Second * 1)
+	//defer ticker.Stop()
+
+	if err := t.sendAuth(c); err != nil {
+		log.Println("send auth:", err)
+		return false
+	}
 
 	for {
 		select {
 		case <-done:
 			return false
-		case t := <-ticker.C:
-			err := c.WriteMessage(websocket.TextMessage, []byte(t.String()))
-			if err != nil {
-				log.Println("write:", err)
-				return false
-			}
+			/*
+				case t := <-ticker.C:
+					err := c.WriteMessage(websocket.TextMessage, []byte(t.String()))
+					if err != nil {
+						log.Println("write:", err)
+						return false
+					}
+			*/
 		case <-t.Interrupt:
 			err := c.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
 			if err != nil {

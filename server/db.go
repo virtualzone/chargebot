@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	. "github.com/virtualzone/chargebot/goshared"
 	_ "modernc.org/sqlite"
 )
 
@@ -66,6 +67,7 @@ drop table if exists auth_codes;
 drop table if exists users;
 drop table if exists vehicles;
 drop table if exists api_tokens;
+drop table if exists telemetry_state;
 `)
 	if err != nil {
 		log.Panicln(err)
@@ -79,6 +81,7 @@ create table if not exists auth_codes(id text primary key, ts text);
 create table if not exists users(id text primary key, tesla_user_id text default '', home_lat real default 0.0, home_lng real default 0.0, home_radius real default 100);
 create table if not exists vehicles(vin text primary key, user_id text);
 create table if not exists api_tokens(token text primary key, user_id text, passhash text);
+create table if not exists telemetry_state(vin text primary key, plugged_in int, charging int, soc int, amps int, charge_limit int, is_home int, ts int);
 `)
 	if err != nil {
 		log.Panicln(err)
@@ -283,4 +286,25 @@ func (db *DB) LogChargingEvent(vin string, eventType int, text string) {
 
 func (db *DB) formatSqliteDatetime(ts time.Time) string {
 	return ts.Format(SQLITE_DATETIME_LAYOUT)
+}
+
+func (db *DB) SaveTelemetryState(state *PersistedTelemetryState) {
+	_, err := db.GetConnection().Exec("replace into telemetry_state values(?, ?, ?, ?, ?, ?, ?, ?)",
+		state.VIN, state.PluggedIn, state.Charging, state.SoC, state.Amps, state.ChargeLimit, state.IsHome, state.UTC)
+	if err != nil {
+		log.Panicln(err)
+	}
+}
+
+func (db *DB) GetTelemetryState(vin string) *PersistedTelemetryState {
+	e := &PersistedTelemetryState{}
+	err := db.GetConnection().QueryRow("select vin, plugged_in, charging, soc, amps, charge_limit, is_home, ts "+
+		"from telemetry_state "+
+		"where vin = ?",
+		vin).Scan(&e.VIN, &e.PluggedIn, &e.Charging, &e.SoC, &e.Amps, &e.ChargeLimit, &e.IsHome, &e.UTC)
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+	return e
 }

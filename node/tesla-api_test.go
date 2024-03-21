@@ -83,6 +83,16 @@ func (a *TeslaAPIMock) DeleteTelemetryConfig(vin string) error {
 	return args.Error(0)
 }
 
+func (a *TeslaAPIMock) RegisterVehicle(vin string) error {
+	args := a.Called(vin)
+	return args.Error(0)
+}
+
+func (a *TeslaAPIMock) UnregisterVehicle(vin string) error {
+	args := a.Called(vin)
+	return args.Error(0)
+}
+
 func UpdateTeslaAPIMockData(api *TeslaAPIMock, vin string, batteryLevel int, chargingState string) {
 	GetDB().SetVehicleStateSoC(vin, batteryLevel)
 	vData := &TeslaAPIVehicleData{

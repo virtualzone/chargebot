@@ -2,8 +2,10 @@ package main
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	. "github.com/virtualzone/chargebot/goshared"
 )
 
 func TestDB_CRUDAuthCode(t *testing.T) {
@@ -116,4 +118,23 @@ func TestDB_IsUserOwnerOfVehicle(t *testing.T) {
 	assert.False(t, GetDB().IsUserOwnerOfVehicle("b", "1"))
 	assert.False(t, GetDB().IsUserOwnerOfVehicle("b", "2"))
 	assert.False(t, GetDB().IsUserOwnerOfVehicle("a", "3"))
+}
+
+func TestDB_CRUDTelemetryState(t *testing.T) {
+	t.Cleanup(ResetTestDB)
+
+	s := &PersistedTelemetryState{
+		VIN:         "abc",
+		PluggedIn:   true,
+		Charging:    true,
+		SoC:         63,
+		Amps:        10,
+		ChargeLimit: 80,
+		IsHome:      true,
+		UTC:         time.Now().UTC().Unix(),
+	}
+	GetDB().SaveTelemetryState(s)
+
+	s2 := GetDB().GetTelemetryState(s.VIN)
+	assert.Equal(t, s, s2)
 }

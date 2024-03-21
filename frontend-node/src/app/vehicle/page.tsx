@@ -1,6 +1,6 @@
 'use client'
 
-import { checkAuth, deleteAPI, getAPI, postAPI, putAPI } from "../util";
+import { deleteAPI, getAPI, postAPI, putAPI } from "../util";
 import { useEffect, useState } from "react";
 import Loading from "../loading";
 import { Accordion, Button, Container, Form, InputGroup, Table } from "react-bootstrap";
@@ -35,12 +35,11 @@ export default function PageVehicle() {
     const searchParams = new URLSearchParams(window.location.search);
     const vin = searchParams.get("vin");
     if (!vin) {
-      router.push('/authorized')
+      router.push('/')
       return;
     }
     vehicleVIN = vin;
     const fetchData = async () => {
-      await checkAuth();
       await loadVehicle();
       setLoading(false);
     }
@@ -117,7 +116,7 @@ export default function PageVehicle() {
     const fetchData = async () => {
       setLoading(true);
       await deleteAPI("/api/1/tesla/vehicle_delete/" + vehicle.vin);
-      router.push('/authorized/?removed=1');
+      router.push('/?removed=1');
     }
     fetchData();
   }
@@ -446,7 +445,7 @@ export default function PageVehicle() {
           </Accordion.Body>
         </Accordion.Item>
       </Accordion>
-      <Link href="/authorized" className="btn btn-link">&lt; Back</Link>
+      <Link href="/" className="btn btn-link">&lt; Back</Link>
     </Container>
   );
 }
