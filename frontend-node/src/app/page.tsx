@@ -34,6 +34,7 @@ export default function PageAuthorized() {
       setShowAlertRemoved(true);
     }
     const fetchData = async () => {
+      loadVehicles();
       loadLatestSurpluses();
       setLoading(false);
     }
@@ -44,22 +45,7 @@ export default function PageAuthorized() {
     console.log("/vehicle/?vin=" + vin);
     router.push("/vehicle/?vin=" + vin);
   }
-
-  async function linkTeslaAccount() {
-    const json = await getAPI("/api/1/auth/tesla/init3rdparty");
-    if (typeof window !== "undefined") {
-      window.location.href = json.url;
-    }
-  }
-
-  async function copyToClipboard(s: string) {
-    try {
-      await navigator.clipboard.writeText(s);
-    } catch (err) {
-      console.error('Failed to copy: ', err);
-    }
-  }
-
+  
   if (isLoading) {
     return <Loading />
   }

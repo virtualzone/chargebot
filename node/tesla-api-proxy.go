@@ -26,6 +26,8 @@ type TeslaAPI interface {
 	Wakeup(vin string) error
 	CreateTelemetryConfig(vin string) error
 	DeleteTelemetryConfig(vin string) error
+	RegisterVehicle(vin string) error
+	UnregisterVehicle(vin string) error
 }
 
 type TeslaAPIProxy struct {
@@ -116,42 +118,173 @@ func (a *TeslaAPIProxy) ListVehicles() ([]TeslaAPIVehicleEntity, error) {
 }
 
 func (a *TeslaAPIProxy) ChargeStart(vin string) error {
-	// TODO
+	payload := AccessTokenRequest{
+		PasswordProtectedRequest: PasswordProtectedRequest{
+			Password: GetConfig().TokenPassword,
+		},
+		AccessToken: a.GetOrRefreshAccessToken(),
+	}
+
+	_, err := a.sendRequest(vin+"/charge_start", payload)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func (a *TeslaAPIProxy) ChargeStop(vin string) error {
-	// TODO
+	payload := AccessTokenRequest{
+		PasswordProtectedRequest: PasswordProtectedRequest{
+			Password: GetConfig().TokenPassword,
+		},
+		AccessToken: a.GetOrRefreshAccessToken(),
+	}
+
+	_, err := a.sendRequest(vin+"/charge_stop", payload)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func (a *TeslaAPIProxy) SetChargeLimit(vin string, limitPercent int) error {
-	// TODO
+	payload := SetChargeLimitRequest{
+		AccessTokenRequest: AccessTokenRequest{
+			PasswordProtectedRequest: PasswordProtectedRequest{
+				Password: GetConfig().TokenPassword,
+			},
+			AccessToken: a.GetOrRefreshAccessToken(),
+		},
+		ChargeLimit: limitPercent,
+	}
+
+	_, err := a.sendRequest(vin+"/set_charge_limit", payload)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func (a *TeslaAPIProxy) SetChargeAmps(vin string, amps int) error {
-	// TODO
+	payload := SetChargeAmpsRequest{
+		AccessTokenRequest: AccessTokenRequest{
+			PasswordProtectedRequest: PasswordProtectedRequest{
+				Password: GetConfig().TokenPassword,
+			},
+			AccessToken: a.GetOrRefreshAccessToken(),
+		},
+		Amps: amps,
+	}
+
+	_, err := a.sendRequest(vin+"/set_charge_amps", payload)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func (a *TeslaAPIProxy) GetVehicleData(vin string) (*TeslaAPIVehicleData, error) {
-	// TODO
-	return nil, nil
+	payload := AccessTokenRequest{
+		PasswordProtectedRequest: PasswordProtectedRequest{
+			Password: GetConfig().TokenPassword,
+		},
+		AccessToken: a.GetOrRefreshAccessToken(),
+	}
+
+	resp, err := a.sendRequest(vin+"/vehicle_data", payload)
+	if err != nil {
+		return nil, err
+	}
+
+	var m TeslaAPIVehicleData
+	if err := UnmarshalBody(resp.Body, &m); err != nil {
+		return nil, err
+	}
+
+	return &m, nil
 }
 
 func (a *TeslaAPIProxy) Wakeup(vin string) error {
-	// TODO
+	payload := AccessTokenRequest{
+		PasswordProtectedRequest: PasswordProtectedRequest{
+			Password: GetConfig().TokenPassword,
+		},
+		AccessToken: a.GetOrRefreshAccessToken(),
+	}
+
+	_, err := a.sendRequest(vin+"/wakeup", payload)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func (a *TeslaAPIProxy) CreateTelemetryConfig(vin string) error {
-	// TODO
+	payload := AccessTokenRequest{
+		PasswordProtectedRequest: PasswordProtectedRequest{
+			Password: GetConfig().TokenPassword,
+		},
+		AccessToken: a.GetOrRefreshAccessToken(),
+	}
+
+	_, err := a.sendRequest(vin+"/create_telemetry_config", payload)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func (a *TeslaAPIProxy) DeleteTelemetryConfig(vin string) error {
-	// TODO
+	payload := AccessTokenRequest{
+		PasswordProtectedRequest: PasswordProtectedRequest{
+			Password: GetConfig().TokenPassword,
+		},
+		AccessToken: a.GetOrRefreshAccessToken(),
+	}
+
+	_, err := a.sendRequest(vin+"/delete_telemetry_config", payload)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (a *TeslaAPIProxy) RegisterVehicle(vin string) error {
+	payload := AccessTokenRequest{
+		PasswordProtectedRequest: PasswordProtectedRequest{
+			Password: GetConfig().TokenPassword,
+		},
+		AccessToken: a.GetOrRefreshAccessToken(),
+	}
+
+	_, err := a.sendRequest("vehicle_add/"+vin, payload)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (a *TeslaAPIProxy) UnregisterVehicle(vin string) error {
+	payload := AccessTokenRequest{
+		PasswordProtectedRequest: PasswordProtectedRequest{
+			Password: GetConfig().TokenPassword,
+		},
+		AccessToken: a.GetOrRefreshAccessToken(),
+	}
+
+	_, err := a.sendRequest("vehicle_delete/"+vin, payload)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -171,6 +304,12 @@ func (a *TeslaAPIProxy) sendRequest(endpoint string, payload interface{}) (*http
 	}
 
 	if resp.StatusCode != http.StatusOK {
+		if resp.StatusCode == http.StatusInternalServerError {
+			var m ErrorResponse
+			if err := UnmarshalBody(resp.Body, &m); err == nil {
+				return nil, fmt.Errorf("api error: %s", m.Error)
+			}
+		}
 		return nil, fmt.Errorf("unexpected response code %d", resp.StatusCode)
 	}
 
