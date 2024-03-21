@@ -12,6 +12,7 @@ type Config struct {
 	TeslaClientID     string
 	DBFile            string
 	Token             string
+	TokenPassword     string
 	TelemetryEndpoint string
 	CmdEndpoint       string
 	DevProxy          bool
@@ -33,6 +34,7 @@ func (c *Config) ReadConfig() {
 	c.TeslaClientID = c.getEnv("TESLA_CLIENT_ID", "e9941f08e0d6-4c2f-b8ee-291060ec648a")
 	c.DBFile = c.getEnv("DB_FILE", "/tmp/chargebot_node.db")
 	c.Token = c.getEnv("TOKEN", "")
+	c.TokenPassword = c.getEnv("PASSWORD", "")
 	c.TelemetryEndpoint = c.getEnv("TELEMETRY_ENDPOINT", "wss://chargebot.io/api/1/user/{token}/ws")
 	c.CmdEndpoint = c.getEnv("CMD_ENDPOINT", "https://chargebot.io/api/1/user/{token}")
 	c.TelemetryEndpoint = strings.ReplaceAll(c.TelemetryEndpoint, "{token}", c.Token)
