@@ -101,7 +101,7 @@ func (router *TeslaRouter) deleteVehicle(w http.ResponseWriter, r *http.Request)
 func (router *TeslaRouter) createAPIToken(w http.ResponseWriter, r *http.Request) {
 	userID := GetUserIDFromRequest(r)
 
-	password := GeneratePassword(16, true, true)
+	password := GeneratePassword(16, true, false)
 	token := GetDB().CreateAPIToken(userID, password)
 
 	resp := GetAPITokenResponse{
@@ -122,7 +122,7 @@ func (router *TeslaRouter) updateAPIToken(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	password := GeneratePassword(16, true, true)
+	password := GeneratePassword(16, true, false)
 	GetDB().UpdateAPITokenPassword(token, password)
 
 	resp := GetAPITokenResponse{

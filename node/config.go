@@ -4,13 +4,16 @@ import (
 	"encoding/json"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 )
 
 type Config struct {
 	TeslaClientID     string
+	TeslaRefreshToken string
 	DBFile            string
+	Port              int
 	Token             string
 	TokenPassword     string
 	TelemetryEndpoint string
@@ -32,7 +35,13 @@ func GetConfig() *Config {
 
 func (c *Config) ReadConfig() {
 	c.TeslaClientID = c.getEnv("TESLA_CLIENT_ID", "e9941f08e0d6-4c2f-b8ee-291060ec648a")
+	c.TeslaRefreshToken = c.getEnv("TESLA_REFRESH_TOKEN", "")
 	c.DBFile = c.getEnv("DB_FILE", "/tmp/chargebot_node.db")
+	port, err := strconv.Atoi(c.getEnv("PORT", "8080"))
+	if err != nil {
+		log.Panicln("PORT must be numeric")
+	}
+	c.Port = port
 	c.Token = c.getEnv("TOKEN", "")
 	c.TokenPassword = c.getEnv("PASSWORD", "")
 	c.TelemetryEndpoint = c.getEnv("TELEMETRY_ENDPOINT", "wss://chargebot.io/api/1/user/{token}/ws")
@@ -41,9 +50,6 @@ func (c *Config) ReadConfig() {
 	c.CmdEndpoint = strings.ReplaceAll(c.CmdEndpoint, "{token}", c.Token)
 	c.DevProxy = (c.getEnv("DEV_PROXY", "0") == "1")
 	c.CryptKey = c.getEnv("CRYPT_KEY", "")
-	if len(c.CryptKey) != 32 {
-		log.Panicln("CRYPT_KEY must be 32 bytes long")
-	}
 }
 
 func (c *Config) Print() {
