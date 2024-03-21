@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -108,7 +109,7 @@ func InitHTTPRouter() {
 	}
 
 	if GetConfig().DevProxy {
-		target, _ := url.Parse("http://localhost:3000")
+		target, _ := url.Parse("http://localhost:3001")
 		proxy := httputil.NewSingleHostReverseProxy(target)
 		router.PathPrefix("/").Handler(proxy)
 	} else {
@@ -122,7 +123,7 @@ func InitHTTPRouter() {
 func ServeHTTP() {
 	log.Println("Initializing REST services...")
 	httpServer := &http.Server{
-		Addr:         "0.0.0.0:8080",
+		Addr:         fmt.Sprintf("0.0.0.0:%d", GetConfig().Port),
 		WriteTimeout: time.Second * 15,
 		ReadTimeout:  time.Second * 15,
 		IdleTimeout:  time.Second * 60,

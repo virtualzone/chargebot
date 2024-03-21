@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha256"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"math/rand"
@@ -153,4 +156,37 @@ func CanUpdateVehicleData(vin string, now *time.Time) bool {
 	}
 	limit := now.Add(time.Minute * time.Duration(MaxVehicleDataUpdateIntervalMinutes) * -1)
 	return event.Timestamp.Before(limit)
+}
+
+func PingCommandServer() error {
+	payload := PasswordProtectedRequest{
+		Password: GetConfig().TokenPassword,
+	}
+	json, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	target := GetConfig().CmdEndpoint + "/ping"
+	r, _ := http.NewRequest("POST", target, bytes.NewReader(json))
+
+	resp, err := RetryHTTPRequest(r)
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected response code %d", resp.StatusCode)
+	}
+
+	m, err := DebugGetResponseBody(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	if m != "true" {
+		return errors.New("expected ping result to be true")
+	}
+
+	return nil
 }

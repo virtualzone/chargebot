@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"net/url"
@@ -94,29 +95,20 @@ func (a *TeslaAPIProxy) GetCachedAccessToken() string {
 }
 
 func (a *TeslaAPIProxy) ListVehicles() ([]TeslaAPIVehicleEntity, error) {
-	token := a.GetOrRefreshAccessToken()
 	payload := AccessTokenRequest{
 		PasswordProtectedRequest: PasswordProtectedRequest{
-			Password: "",
+			Password: GetConfig().TokenPassword,
 		},
-		AccessToken: token,
-	}
-	json, err := json.Marshal(payload)
-	if err != nil {
-		return nil, err
+		AccessToken: a.GetOrRefreshAccessToken(),
 	}
 
-	target := GetConfig().CmdEndpoint + "/list_vehicles"
-	r, _ := http.NewRequest("POST", target, bytes.NewReader(json))
-
-	resp, err := RetryHTTPJSONRequest(r, a.GetOrRefreshAccessToken())
+	resp, err := a.sendRequest("list_vehicles", payload)
 	if err != nil {
-		log.Println(err)
 		return nil, err
 	}
 
 	var m []TeslaAPIVehicleEntity
-	if err := UnmarshalValidateBody(resp.Body, &m); err != nil {
+	if err := UnmarshalBody(resp.Body, &m); err != nil {
 		return nil, err
 	}
 
@@ -161,4 +153,26 @@ func (a *TeslaAPIProxy) CreateTelemetryConfig(vin string) error {
 func (a *TeslaAPIProxy) DeleteTelemetryConfig(vin string) error {
 	// TODO
 	return nil
+}
+
+func (a *TeslaAPIProxy) sendRequest(endpoint string, payload interface{}) (*http.Response, error) {
+	json, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+
+	target := GetConfig().CmdEndpoint + "/" + endpoint
+	r, _ := http.NewRequest("POST", target, bytes.NewReader(json))
+
+	resp, err := RetryHTTPJSONRequest(r, a.GetOrRefreshAccessToken())
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected response code %d", resp.StatusCode)
+	}
+
+	return resp, nil
 }

@@ -28,6 +28,7 @@ type ErrorResponse struct {
 func (router *UserRouter) SetupRoutes(s *mux.Router) {
 	router.VINToSessionCache = NewInMemoryCache(5 * time.Minute)
 	router.WebsocketUpgrader = websocket.Upgrader{}
+	s.HandleFunc("/{token}/ping", router.ping).Methods("POST")
 	s.HandleFunc("/{token}/ws", router.websocket).Methods("GET")
 	s.HandleFunc("/{token}/list_vehicles", router.listVehicles).Methods("POST")
 	s.HandleFunc("/{token}/{vin}/charge_start", router.chargeStart).Methods("POST")
@@ -81,24 +82,45 @@ func (router *UserRouter) websocket(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (router *UserRouter) listVehicles(w http.ResponseWriter, r *http.Request) {
-	var m *AccessTokenRequest
+func (router *UserRouter) ping(w http.ResponseWriter, r *http.Request) {
+	var m PasswordProtectedRequest
+	if err := UnmarshalValidateBody(r.Body, &m); err != nil {
+		SendBadRequest(w)
+		return
+	}
 	a := router.authenticateUserRequest(w, r, &m, false)
+	if a == nil {
+		return
+	}
+	SendJSON(w, true)
+}
+
+func (router *UserRouter) listVehicles(w http.ResponseWriter, r *http.Request) {
+	var m AccessTokenRequest
+	if err := UnmarshalValidateBody(r.Body, &m); err != nil {
+		SendBadRequest(w)
+		return
+	}
+	a := router.authenticateUserRequest(w, r, &m.PasswordProtectedRequest, false)
 	if a == nil {
 		return
 	}
 
 	res, err := GetTeslaAPI().ListVehicles(m.AccessToken)
 	if err != nil {
-		SendInternalServerError(w)
+		router.sendError(w, err)
 		return
 	}
 	SendJSON(w, res)
 }
 
 func (router *UserRouter) chargeStart(w http.ResponseWriter, r *http.Request) {
-	var m *AccessTokenRequest
-	a := router.authenticateUserRequest(w, r, &m, true)
+	var m AccessTokenRequest
+	if err := UnmarshalValidateBody(r.Body, &m); err != nil {
+		SendBadRequest(w)
+		return
+	}
+	a := router.authenticateUserRequest(w, r, &m.PasswordProtectedRequest, true)
 	if a == nil {
 		return
 	}
@@ -117,7 +139,11 @@ func (router *UserRouter) chargeStart(w http.ResponseWriter, r *http.Request) {
 
 func (router *UserRouter) chargeStop(w http.ResponseWriter, r *http.Request) {
 	var m *AccessTokenRequest
-	a := router.authenticateUserRequest(w, r, &m, true)
+	if err := UnmarshalValidateBody(r.Body, &m); err != nil {
+		SendBadRequest(w)
+		return
+	}
+	a := router.authenticateUserRequest(w, r, &m.PasswordProtectedRequest, true)
 	if a == nil {
 		return
 	}
@@ -136,7 +162,11 @@ func (router *UserRouter) chargeStop(w http.ResponseWriter, r *http.Request) {
 
 func (router *UserRouter) vehicleData(w http.ResponseWriter, r *http.Request) {
 	var m *AccessTokenRequest
-	a := router.authenticateUserRequest(w, r, &m, true)
+	if err := UnmarshalValidateBody(r.Body, &m); err != nil {
+		SendBadRequest(w)
+		return
+	}
+	a := router.authenticateUserRequest(w, r, &m.PasswordProtectedRequest, true)
 	if a == nil {
 		return
 	}
@@ -151,7 +181,11 @@ func (router *UserRouter) vehicleData(w http.ResponseWriter, r *http.Request) {
 
 func (router *UserRouter) setChargeLimit(w http.ResponseWriter, r *http.Request) {
 	var m *SetChargeLimitRequest
-	a := router.authenticateUserRequest(w, r, &m, true)
+	if err := UnmarshalValidateBody(r.Body, &m); err != nil {
+		SendBadRequest(w)
+		return
+	}
+	a := router.authenticateUserRequest(w, r, &m.PasswordProtectedRequest, true)
 	if a == nil {
 		return
 	}
@@ -170,7 +204,11 @@ func (router *UserRouter) setChargeLimit(w http.ResponseWriter, r *http.Request)
 
 func (router *UserRouter) setChargeAmps(w http.ResponseWriter, r *http.Request) {
 	var m *SetChargeAmpsRequest
-	a := router.authenticateUserRequest(w, r, &m, true)
+	if err := UnmarshalValidateBody(r.Body, &m); err != nil {
+		SendBadRequest(w)
+		return
+	}
+	a := router.authenticateUserRequest(w, r, &m.PasswordProtectedRequest, true)
 	if a == nil {
 		return
 	}
@@ -187,22 +225,10 @@ func (router *UserRouter) setChargeAmps(w http.ResponseWriter, r *http.Request) 
 	SendJSON(w, true)
 }
 
-func (router *UserRouter) authenticateUserRequest(w http.ResponseWriter, r *http.Request, o interface{}, requireVehicle bool) *AuthenticatedUserRequest {
+func (router *UserRouter) authenticateUserRequest(w http.ResponseWriter, r *http.Request, m *PasswordProtectedRequest, requireVehicle bool) *AuthenticatedUserRequest {
 	vars := mux.Vars(r)
 	token := vars["token"]
 	vin := vars["vin"]
-
-	if err := UnmarshalBody(r.Body, &o); err != nil {
-		SendBadRequest(w)
-		return nil
-	}
-
-	m, ok := o.(PasswordProtectedRequest)
-	if !ok {
-		log.Println("authenticateUserRequest() failed with interface not being of type PasswordProtectedRequest")
-		SendInternalServerError(w)
-		return nil
-	}
 
 	if !GetDB().IsTokenPasswordValid(token, m.Password) {
 		SendUnauthorized(w)

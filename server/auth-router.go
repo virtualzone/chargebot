@@ -72,7 +72,7 @@ func (router *AuthRouter) callback(w http.ResponseWriter, r *http.Request) {
 
 	token := GetDB().GetAPIToken(user.ID)
 	if token == "" {
-		password := GeneratePassword(16, true, true)
+		password := GeneratePassword(16, true, false)
 		token = GetDB().CreateAPIToken(user.ID, password)
 	}
 	user.APIToken = token
