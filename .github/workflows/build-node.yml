@@ -1,8 +1,6 @@
-name: Build Backend
+name: Build Node
 
 on:
-  pull_request:
-    branches: [ main ]
   workflow_dispatch:
     branches: [ main ]
   push:
@@ -20,10 +18,10 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Install dependencies
-      working-directory: ./backend
+      working-directory: ./node
       run: go get -d -v ./...
     - name: Run tests
-      working-directory: ./backend
+      working-directory: ./node
       run: go test -cover -v
 
   build:
