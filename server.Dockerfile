@@ -8,7 +8,7 @@ FROM golang:1.22-bookworm AS server-builder
 RUN export GOBIN=$HOME/work/bin
 WORKDIR /go/src/app
 COPY goshared/ /go/src/goshared
-COPY backend/ .
+COPY server/ .
 RUN go get -d -v ./...
 RUN CGO_ENABLED=0 go build -ldflags="-w -s" -o main .
 
