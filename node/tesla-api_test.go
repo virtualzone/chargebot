@@ -93,6 +93,15 @@ func (a *TeslaAPIMock) UnregisterVehicle(vin string) error {
 	return args.Error(0)
 }
 
+func (a *TeslaAPIMock) GetTelemetryState(vin string) (*PersistedTelemetryState, error) {
+	args := a.Called(vin)
+	if resp, ok := args.Get(0).(*PersistedTelemetryState); !ok {
+		panic("assert: arguments wasn't correct type")
+	} else {
+		return resp, args.Error(1)
+	}
+}
+
 func UpdateTeslaAPIMockData(api *TeslaAPIMock, vin string, batteryLevel int, chargingState string) {
 	GetDB().SetVehicleStateSoC(vin, batteryLevel)
 	vData := &TeslaAPIVehicleData{

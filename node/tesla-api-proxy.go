@@ -28,6 +28,7 @@ type TeslaAPI interface {
 	DeleteTelemetryConfig(vin string) error
 	RegisterVehicle(vin string) error
 	UnregisterVehicle(vin string) error
+	GetTelemetryState(vin string) (*PersistedTelemetryState, error)
 }
 
 type TeslaAPIProxy struct {
@@ -313,6 +314,26 @@ func (a *TeslaAPIProxy) UnregisterVehicle(vin string) error {
 	}
 
 	return nil
+}
+
+func (a *TeslaAPIProxy) GetTelemetryState(vin string) (*PersistedTelemetryState, error) {
+	log.Println("Tesla API: Poll telemetry state from chargebot.io...")
+
+	payload := PasswordProtectedRequest{
+		Password: GetConfig().TokenPassword,
+	}
+
+	resp, err := a.sendRequest(vin+"/state", payload)
+	if err != nil {
+		return nil, err
+	}
+
+	var m PersistedTelemetryState
+	if err := UnmarshalBody(resp.Body, &m); err != nil {
+		return nil, err
+	}
+
+	return &m, nil
 }
 
 func (a *TeslaAPIProxy) sendRequest(endpoint string, payload interface{}) (*http.Response, error) {

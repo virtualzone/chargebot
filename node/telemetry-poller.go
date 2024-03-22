@@ -3,19 +3,75 @@ package main
 import (
 	"encoding/json"
 	"log"
-	"net/url"
 	"os"
 	"strings"
 	"time"
 
-	"github.com/gorilla/websocket"
 	. "github.com/virtualzone/chargebot/goshared"
 )
 
 type TelemetryPoller struct {
 	Interrupt chan os.Signal
+	ticker    *time.Ticker
+	vins      []string
+	lastKnown map[string]int64
+	polling   bool
 }
 
+func (t *TelemetryPoller) Poll() {
+	t.initVins()
+	t.polling = false
+	t.ticker = time.NewTicker(time.Second * 5)
+	go func() {
+		for {
+			select {
+			case <-t.ticker.C:
+				if t.polling {
+					break
+				}
+				t.polling = true
+				for _, vin := range t.vins {
+					t.getVehicleState(vin)
+				}
+				t.polling = false
+			case <-t.Interrupt:
+				return
+			}
+		}
+	}()
+}
+
+func (t *TelemetryPoller) Reconnect() {
+	t.initVins()
+}
+
+func (t *TelemetryPoller) getVehicleState(vin string) {
+	state, err := GetTeslaAPI().GetTelemetryState(vin)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	if state == nil {
+		return
+	}
+	lastKnown, ok := t.lastKnown[vin]
+	if !ok || lastKnown < state.UTC {
+		t.processState(state)
+		t.lastKnown[vin] = state.UTC
+	}
+}
+
+func (t *TelemetryPoller) initVins() {
+	t.vins = []string{}
+	t.lastKnown = make(map[string]int64)
+	vehicles := GetDB().GetVehicles()
+	for _, v := range vehicles {
+		t.vins = append(t.vins, v.VIN)
+		t.lastKnown[v.VIN] = 0
+	}
+}
+
+/*
 func (t *TelemetryPoller) Poll() {
 	go func() {
 		interrupted := false
@@ -112,6 +168,7 @@ func (t *TelemetryPoller) connectAndListen() bool {
 
 	}
 }
+*/
 
 func (t *TelemetryPoller) processState(telemetryState *PersistedTelemetryState) {
 	vehicle := GetDB().GetVehicleByVIN(telemetryState.VIN)
@@ -119,6 +176,10 @@ func (t *TelemetryPoller) processState(telemetryState *PersistedTelemetryState) 
 		log.Printf("could not find vehicle by vin for telemetry data: %s\n", telemetryState.VIN)
 		return
 	}
+
+	sState, _ := json.Marshal(telemetryState)
+	LogDebug("Processing vehicle state: " + string(sState))
+
 	oldState := GetDB().GetVehicleState(vehicle.VIN)
 	if oldState == nil {
 		oldState = &VehicleState{

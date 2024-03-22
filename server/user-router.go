@@ -31,6 +31,7 @@ func (router *UserRouter) SetupRoutes(s *mux.Router) {
 	s.HandleFunc("/{token}/list_vehicles", router.listVehicles).Methods("POST")
 	s.HandleFunc("/{token}/vehicle_add/{vin}", router.addVehicle).Methods("POST")
 	s.HandleFunc("/{token}/vehicle_delete/{vin}", router.deleteVehicle).Methods("POST")
+	s.HandleFunc("/{token}/{vin}/state", router.getTelemetryState).Methods("POST")
 	s.HandleFunc("/{token}/{vin}/charge_start", router.chargeStart).Methods("POST")
 	s.HandleFunc("/{token}/{vin}/charge_stop", router.chargeStop).Methods("POST")
 	s.HandleFunc("/{token}/{vin}/set_charge_limit", router.setChargeLimit).Methods("POST")
@@ -164,6 +165,21 @@ func (router *UserRouter) ping(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	SendJSON(w, true)
+}
+
+func (router *UserRouter) getTelemetryState(w http.ResponseWriter, r *http.Request) {
+	var m PasswordProtectedRequest
+	if err := UnmarshalValidateBody(r.Body, &m); err != nil {
+		SendBadRequest(w)
+		return
+	}
+	a := router.authenticateUserRequest(w, r, &m, true)
+	if a == nil {
+		return
+	}
+
+	state := GetDB().GetTelemetryState(a.Vehicle.VIN)
+	SendJSON(w, state)
 }
 
 func (router *UserRouter) listVehicles(w http.ResponseWriter, r *http.Request) {
