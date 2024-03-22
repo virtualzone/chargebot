@@ -6,11 +6,28 @@ chargebot.io allows for charging your Tesla from your solar power plant and/or a
 1. Link your Tesla Account with chargebot.io and note down:
    * Your Tesla Token
    * Your chargebot.io Token and Token Password
-1. Set up your chargebot.io remote controller node using Docker:
+1. Set up your chargebot.io remote controller node using a ```docker-compose.yml``` file for Docker Compose:
    ```
-   docker run 
+   services:
+     node:
+       image: ghcr.io/virtualzone/chargebot:latest
+       restart: always
+       ports:
+         - 8080:8080
+       environment:
+         TESLA_REFRESH_TOKEN: 'initial-tesla-refresh-token'
+         DB_FILE: '/data/chargbeot.db'
+         PORT: '8080'
+         TOKEN: 'your-chargebot.io-token'
+         PASSWORD: 'your-chargebot-io-token-password'
+         CRYPT_KEY: 'a-32-bytes-long-random-key'
+       volumes:
+         - db:/data
+     volumes: 
+       data:
    ```
-1. Open 
+1. Run using: ```docker compose up -d```
+1. Access the web frontend at: http://localhost:8080
 
 ## How it works
 chargebot.io uses the Tesla Fleet API and Tesla Fleet Telemetry in order to control your vehicle's charging process.
@@ -20,3 +37,16 @@ The actual work is done by your local remote controller node. It decides whether
 The centralized chargebot.io instance serves as a proxy for your local node's command and forwards them to the Tesla Fleet API. The centralized instance is required as it signs requests from your local node to your Tesla with a private key and forwards incoming Fleet Telemetry data to your local node.
 
 Only your local node knows and saved your personal Tesla Token. It is neither stored nor used by the centralized chargebot.io instance.
+
+## Environment variables
+| Environment Variable | Type | Default | Description |
+| --- | --- | --- | --- |
+| TESLA_REFRESH_TOKEN | string |  | Tesla Refresh Token shown after linking your Tesla Account with your chargebot.io account (only needed for initial setup) |
+| DB_FILE | string | /tmp/chargebot_node.db | SQLite database file |
+| PORT | int | 8080 | HTTP listening port |
+| TOKEN | string |  | Your chargebot.io token |
+| PASSWORD | string |  | Your chargebot.io token's password |
+| CRYPT_KEY | string |  | A key for encrypting your Tesla Refresh Token in the SQLite database |
+
+## More help
+Visit https://chargebot.io/help/ for more information.
