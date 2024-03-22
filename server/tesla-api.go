@@ -84,22 +84,7 @@ type TeslaAPI interface {
 }
 
 type TeslaAPIImpl struct {
-	//UserIDToTokenCache *bigcache.BigCache
 }
-
-/*
-func (a *TeslaAPIImpl) InitTokenCache() {
-	config := bigcache.DefaultConfig(8 * time.Hour)
-	config.CleanWindow = 1 * time.Minute
-	config.HardMaxCacheSize = 1024
-
-	cache2, err := bigcache.New(context.Background(), config)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	a.UserIDToTokenCache = cache2
-}
-*/
 
 func (a *TeslaAPIImpl) GetTokens(userID string, code string, redirectURI string) (*TeslaAPITokenReponse, error) {
 	target := "https://auth.tesla.com/oauth2/v3/token"
@@ -130,9 +115,6 @@ func (a *TeslaAPIImpl) GetTokens(userID string, code string, redirectURI string)
 		return nil, errors.New("could not parse jwt")
 	}
 
-	// Cache token
-	//a.UserIDToTokenCache.Set(userID, []byte(m.AccessToken))
-
 	return &m, nil
 }
 
@@ -162,43 +144,8 @@ func (a *TeslaAPIImpl) RefreshToken(userID string, refreshToken string) (*TeslaA
 		return nil, errors.New("could not parse jwt")
 	}
 
-	// Cache token
-	//a.UserIDToTokenCache.Set(userID, []byte(m.AccessToken))
-
 	return &m, nil
 }
-
-/*
-func (a *TeslaAPIImpl) GetOrRefreshAccessToken(userID string) string {
-	//log.Printf("GetOrRefreshAccessToken() with userID %s\n", userID)
-	//debug.PrintStack()
-	accessToken := a.GetCachedAccessToken(userID)
-	if accessToken == "" {
-		user := GetDB().GetUser(userID)
-		if user == nil {
-			log.Printf("user not found: %s\n", userID)
-			return ""
-		}
-		token, err := a.RefreshToken(userID, user.TeslaRefreshToken)
-		if err != nil {
-			log.Println(err)
-			return ""
-		}
-		user.TeslaRefreshToken = token.RefreshToken
-		GetDB().CreateUpdateUser(user)
-		accessToken = token.AccessToken
-	}
-	return accessToken
-}
-
-func (a *TeslaAPIImpl) GetCachedAccessToken(userID string) string {
-	token, err := a.UserIDToTokenCache.Get(userID)
-	if err != nil {
-		return ""
-	}
-	return string(token)
-}
-*/
 
 func (a *TeslaAPIImpl) InitSession(accessToken string, vin string) (*vehicle.Vehicle, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
@@ -313,9 +260,6 @@ func (a *TeslaAPIImpl) Wakeup(accessToken string, vin string) error {
 		log.Println(err)
 		return err
 	}
-
-	// wait a few seconds to assure vehicle is online
-	time.Sleep(20 * time.Second)
 
 	return nil
 }

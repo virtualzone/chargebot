@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"math"
 	"net/http"
 	"time"
@@ -35,9 +36,13 @@ func (router *ManualControlRouter) testDrive(w http.ResponseWriter, r *http.Requ
 			GetDB().SetVehicleStateCharging(vehicle.VIN, ChargeStateNotCharging)
 			state = GetDB().GetVehicleState(vehicle.VIN)
 		}
+		log.Println("Test Drive: Activate charging...")
 		cc.activateCharging(vehicle, state, int(math.Round((float64)(vehicle.MaxAmps)/2)), ChargeStateChargingOnGrid)
+		log.Println("Test Drive: Charging in progress, check app...")
 		time.Sleep(30 * time.Second)
+		log.Println("Test Drive: Stop charging...")
 		cc.stopCharging(vehicle)
+		log.Println("Test Drive: Done.")
 	}()
 }
 

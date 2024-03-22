@@ -79,6 +79,7 @@ func (router *UserRouter) websocket(w http.ResponseWriter, r *http.Request) {
 	authorized := false
 	userID := ""
 	lastTs := make(map[string]int64)
+	vehicleVINs := []string{}
 
 	ticker := time.NewTicker(time.Second * 5)
 	defer ticker.Stop()
@@ -114,7 +115,11 @@ func (router *UserRouter) websocket(w http.ResponseWriter, r *http.Request) {
 
 				userID = GetDB().GetAPITokenUserID(token)
 				vehicles := GetDB().GetVehicles(userID)
+
 				for _, vehicle := range vehicles {
+					vehicleVINs = append(vehicleVINs, vehicle.VIN)
+					GetTelemetryQueue().AddActiveVIN(vehicle.VIN)
+					defer GetTelemetryQueue().RemoveActiveVIN(vehicle.VIN)
 					state := GetDB().GetTelemetryState(vehicle.VIN)
 					if state != nil {
 						router.sendWebsocketState(c, state)
@@ -133,14 +138,13 @@ func (router *UserRouter) websocket(w http.ResponseWriter, r *http.Request) {
 			return
 		case <-ticker.C:
 			if authorized {
-				vehicles := GetDB().GetVehicles(userID)
-				for _, vehicle := range vehicles {
-					state := GetDB().GetTelemetryState(vehicle.VIN)
+				for _, vin := range vehicleVINs {
+					state := GetTelemetryQueue().GetState(vin)
 					if state != nil {
-						before, ok := lastTs[vehicle.VIN]
+						before, ok := lastTs[vin]
 						if !ok || before < state.UTC {
 							router.sendWebsocketState(c, state)
-							lastTs[vehicle.VIN] = state.UTC
+							lastTs[vin] = state.UTC
 						}
 					}
 				}

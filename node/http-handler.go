@@ -14,7 +14,7 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/go-playground/validator"
+	"github.com/go-playground/validator/v10"
 	"github.com/gorilla/mux"
 )
 

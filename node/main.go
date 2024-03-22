@@ -7,9 +7,19 @@ import (
 )
 
 var TeslaAPIInstance TeslaAPI
+var poller *TelemetryPoller
+var ChargeControllerInstance *ChargeController
 
 func GetTeslaAPI() TeslaAPI {
 	return TeslaAPIInstance
+}
+
+func GetTelemetryPoller() *TelemetryPoller {
+	return poller
+}
+
+func GetChargeController() *ChargeController {
+	return ChargeControllerInstance
 }
 
 func sanityCheck() {
@@ -53,11 +63,16 @@ func main() {
 
 	TeslaAPIInstance = &TeslaAPIProxy{}
 
+	ChargeControllerInstance = NewChargeController()
+	GetChargeController().Init()
+
+	InitPeriodicPriceUpdateControl()
+
 	InitHTTPRouter()
 
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
-	poller := &TelemetryPoller{
+	poller = &TelemetryPoller{
 		Interrupt: make(chan os.Signal),
 	}
 	poller.Poll()

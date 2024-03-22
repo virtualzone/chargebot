@@ -177,7 +177,9 @@ func (db *DB) GetSetting(key string) string {
 	err := db.GetConnection().QueryRow("select value from settings where key = ?", key).
 		Scan(&value)
 	if err != nil {
-		log.Println(err)
+		if err != sql.ErrNoRows {
+			log.Println(err)
+		}
 		return ""
 	}
 	if key == SettingRefreshToken && GetConfig().CryptKey != "" && strings.Index(value, "c:") == 0 {
@@ -209,7 +211,9 @@ func (db *DB) GetVehicleByVIN(vin string) *Vehicle {
 		vin).
 		Scan(&e.VIN, &e.DisplayName, &e.Enabled, &e.TargetSoC, &e.MaxAmps, &e.NumPhases, &e.SurplusCharging, &e.MinSurplus, &e.MinChargeTime, &e.LowcostCharging, &e.GridProvider, &e.GridStrategy, &e.DepartDays, &e.DepartTime, &e.MaxPrice, &e.TibberToken, &ts)
 	if err != nil {
-		log.Println(err)
+		if err != sql.ErrNoRows {
+			log.Println(err)
+		}
 		return nil
 	}
 	if ts != "" {
@@ -226,7 +230,9 @@ func (db *DB) GetVehicles() []*Vehicle {
 		"from vehicles " +
 		"order by display_name")
 	if err != nil {
-		log.Println(err)
+		if err != sql.ErrNoRows {
+			log.Println(err)
+		}
 		return nil
 	}
 	defer rows.Close()
@@ -261,7 +267,9 @@ func (db *DB) GetVehicleState(vin string) *VehicleState {
 		vin).
 		Scan(&e.VIN, &e.PluggedIn, &e.Charging, &e.SoC, &e.Amps, &e.ChargeLimit, &e.IsHome)
 	if err != nil {
-		log.Println(err)
+		if err != sql.ErrNoRows {
+			log.Println(err)
+		}
 		return nil
 	}
 	return e
@@ -334,7 +342,9 @@ func (db *DB) GetLatestSurplusRecords(num int) []*SurplusRecord {
 		"from surpluses order by ts desc limit ?",
 		num)
 	if err != nil {
-		log.Println(err)
+		if err != sql.ErrNoRows {
+			log.Println(err)
+		}
 		return nil
 	}
 	defer rows.Close()
@@ -397,7 +407,9 @@ func (db *DB) GetUpcomingTibberPrices(vin string, sortByPriceAsc bool) []*GridPr
 		"order by "+order,
 		vin, hourstampStart)
 	if err != nil {
-		log.Println(err)
+		if err != sql.ErrNoRows {
+			log.Println(err)
+		}
 		return nil
 	}
 	defer rows.Close()
@@ -431,7 +443,9 @@ func (db *DB) GetVehicleVINsWithTibberTokenWithoutPricesForStarttime(startTime t
 		"limit ?",
 		hourstampStart, limit)
 	if err != nil {
-		log.Println(err)
+		if err != sql.ErrNoRows {
+			log.Println(err)
+		}
 		return nil
 	}
 	defer rows.Close()
@@ -470,7 +484,9 @@ func (db *DB) GetLatestChargingEvent(vin string, eventType int) *ChargingEvent {
 		vin, eventType).
 		Scan(&ts, &eventId, &details)
 	if err != nil {
-		log.Println(err)
+		if err != sql.ErrNoRows {
+			log.Println(err)
+		}
 		return nil
 	}
 	parsedTime, _ := time.Parse(SQLITE_DATETIME_LAYOUT, ts)
@@ -488,7 +504,9 @@ func (db *DB) GetLatestChargingEvents(vin string, num int) []*ChargingEvent {
 		"from logs where vehicle_vin = ? order by ts desc limit ?",
 		vin, num)
 	if err != nil {
-		log.Println(err)
+		if err != sql.ErrNoRows {
+			log.Println(err)
+		}
 		return nil
 	}
 	defer rows.Close()
