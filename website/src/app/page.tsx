@@ -55,15 +55,15 @@ export default function Home() {
         <h2 className="pb-3">FAQ</h2>
         <Accordion flush={true}>
           <Accordion.Item eventKey="0">
-            <Accordion.Header>Why do I need to sign in with my Tesla account?</Accordion.Header>
+            <Accordion.Header>Why do I need to link my Tesla account?</Accordion.Header>
             <Accordion.Body>
-              We're using Tesla's Fleet API in order to communicate with your vehicle and to control your Tesla's charging. Your credentials are processed by Tesla directly. We only receive an access token which allows for controlling the charging process.
+              We're using Tesla's Fleet API in order to communicate with your vehicle and to control your Tesla's charging. By linking your Tesla Account with chargebot.io, we show you a Token issued by Tesla which you deploy on your local remote controller node instance. This Token is not stored by chargebot.io.
             </Accordion.Body>
           </Accordion.Item>
           <Accordion.Item eventKey="1">
             <Accordion.Header>Is my data safe?</Accordion.Header>
             <Accordion.Body>
-              We employ industry standards and latest technology in order to protect your data. Your data is not shared with anyone. Our servers are hosted in Germany.
+              All relevant data (especially your Tesla Access and Refresh Tokens) is stored only on your local remote controller node within your sovereignty. We neither store nor use your Tesla Tokens within the centralized chargebot.io service.
             </Accordion.Body>
           </Accordion.Item>
           <Accordion.Item eventKey="2">
@@ -73,8 +73,17 @@ export default function Home() {
                 <li>A Tesla vehicle</li>
                 <li>A solar power system<br />and/or</li>
                 <li>A Tibber contract with Tibber Pulse or an electric meter allowing for dynamic hourly prices</li>
-                <li>A home automation system (i.e. Home Assistant, OpenHAB, ioBroker) or another solution which can regularly notify us about your solar surplus</li>
+                <li>A home automation system (i.e. Home Assistant, OpenHAB, ioBroker) or another solution which can regularly notify your local chargebot.io node about your solar surplus</li>
               </ul>
+            </Accordion.Body>
+          </Accordion.Item>
+          <Accordion.Item eventKey="3">
+            <Accordion.Header>How does it work?</Accordion.Header>
+            <Accordion.Body>
+              chargebot.io uses the Tesla Fleet API and Tesla Fleet Telemetry in order to control your vehicle's charging process.
+              The actual work is done by your local remote controller node. It decides whether there's enure surplus from your solar power plant in order to charge your Tesla. It checks your grid provider for the current prices and starts charging if the prices are below your defined maximum.
+              The centralized chargebot.io instance serves as a proxy for your local node's command and forwards them to the Tesla Fleet API. The centralized instance is required as it signs requests from your local node to your Tesla with a private key and forwards incoming Fleet Telemetry data to your local node.
+              Only your local node knows and saved your personal Tesla Token. It is neither stored nor used by the centralized chargebot.io instance.
             </Accordion.Body>
           </Accordion.Item>
         </Accordion>

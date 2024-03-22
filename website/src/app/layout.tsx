@@ -84,6 +84,7 @@ export default function RootLayout({
             <li className="nav-item"><Link href="/help" className="nav-link px-2 text-body-secondary">Help</Link></li>
             <li className="nav-item"><Link href="/imprint" className="nav-link px-2 text-body-secondary">Imprint</Link></li>
             <li className="nav-item"><Link href="/privacy-policy" className="nav-link px-2 text-body-secondary">Privacy Policy</Link></li>
+            <li className="nav-item"><Link href="https://github.com/virtualzone/chargebot" className="nav-link px-2 text-body-secondary" target='_blank'>GitHub</Link></li>
           </ul>
         </footer>
       </body>
