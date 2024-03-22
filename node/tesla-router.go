@@ -89,6 +89,9 @@ func (router *TeslaRouter) addVehicle(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Could not enroll vehicle %s in fleet telemetry: %s\n", e.VIN, err.Error())
 	}
 
+	// Reconnect websocket so server re-caches the correct vins
+	GetTelemetryPoller().Reconnect()
+
 	SendJSON(w, true)
 }
 
@@ -197,6 +200,9 @@ func (router *TeslaRouter) deleteVehicle(w http.ResponseWriter, r *http.Request)
 	GetDB().DeleteVehicle(vehicle.VIN)
 
 	GetTeslaAPI().UnregisterVehicle(vehicle.VIN)
+
+	// Reconnect websocket so server re-caches the correct vins
+	GetTelemetryPoller().Reconnect()
 
 	SendJSON(w, true)
 }

@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
-	"github.com/go-playground/validator"
+	"github.com/go-playground/validator/v10"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/mux"
 )
@@ -214,9 +214,9 @@ func ServeHTTP() {
 	log.Println("Initializing REST services...")
 	httpServer := &http.Server{
 		Addr:         "0.0.0.0:8080",
-		WriteTimeout: time.Second * 15,
-		ReadTimeout:  time.Second * 15,
-		IdleTimeout:  time.Second * 60,
+		WriteTimeout: time.Second * 60,
+		ReadTimeout:  time.Second * 60,
+		IdleTimeout:  time.Second * 120,
 		Handler:      httpRouter,
 	}
 

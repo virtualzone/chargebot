@@ -11,12 +11,12 @@ type AccessTokenRequest struct {
 
 type SetChargeLimitRequest struct {
 	AccessTokenRequest
-	ChargeLimit int `json:"limit" validate:"min:0,max:100,required"`
+	ChargeLimit int `json:"limit" validate:"min=0,max=100,required"`
 }
 
 type SetChargeAmpsRequest struct {
 	AccessTokenRequest
-	Amps int `json:"limit" validate:"min:0,max:16,required"`
+	Amps int `json:"limit" validate:"min=0,max=16,required"`
 }
 
 type TeslaAPIVehicleEntity struct {

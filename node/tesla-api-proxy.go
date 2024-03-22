@@ -36,6 +36,8 @@ type TeslaAPIProxy struct {
 }
 
 func (a *TeslaAPIProxy) RefreshToken(refreshToken string) (*TeslaAPITokenReponse, error) {
+	log.Println("Tesla API: Refreshing Access Token...")
+
 	target := "https://auth.tesla.com/oauth2/v3/token"
 	data := url.Values{}
 	data.Set("grant_type", "refresh_token")
@@ -97,6 +99,8 @@ func (a *TeslaAPIProxy) GetCachedAccessToken() string {
 }
 
 func (a *TeslaAPIProxy) ListVehicles() ([]TeslaAPIVehicleEntity, error) {
+	log.Println("Tesla API: List Vehicles...")
+
 	payload := AccessTokenRequest{
 		PasswordProtectedRequest: PasswordProtectedRequest{
 			Password: GetConfig().TokenPassword,
@@ -118,6 +122,8 @@ func (a *TeslaAPIProxy) ListVehicles() ([]TeslaAPIVehicleEntity, error) {
 }
 
 func (a *TeslaAPIProxy) ChargeStart(vin string) error {
+	log.Println("Tesla API: Start Charge...")
+
 	payload := AccessTokenRequest{
 		PasswordProtectedRequest: PasswordProtectedRequest{
 			Password: GetConfig().TokenPassword,
@@ -134,6 +140,8 @@ func (a *TeslaAPIProxy) ChargeStart(vin string) error {
 }
 
 func (a *TeslaAPIProxy) ChargeStop(vin string) error {
+	log.Println("Tesla API: Stop Charge...")
+
 	payload := AccessTokenRequest{
 		PasswordProtectedRequest: PasswordProtectedRequest{
 			Password: GetConfig().TokenPassword,
@@ -150,6 +158,8 @@ func (a *TeslaAPIProxy) ChargeStop(vin string) error {
 }
 
 func (a *TeslaAPIProxy) SetChargeLimit(vin string, limitPercent int) error {
+	log.Printf("Tesla API: Set Charge Limit to % d ...\n", limitPercent)
+
 	payload := SetChargeLimitRequest{
 		AccessTokenRequest: AccessTokenRequest{
 			PasswordProtectedRequest: PasswordProtectedRequest{
@@ -169,6 +179,8 @@ func (a *TeslaAPIProxy) SetChargeLimit(vin string, limitPercent int) error {
 }
 
 func (a *TeslaAPIProxy) SetChargeAmps(vin string, amps int) error {
+	log.Printf("Tesla API: Set Charge Amps to % d ...\n", amps)
+
 	payload := SetChargeAmpsRequest{
 		AccessTokenRequest: AccessTokenRequest{
 			PasswordProtectedRequest: PasswordProtectedRequest{
@@ -188,6 +200,8 @@ func (a *TeslaAPIProxy) SetChargeAmps(vin string, amps int) error {
 }
 
 func (a *TeslaAPIProxy) GetVehicleData(vin string) (*TeslaAPIVehicleData, error) {
+	log.Println("Tesla API: Get Vehicle Data...")
+
 	payload := AccessTokenRequest{
 		PasswordProtectedRequest: PasswordProtectedRequest{
 			Password: GetConfig().TokenPassword,
@@ -209,6 +223,8 @@ func (a *TeslaAPIProxy) GetVehicleData(vin string) (*TeslaAPIVehicleData, error)
 }
 
 func (a *TeslaAPIProxy) Wakeup(vin string) error {
+	log.Println("Tesla API: Wake Up...")
+
 	payload := AccessTokenRequest{
 		PasswordProtectedRequest: PasswordProtectedRequest{
 			Password: GetConfig().TokenPassword,
@@ -221,10 +237,15 @@ func (a *TeslaAPIProxy) Wakeup(vin string) error {
 		return err
 	}
 
+	// wait a few seconds to assure vehicle is online
+	time.Sleep(20 * time.Second)
+
 	return nil
 }
 
 func (a *TeslaAPIProxy) CreateTelemetryConfig(vin string) error {
+	log.Println("Tesla API: Create Telemetry Config...")
+
 	payload := AccessTokenRequest{
 		PasswordProtectedRequest: PasswordProtectedRequest{
 			Password: GetConfig().TokenPassword,
@@ -241,6 +262,8 @@ func (a *TeslaAPIProxy) CreateTelemetryConfig(vin string) error {
 }
 
 func (a *TeslaAPIProxy) DeleteTelemetryConfig(vin string) error {
+	log.Println("Tesla API: Delete Telemetry Config...")
+
 	payload := AccessTokenRequest{
 		PasswordProtectedRequest: PasswordProtectedRequest{
 			Password: GetConfig().TokenPassword,
@@ -257,6 +280,8 @@ func (a *TeslaAPIProxy) DeleteTelemetryConfig(vin string) error {
 }
 
 func (a *TeslaAPIProxy) RegisterVehicle(vin string) error {
+	log.Println("Tesla API: Register Vehicle with chargebot.io...")
+
 	payload := AccessTokenRequest{
 		PasswordProtectedRequest: PasswordProtectedRequest{
 			Password: GetConfig().TokenPassword,
@@ -273,6 +298,8 @@ func (a *TeslaAPIProxy) RegisterVehicle(vin string) error {
 }
 
 func (a *TeslaAPIProxy) UnregisterVehicle(vin string) error {
+	log.Println("Tesla API: Unregister Vehicle with chargebot.io...")
+
 	payload := AccessTokenRequest{
 		PasswordProtectedRequest: PasswordProtectedRequest{
 			Password: GetConfig().TokenPassword,
@@ -297,7 +324,7 @@ func (a *TeslaAPIProxy) sendRequest(endpoint string, payload interface{}) (*http
 	target := GetConfig().CmdEndpoint + "/" + endpoint
 	r, _ := http.NewRequest("POST", target, bytes.NewReader(json))
 
-	resp, err := RetryHTTPJSONRequest(r, a.GetOrRefreshAccessToken())
+	resp, err := RetryHTTPJSONRequest(r, "")
 	if err != nil {
 		log.Println(err)
 		return nil, err

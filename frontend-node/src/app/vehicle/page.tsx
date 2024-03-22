@@ -363,46 +363,42 @@ export default function PageVehicle() {
     </Form>
   );
   let accordionChargingEvents = <></>;
-  if (vehicle.api_token) {
-    accordionChargingEvents = (
-      <Accordion.Item eventKey="4">
-        <Accordion.Header>Latest charging events</Accordion.Header>
-        <Accordion.Body>
-          {eventsTable}
-        </Accordion.Body>
-      </Accordion.Item>
-    );
-  }
+  accordionChargingEvents = (
+    <Accordion.Item eventKey="4">
+      <Accordion.Header>Latest charging events</Accordion.Header>
+      <Accordion.Body>
+        {eventsTable}
+      </Accordion.Body>
+    </Accordion.Item>
+  );
   let accordionState = <></>;
-  if ((vehicle.api_token) && (vehicleState)) {
-    accordionState = (
-      <Accordion.Item eventKey="2">
-        <Accordion.Header>Vehicle State</Accordion.Header>
-        <Accordion.Body>
-          <Table>
-            <tbody>
-              <tr>
-                <td>Plugged In</td>
-                <td>{vehicleState.pluggedIn ? 'Yes' : 'No'}</td>
-              </tr>
-              <tr>
-                <td>Charging State</td>
-                <td>{getChargeStateText(vehicleState.chargingState)}</td>
-              </tr>
-              <tr>
-                <td>SoC</td>
-                <td>{vehicleState.soc ? vehicleState.soc + ' %' : 'Unknown'}</td>
-              </tr>
-              <tr>
-                <td>Amps</td>
-                <td>{vehicleState.amps !== undefined ? vehicleState.amps + ' A' : 'Unknown'}</td>
-              </tr>
-            </tbody>
-          </Table>
-        </Accordion.Body>
-      </Accordion.Item>
-    );
-  }
+  accordionState = (
+    <Accordion.Item eventKey="2">
+      <Accordion.Header>Vehicle State</Accordion.Header>
+      <Accordion.Body>
+        <Table>
+          <tbody>
+            <tr>
+              <td>Plugged In</td>
+              <td>{vehicleState.pluggedIn ? 'Yes' : 'No'}</td>
+            </tr>
+            <tr>
+              <td>Charging State</td>
+              <td>{getChargeStateText(vehicleState.chargingState)}</td>
+            </tr>
+            <tr>
+              <td>SoC</td>
+              <td>{vehicleState.soc ? vehicleState.soc + ' %' : 'Unknown'}</td>
+            </tr>
+            <tr>
+              <td>Amps</td>
+              <td>{vehicleState.amps !== undefined ? vehicleState.amps + ' A' : 'Unknown'}</td>
+            </tr>
+          </tbody>
+        </Table>
+      </Accordion.Body>
+    </Accordion.Item>
+  );
   let accordionManualControl = (
     <Accordion.Item eventKey="5">
       <Accordion.Header>Test Drive</Accordion.Header>
@@ -428,7 +424,7 @@ export default function PageVehicle() {
       <p>Before chargebot.io can control your vehicle's charging process, you need to set up the virtual key:</p>
       <p><a href="https://tesla.com/_ak/chargebot.io" target="_blank">Set Up Virtual Key</a></p>
       <br />
-      <Accordion defaultActiveKey={((vehicle.api_token) && (vehicleState)) ? '2' : '0'} flush={true}>
+      <Accordion defaultActiveKey={'2'} flush={true}>
         {accordionState}
         <Accordion.Item eventKey="0">
           <Accordion.Header>Charging Preferences</Accordion.Header>

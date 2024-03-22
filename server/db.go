@@ -101,7 +101,9 @@ func (db *DB) IsValidAuthCode(code string) bool {
 	row := db.GetConnection().QueryRow("select count(*) from auth_codes where id = ?", code)
 	var count int
 	if err := row.Scan(&count); err != nil {
-		log.Println(err)
+		if err != sql.ErrNoRows {
+			log.Println(err)
+		}
 		return false
 	}
 	return count == 1
@@ -137,7 +139,9 @@ func (db *DB) GetUser(ID string) *User {
 		ID).
 		Scan(&e.ID, &e.TeslaUserID, &e.HomeLatitude, &e.HomeLongitude, &e.HomeRadius, &e.APIToken)
 	if err != nil {
-		log.Println(err)
+		if err != sql.ErrNoRows {
+			log.Println(err)
+		}
 		return nil
 	}
 	return e
@@ -160,7 +164,9 @@ func (db *DB) GetVehicleByVIN(vin string) *Vehicle {
 		vin).
 		Scan(&e.VIN, &e.UserID, &e.APIToken)
 	if err != nil {
-		log.Println(err)
+		if err != sql.ErrNoRows {
+			log.Println(err)
+		}
 		return nil
 	}
 	return e
@@ -175,7 +181,9 @@ func (db *DB) GetVehicles(UserID string) []*Vehicle {
 		"order by vin",
 		UserID)
 	if err != nil {
-		log.Println(err)
+		if err != sql.ErrNoRows {
+			log.Println(err)
+		}
 		return nil
 	}
 	defer rows.Close()
@@ -193,7 +201,9 @@ func (db *DB) GetAllVehicles() []*Vehicle {
 		"from vehicles " +
 		"left join api_tokens on api_tokens.user_id = vehicles.user_id")
 	if err != nil {
-		log.Println(err)
+		if err != sql.ErrNoRows {
+			log.Println(err)
+		}
 		return nil
 	}
 	defer rows.Close()
@@ -235,7 +245,9 @@ func (db *DB) GetAPITokenUserID(token string) string {
 		token).
 		Scan(&userID)
 	if err != nil {
-		log.Println(err)
+		if err != sql.ErrNoRows {
+			log.Println(err)
+		}
 		return ""
 	}
 	return userID
@@ -247,7 +259,9 @@ func (db *DB) GetAPIToken(userID string) string {
 		userID).
 		Scan(&token)
 	if err != nil {
-		log.Println(err)
+		if err != sql.ErrNoRows {
+			log.Println(err)
+		}
 		return ""
 	}
 	return token
@@ -270,7 +284,9 @@ func (db *DB) IsTokenPasswordValid(token string, password string) bool {
 		"where token = ?",
 		token).Scan(&passhash)
 	if err != nil {
-		log.Println(err)
+		if err != sql.ErrNoRows {
+			log.Println(err)
+		}
 		return false
 	}
 	return IsValidHash(password, passhash)
@@ -303,7 +319,9 @@ func (db *DB) GetTelemetryState(vin string) *PersistedTelemetryState {
 		"where vin = ?",
 		vin).Scan(&e.VIN, &e.PluggedIn, &e.Charging, &e.SoC, &e.Amps, &e.ChargeLimit, &e.IsHome, &e.UTC)
 	if err != nil {
-		log.Println(err)
+		if err != sql.ErrNoRows {
+			log.Println(err)
+		}
 		return nil
 	}
 	return e

@@ -72,7 +72,9 @@ func GeneratePassword(length int, includeNumber bool, includeSpecial bool) strin
 
 func RetryHTTPJSONRequest(req *http.Request, authToken string) (*http.Response, error) {
 	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("Authorization", "Bearer "+authToken)
+	if authToken != "" {
+		req.Header.Add("Authorization", "Bearer "+authToken)
+	}
 	return RetryHTTPRequest(req)
 }
 
@@ -82,7 +84,9 @@ func RetryHTTPRequest(req *http.Request) (*http.Response, error) {
 		return slices.Contains(retryCodes, code)
 	}
 
-	client := &http.Client{}
+	client := &http.Client{
+		Timeout: time.Second * 60,
+	}
 	retryCounter := 1
 	var resp *http.Response
 	var err error
