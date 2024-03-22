@@ -80,10 +80,10 @@ export default function Home() {
           <Accordion.Item eventKey="3">
             <Accordion.Header>How does it work?</Accordion.Header>
             <Accordion.Body>
-              chargebot.io uses the Tesla Fleet API and Tesla Fleet Telemetry in order to control your vehicle's charging process.
-              The actual work is done by your local remote controller node. It decides whether there's enure surplus from your solar power plant in order to charge your Tesla. It checks your grid provider for the current prices and starts charging if the prices are below your defined maximum.
-              The centralized chargebot.io instance serves as a proxy for your local node's command and forwards them to the Tesla Fleet API. The centralized instance is required as it signs requests from your local node to your Tesla with a private key and forwards incoming Fleet Telemetry data to your local node.
-              Only your local node knows and saved your personal Tesla Token. It is neither stored nor used by the centralized chargebot.io instance.
+              <p>chargebot.io uses the Tesla Fleet API and Tesla Fleet Telemetry in order to control your vehicle's charging process.</p>
+              <p>The actual work is done by your local remote controller node. It decides whether there's enough surplus from your solar power plant in order to charge your Tesla. It checks your grid provider for the current prices and starts charging if the prices are below your defined maximum.</p>
+              <p>The centralized chargebot.io instance serves as a proxy for your local node's command and forwards them to the Tesla Fleet API. The centralized instance is required as it signs requests from your local node to your Tesla with a private key and forwards incoming Fleet Telemetry data to your local node.</p>
+              <p>Only your local node knows and saves your personal Tesla Token. It is neither stored nor used by the centralized chargebot.io instance.</p>
             </Accordion.Body>
           </Accordion.Item>
         </Accordion>

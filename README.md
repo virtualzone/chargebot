@@ -32,11 +32,11 @@ chargebot.io allows for charging your Tesla from your solar power plant and/or a
 ## How it works
 chargebot.io uses the Tesla Fleet API and Tesla Fleet Telemetry in order to control your vehicle's charging process.
 
-The actual work is done by your local remote controller node. It decides whether there's enure surplus from your solar power plant in order to charge your Tesla. It checks your grid provider for the current prices and starts charging if the prices are below your defined maximum.
+The actual work is done by your local remote controller node. It decides whether there's enough surplus from your solar power plant in order to charge your Tesla. It checks your grid provider for the current prices and starts charging if the prices are below your defined maximum.
 
 The centralized chargebot.io instance serves as a proxy for your local node's command and forwards them to the Tesla Fleet API. The centralized instance is required as it signs requests from your local node to your Tesla with a private key and forwards incoming Fleet Telemetry data to your local node.
 
-Only your local node knows and saved your personal Tesla Token. It is neither stored nor used by the centralized chargebot.io instance.
+Only your local node knows and saves your personal Tesla Token. It is neither stored nor used by the centralized chargebot.io instance.
 
 ## Environment variables
 | Environment Variable | Type | Default | Description |
