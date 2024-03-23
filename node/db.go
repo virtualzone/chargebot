@@ -94,7 +94,8 @@ const (
 )
 
 const (
-	SettingRefreshToken = "refresh_token"
+	SettingRefreshToken    = "refresh_token"
+	SettingsPermanentError = "permanent_error"
 )
 
 type DB struct {

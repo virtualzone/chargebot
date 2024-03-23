@@ -20,6 +20,8 @@ func (router *TeslaRouter) SetupRoutes(s *mux.Router) {
 	s.HandleFunc("/state/{vin}", router.getVehicleState).Methods("GET")
 	s.HandleFunc("/surplus", router.getLatestSurpluses).Methods("GET")
 	s.HandleFunc("/events/{vin}", router.getLatestChargingEvents).Methods("GET")
+	s.HandleFunc("/permanent_error", router.getPermanentError).Methods("GET")
+	s.HandleFunc("/resolve_permanent_error", router.resolvePermanentError).Methods("POST")
 }
 
 func (router *TeslaRouter) listVehicles(w http.ResponseWriter, r *http.Request) {
@@ -230,4 +232,14 @@ func (router *TeslaRouter) getLatestChargingEvents(w http.ResponseWriter, r *htt
 
 	res := GetDB().GetLatestChargingEvents(vin, 50)
 	SendJSON(w, res)
+}
+
+func (router *TeslaRouter) getPermanentError(w http.ResponseWriter, r *http.Request) {
+	val := GetDB().GetSetting(SettingsPermanentError)
+	SendJSON(w, val == "1")
+}
+
+func (router *TeslaRouter) resolvePermanentError(w http.ResponseWriter, r *http.Request) {
+	GetDB().SetSetting(SettingsPermanentError, "")
+	SendJSON(w, true)
 }

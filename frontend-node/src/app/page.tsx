@@ -1,15 +1,16 @@
 'use client'
 
 import Link from "next/link";
-import { getAPI } from "./util";
+import { getAPI, postAPI } from "./util";
 import { useEffect, useState } from "react";
 import Loading from "./loading";
-import { Alert, Container, ListGroup, Table } from "react-bootstrap";
+import { Alert, Button, Container, ListGroup, Table } from "react-bootstrap";
 import { useRouter } from "next/navigation";
 
 export default function PageAuthorized() {
   const [vehicles, setVehicles] = useState([] as any[])
   const [isLoading, setLoading] = useState(true)
+  const [permanentError, setPermanentError] = useState(false)
   const [showAlertAdded, setShowAlertAdded] = useState(false)
   const [showAlertRemoved, setShowAlertRemoved] = useState(false)
   const [surpluses, setSurpluses] = useState([] as any)
@@ -36,14 +37,19 @@ export default function PageAuthorized() {
     const fetchData = async () => {
       loadVehicles();
       loadLatestSurpluses();
+      setPermanentError(await getAPI("/api/1/tesla/permanent_error"))
       setLoading(false);
     }
     fetchData();
   }, []);
 
   function selectVehicle(vin: string) {
-    console.log("/vehicle/?vin=" + vin);
     router.push("/vehicle/?vin=" + vin);
+  }
+
+  function resetPermanentError() {
+      postAPI("/api/1/tesla/resolve_permanent_error", {});
+      setPermanentError(false);
   }
   
   if (isLoading) {
@@ -108,9 +114,23 @@ export default function PageAuthorized() {
     </>
   );
 
+  let permanentErrorSection = <></>;
+  if (permanentError) {
+    permanentErrorSection = (
+      <Alert variant='danger' dismissible={false} hidden={!permanentError}>
+        <p><strong>Action required</strong></p>
+        <p>There was was a recurring error controlling the charging process of one your vehicles. This can happen i.e. if your charger has a problem. chargebot.io has stopped trying to control your vehicle in order to avoid keeping your vehicle awake.</p>
+        <p>Try to reconnect your charger and check if everything is set up correctly.</p>
+        <p>When done, reset this permanent error in order to start charge-controlling your vehicle again.</p>
+        <Button onClick={() => resetPermanentError()}>Reset error</Button>
+      </Alert>
+    );
+  }
+
   return (
     <Container fluid="sm" className="pt-5 container-max-width min-height">
       <h2 className="pb-3">My vehicles</h2>
+      {permanentErrorSection}
       <Alert variant='success' dismissible={true} hidden={!showAlertAdded}>Vehicle successfully added to your account.</Alert>
       <Alert variant='success' dismissible={true} hidden={!showAlertRemoved}>Vehicle successfully removed from your account.</Alert>
       {vehicleList}

@@ -10,19 +10,22 @@ import (
 )
 
 const MaxVehicleDataUpdateIntervalMinutes int = 5
+const MaxChargeStartFailCounts int = 10
 
 var DelayBetweenAPICommands time.Duration = time.Second * 2
 
 type ChargeController struct {
-	Ticker *time.Ticker
-	Time   Time
-	Async  bool
+	Ticker               *time.Ticker
+	Time                 Time
+	Async                bool
+	ChargeStartFailCount int
 }
 
 func NewChargeController() *ChargeController {
 	return &ChargeController{
-		Time:  new(RealTime),
-		Async: true,
+		Time:                 new(RealTime),
+		Async:                true,
+		ChargeStartFailCount: 0,
 	}
 }
 
@@ -37,6 +40,11 @@ func (c *ChargeController) Init() {
 }
 
 func (c *ChargeController) OnTick() {
+	permanentError := (GetDB().GetSetting(SettingsPermanentError) == "1")
+	if permanentError {
+		log.Println("ACTION REQUIRED: Permanent error after recurring charge failures. Check Web UI to resolve.")
+		return
+	}
 	vehicles := GetDB().GetVehicles()
 	for _, vehicle := range vehicles {
 		if c.Async {
@@ -132,6 +140,23 @@ func (c *ChargeController) checkStartCharging(vehicle *Vehicle, state *VehicleSt
 }
 
 func (c *ChargeController) activateCharging(vehicle *Vehicle, state *VehicleState, amps int, source ChargeState) bool {
+	if c.ChargeStartFailCount > 0 {
+		if c.ChargeStartFailCount >= MaxChargeStartFailCounts {
+			log.Printf("Activate charging failed for %d times, giving up and setting permanent error\n", c.ChargeStartFailCount)
+			GetDB().SetSetting(SettingsPermanentError, "1")
+			c.ChargeStartFailCount = 0
+			return false
+		}
+		minWaitTime := time.Minute * time.Duration(c.ChargeStartFailCount*5)
+		lastAttempt := GetDB().GetLatestChargingEvent(vehicle.VIN, LogEventChargeStart)
+		if lastAttempt != nil {
+			if lastAttempt.Timestamp.After(c.Time.UTCNow().Add(minWaitTime * -1)) {
+				return false
+			}
+		}
+		log.Printf("This is attempt %d to activate charging after previous errors\n", c.ChargeStartFailCount)
+	}
+
 	err := GetTeslaAPI().Wakeup(vehicle.VIN)
 	if err != nil {
 		GetDB().LogChargingEvent(vehicle.VIN, LogEventWakeVehicle, "could not wake vehicle: "+err.Error())
@@ -163,8 +188,10 @@ func (c *ChargeController) activateCharging(vehicle *Vehicle, state *VehicleStat
 
 	if err := GetTeslaAPI().ChargeStart(vehicle.VIN); err != nil {
 		GetDB().LogChargingEvent(vehicle.VIN, LogEventChargeStart, "could not start charging: "+err.Error())
+		c.ChargeStartFailCount++
 		return false
 	}
+	c.ChargeStartFailCount = 0
 	GetDB().LogChargingEvent(vehicle.VIN, LogEventChargeStart, "")
 
 	GetDB().SetVehicleStateAmps(vehicle.VIN, amps)

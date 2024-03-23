@@ -317,8 +317,6 @@ func (a *TeslaAPIProxy) UnregisterVehicle(vin string) error {
 }
 
 func (a *TeslaAPIProxy) GetTelemetryState(vin string) (*PersistedTelemetryState, error) {
-	log.Println("Tesla API: Poll telemetry state from chargebot.io...")
-
 	payload := PasswordProtectedRequest{
 		Password: GetConfig().TokenPassword,
 	}
