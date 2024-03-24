@@ -4,17 +4,13 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import './global.css'
 import { Button, Container, Navbar } from 'react-bootstrap';
 import Script from 'next/script';
-import Link from 'next/link';
-import { BatteryCharging } from 'react-feather';
-import { usePathname } from 'next/navigation';
+import { BatteryCharging, HelpCircle } from 'react-feather';
 
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const pathname = usePathname();
-
   return (
     <html lang="en" data-bs-theme="auto">
       <head>
@@ -50,8 +46,7 @@ export default function RootLayout({
           <Container>
             <Navbar.Brand href="/"><BatteryCharging /> chargebot.io</Navbar.Brand>
             <Navbar.Text className="justify-content-end">
-              <Button variant='link' href='https://chargebot.io/help/' target='_blank'>Help</Button>
-              <Button variant='link' href='/'>My vehicles</Button>
+              <Button variant='link' href='https://chargebot.io/help/' target='_blank'><HelpCircle className='feather-button' /></Button>
             </Navbar.Text>
           </Container>
         </Navbar>

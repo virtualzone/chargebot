@@ -69,7 +69,7 @@ export default function PageAuthorized() {
         <ListGroup className="mb-5">
           {(vehicles as any[]).map(e => {
             return (
-              <ListGroup.Item action={true} onClick={() => selectVehicle(e.vin)} key={e.id}>
+              <ListGroup.Item action={true} onClick={() => selectVehicle(e.vin)} key={e.vin}>
                 <strong>{e.display_name}</strong>
                 <br />
                 {e.vin}
