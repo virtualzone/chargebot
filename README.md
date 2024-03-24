@@ -38,6 +38,13 @@ The centralized chargebot.io instance serves as a proxy for your local node's co
 
 Only your local node knows and saves your personal Tesla Token. It is neither stored nor used by the centralized chargebot.io instance.
 
+## Push notifications
+chargebot.io supports sending push notifications using Telegram. To set it up, follow these steps:
+
+1. Create a bot by sending ```/newbot``` to Telegram's [@BotFather](https://t.me/BotFather) by following [these instructions](https://core.telegram.org/bots/features#botfather) and note down the displayed token.
+1. Find out your Telegram User ID by i.e. sending any message to the [GetIDs bot](https://t.me/getidsbot).
+1. Set the ```TELEGRAM_TOKEN``` and ```TELEGRAM_CHAT_ID``` environment variables and restart your node.
+
 ## Environment variables
 | Environment Variable | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -47,6 +54,8 @@ Only your local node knows and saves your personal Tesla Token. It is neither st
 | TOKEN | string |  | Your chargebot.io token |
 | PASSWORD | string |  | Your chargebot.io token's password |
 | CRYPT_KEY | string |  | A key for encrypting your Tesla Refresh Token in the SQLite database |
+| TELEGRAM_TOKEN | string |  | Telegram Bot Authentication Token for push notifications |
+| TELEGRAM_CHAT_ID | string |  | Telegram Chat ID for push notifications |
 
 ## More help
 Visit https://chargebot.io/help/ for more information.

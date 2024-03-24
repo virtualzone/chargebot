@@ -20,6 +20,8 @@ type Config struct {
 	CmdEndpoint       string
 	DevProxy          bool
 	CryptKey          string
+	TelegramToken     string
+	TelegramChatID    string
 }
 
 var _configInstance *Config
@@ -50,6 +52,8 @@ func (c *Config) ReadConfig() {
 	c.CmdEndpoint = strings.ReplaceAll(c.CmdEndpoint, "{token}", c.Token)
 	c.DevProxy = (c.getEnv("DEV_PROXY", "0") == "1")
 	c.CryptKey = c.getEnv("CRYPT_KEY", "")
+	c.TelegramToken = c.getEnv("TELEGRAM_TOKEN", "")
+	c.TelegramChatID = c.getEnv("TELEGRAM_CHAT_ID", "")
 }
 
 func (c *Config) Print() {

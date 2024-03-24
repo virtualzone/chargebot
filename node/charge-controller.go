@@ -106,6 +106,8 @@ func (c *ChargeController) stopCharging(vehicle *Vehicle) {
 
 	GetDB().SetVehicleStateCharging(vehicle.VIN, ChargeStateNotCharging)
 	GetDB().LogChargingEvent(vehicle.VIN, LogEventChargeStop, "charging stopped")
+
+	SendPushNotification(fmt.Sprintf("Charging stopped for %s.", vehicle.DisplayName))
 }
 
 func (c *ChargeController) checkTargetState(vehicle *Vehicle, state *VehicleState) (ChargeState, int) {
@@ -143,6 +145,7 @@ func (c *ChargeController) activateCharging(vehicle *Vehicle, state *VehicleStat
 	if c.ChargeStartFailCount > 0 {
 		if c.ChargeStartFailCount >= MaxChargeStartFailCounts {
 			log.Printf("Activate charging failed for %d times, giving up and setting permanent error\n", c.ChargeStartFailCount)
+			SendPushNotification(fmt.Sprintf("ACTION REQUIRED: Activate charging failed for %d times, giving up and setting permanent error. Resolve issue and release permanent error in Web UI.", c.ChargeStartFailCount))
 			GetDB().SetSetting(SettingsPermanentError, "1")
 			c.ChargeStartFailCount = 0
 			return false
@@ -196,6 +199,12 @@ func (c *ChargeController) activateCharging(vehicle *Vehicle, state *VehicleStat
 
 	GetDB().SetVehicleStateAmps(vehicle.VIN, amps)
 	GetDB().SetVehicleStateCharging(vehicle.VIN, source)
+
+	sourceText := "solar power"
+	if source == ChargeStateChargingOnGrid {
+		sourceText = "grid"
+	}
+	SendPushNotification(fmt.Sprintf("Charging activated for %s using %s with %d amps.", vehicle.DisplayName, sourceText, amps))
 
 	// charging should start now
 	return true
