@@ -1,12 +1,10 @@
 'use client'
 
-import Link from "next/link";
 import Image from "next/image";
 import { checkAuth, getAPI, getUserDetails, postAPI, saveUserDetails } from "../util";
 import { useEffect, useState } from "react";
 import Loading from "../loading";
-import { Alert, Button, Container, Form, InputGroup, Modal } from "react-bootstrap";
-import { useRouter } from "next/navigation";
+import { Alert, Button, Container, Form, InputGroup } from "react-bootstrap";
 import { Loader as IconLoad, Navigation as IconLocation } from 'react-feather';
 import { copyToClipboard } from "../util";
 
@@ -23,7 +21,6 @@ export default function PageAuthorized() {
   const [homeLongitude, setHomeLongitude] = useState(0.0)
   const [homeRadius, setHomeRadius] = useState(100)
   const [savingHomeLocation, setSavingHomeLocation] = useState(false)
-  const router = useRouter();
 
   const loadVehicles = async () => {
     const json = await getAPI("/api/1/tesla/my_vehicles");
@@ -40,7 +37,8 @@ export default function PageAuthorized() {
     }
     const fetchData = async () => {
       await checkAuth();
-      let userDetails = getUserDetails();
+      let userDetails = await getAPI("/api/1/auth/me");
+      saveUserDetails(userDetails);
       setApiToken(userDetails.api_token);
       if (userDetails.tesla_user_id) {
         setTeslaAccountLinked(true);
@@ -55,11 +53,6 @@ export default function PageAuthorized() {
     }
     fetchData();
   }, []);
-
-  function selectVehicle(vin: string) {
-    console.log("/vehicle/?vin=" + vin);
-    router.push("/vehicle/?vin=" + vin);
-  }
 
   async function linkTeslaAccount() {
     const json = await getAPI("/api/1/auth/tesla/init3rdparty");
@@ -117,9 +110,9 @@ export default function PageAuthorized() {
       <p>Set up your remote controller node in order to control your vehicle's charging process.</p>
       <p>When necessary, you can re-link your Tesla account and get a Token again.</p>
       <Button variant="danger" onClick={() => linkTeslaAccount()}>
-          <Image src="/tesla-icon.svg" width={24} height={24} alt="" className="me-2" />
-          Re-Link your Tesla Account
-        </Button>
+        <Image src="/tesla-icon.svg" width={24} height={24} alt="" className="me-2" />
+        Re-Link your Tesla Account
+      </Button>
     </>
   );
 
@@ -166,6 +159,30 @@ export default function PageAuthorized() {
       {token}
     </>
   );
+
+  let vehiclesSection = <></>;
+  if (vehicles) {
+    if (vehicles.length === 0) {
+      vehiclesSection = (
+        <>
+          <h2 className="pb-3" style={{ 'marginTop': '50px' }}>Vehicles</h2>
+          <p>No vehicles have been assigned to your account yet. When setting up your remote controller node and adding vehicles, these get assigned to your account automatically.</p>
+        </>
+      );
+    } else {
+      vehiclesSection = (
+        <>
+          <h2 className="pb-3" style={{ 'marginTop': '50px' }}>Vehicles</h2>
+          <p>The following vehicles have been assigned to your account automatically using your remote controller node:</p>
+          <ul>
+            {vehicles.map(v => {
+              return <li key={v.vin}>{v.vin}</li>
+            })}
+          </ul>
+        </>
+      );
+    }
+  }
 
   let homeLocation = (
     <>
@@ -225,6 +242,7 @@ export default function PageAuthorized() {
       {vehicleList}
       {tokenSection}
       {homeLocation}
+      {vehiclesSection}
     </Container>
   )
 }

@@ -10,12 +10,8 @@ export default function PageHelp() {
   const haScriptSurplus = `service: shell_command.push_pv_surplus
   data:
     surplus: "{{ states('sensor.power_production_changeme') }}"`
-  const shellCommandPlugState = `shell_command:
-  push_tesla_plugged_in: >
-    curl --header 'Content-Type: application/json' http://localhost:8080/api/1/user/{{vehicle}}/plugged_in
-  push_tesla_unplugged: >
-    curl --header 'Content-Type: application/json' http://localhost:8080/api/1/user/{{vehicle}}/unplugged`
-  const haScriptPlugIn = `vehicle: your-vehicles-VIN`
+  const plugInComand = `curl --header 'Content-Type: application/json' -X POST http://localhost:8080/api/1/user/{{VIN}}/plugged_in`
+  const plugOutComand = `curl --header 'Content-Type: application/json' -X POST http://localhost:8080/api/1/user/{{VIN}}/unplugged`
   const dockerCompose = `services:
   node:
     image: ghcr.io/virtualzone/chargebot:latest
@@ -80,6 +76,18 @@ export default function PageHelp() {
           </ul>
         </li>
       </ol>
+
+      <h5 style={{ 'marginTop': '50px' }}>How does chargebot.io know whether my Tesla is plugged in or not?</h5>
+      <p>By default, chargebot.io tries to auto-detect your vehicle's plugged state. This is done by evaluating data provided via Tesla's Fleet Telemetry service. However, the relevant data provided by Fleet Telemetry is not as accurate as desirable (see <a href="https://github.com/teslamotors/fleet-telemetry/issues/123" target="_blank">this issue</a>).</p>
+      <p>If you prefer to have more accurate information about your vehicle's plugged state, you can use the following webhooks after setting the environment variable <pre style={{'display': 'inline'}}>PLUG_AUTODETECT</pre> to <pre style={{'display': 'inline'}}>0</pre>:</p>
+      <p>When your vehicle got plugged in at your home charger:</p>
+      <CopyBlock text={plugInComand} language="shell" wrapLongLines={true} showLineNumbers={false} customStyle={{'marginBottom': '20px'}} />
+      <p>When your vehicle got unplugged from your home charger:</p>
+      <CopyBlock text={plugOutComand} language="shell" wrapLongLines={true} showLineNumbers={false} />
+
+      <h5 style={{ 'marginTop': '50px' }}>How can I add authentication to my chargebot.io node's web interface?</h5>
+      <p>The remote controller node does not have a built-in authentication mechanism.</p>
+      <p>When authentication is required (i.e. when exposing the web interface to the internet), please use HTTP basic authentication on a reverse proxy in front of the node, or use a solution such as <a href="https://www.authelia.com" target="_blank">Authelia</a>.</p>
 
       <h5 style={{ 'marginTop': '50px' }}>How can I contribute?</h5>
       <p>Check out chargebot.io's <a href="https://github.com/virtualzone/chargebot" target="_blank">source code repository at GitHub</a>.</p>
