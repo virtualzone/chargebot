@@ -135,22 +135,17 @@ func OnVehicleUnplugged(vehicle *Vehicle, oldState *VehicleState) {
 
 func OnVehiclePluggedIn(vehicle *Vehicle) {
 	// vehicle got plugged in at home
-	GetDB().SetVehicleStatePluggedIn(vehicle.VIN, true)
-	GetDB().LogChargingEvent(vehicle.VIN, LogEventVehiclePlugIn, "")
-	if vehicle.Enabled {
-		go func() {
+	go func() {
+		if vehicle.Enabled {
 			// wait a few moments to ensure vehicle is online
-			time.Sleep(10 * time.Second)
-			if err := GetTeslaAPI().Wakeup(vehicle.VIN); err != nil {
-				log.Printf("could not init session for vehicle %s on plug in: %s\n", vehicle.VIN, err.Error())
-				return
-			}
-			time.Sleep(5 * time.Second)
+			time.Sleep(20 * time.Second)
 			if err := GetTeslaAPI().ChargeStop(vehicle.VIN); err != nil {
 				log.Printf("could not stop charging for vehicle %s on plug in: %s\n", vehicle.VIN, err.Error())
 			}
-		}()
-	}
+		}
+		GetDB().SetVehicleStatePluggedIn(vehicle.VIN, true)
+		GetDB().LogChargingEvent(vehicle.VIN, LogEventVehiclePlugIn, "")
+	}()
 }
 
 func CanUpdateVehicleData(vin string, now *time.Time) bool {

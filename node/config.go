@@ -10,18 +10,19 @@ import (
 )
 
 type Config struct {
-	TeslaClientID     string
-	TeslaRefreshToken string
-	DBFile            string
-	Port              int
-	Token             string
-	TokenPassword     string
-	TelemetryEndpoint string
-	CmdEndpoint       string
-	DevProxy          bool
-	CryptKey          string
-	TelegramToken     string
-	TelegramChatID    string
+	TeslaClientID          string
+	TeslaRefreshToken      string
+	DBFile                 string
+	Port                   int
+	Token                  string
+	TokenPassword          string
+	TelemetryEndpoint      string
+	CmdEndpoint            string
+	DevProxy               bool
+	CryptKey               string
+	TelegramToken          string
+	TelegramChatID         string
+	PlugStateAutodetection bool
 }
 
 var _configInstance *Config
@@ -54,6 +55,7 @@ func (c *Config) ReadConfig() {
 	c.CryptKey = c.getEnv("CRYPT_KEY", "")
 	c.TelegramToken = c.getEnv("TELEGRAM_TOKEN", "")
 	c.TelegramChatID = c.getEnv("TELEGRAM_CHAT_ID", "")
+	c.PlugStateAutodetection = (c.getEnv("PLUG_AUTODETECT", "1") == "1")
 }
 
 func (c *Config) Print() {

@@ -23,8 +23,10 @@ type PlugInOutRequest struct {
 
 func (router *UserRouter) SetupRoutes(s *mux.Router) {
 	s.HandleFunc("/surplus", router.recordSurplus).Methods("POST")
-	s.HandleFunc("/{vin}/plugged_in", router.vehiclePluggedIn).Methods("POST")
-	s.HandleFunc("/{vin}/unplugged", router.vehicleUnplugged).Methods("POST")
+	if !GetConfig().PlugStateAutodetection {
+		s.HandleFunc("/{vin}/plugged_in", router.vehiclePluggedIn).Methods("POST")
+		s.HandleFunc("/{vin}/unplugged", router.vehicleUnplugged).Methods("POST")
+	}
 }
 
 func (router *UserRouter) recordSurplus(w http.ResponseWriter, r *http.Request) {

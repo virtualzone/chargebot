@@ -214,8 +214,10 @@ func (t *TelemetryPoller) processState(telemetryState *PersistedTelemetryState) 
 	if vehicle.Enabled && oldState.Charging == ChargeStateNotCharging && telemetryState.Charging {
 		// if vehicle is charging although assumed not to, it could be that it has been plugged in recently
 		if !oldState.PluggedIn && telemetryState.IsHome {
-			OnVehiclePluggedIn(vehicle)
-			return
+			if GetConfig().PlugStateAutodetection {
+				OnVehiclePluggedIn(vehicle)
+				return
+			}
 		} else {
 			// otherwise, this is an anomaly where chargebot stopped charging but vehicle is still charging
 			// check if charging was actually stopped within the last minutes (else, it might just be the A/C)
@@ -227,30 +229,33 @@ func (t *TelemetryPoller) processState(telemetryState *PersistedTelemetryState) 
 			}
 		}
 	}
-	// Workarounds for incorrect ChargeState in telemetry data
-	// https://github.com/teslamotors/fleet-telemetry/issues/123
-	if oldState.PluggedIn && !telemetryState.IsHome {
-		// If vehicle was plugged in but is not home anymore, it is obiously not plugged in anymore
-		OnVehicleUnplugged(vehicle, oldState)
-		return
-	}
-	if !telemetryState.IsHome {
-		return
-	}
-	now := time.Now().UTC()
-	if CanUpdateVehicleData(vehicle.VIN, &now) {
-		data, err := GetTeslaAPI().GetVehicleData(vehicle.VIN)
-		if err != nil {
-			log.Println(err)
+
+	if GetConfig().PlugStateAutodetection {
+		// Workarounds for incorrect ChargeState in telemetry data
+		// https://github.com/teslamotors/fleet-telemetry/issues/123
+		if oldState.PluggedIn && !telemetryState.IsHome {
+			// If vehicle was plugged in but is not home anymore, it is obiously not plugged in anymore
+			OnVehicleUnplugged(vehicle, oldState)
 			return
 		}
-		GetDB().LogChargingEvent(vehicle.VIN, LogEventVehicleUpdateData, "")
-		cableConnected := (strings.ToLower(data.ChargeState.ConnectedChargeCable) == "iec" || strings.ToLower(data.ChargeState.ConnectedChargeCable) == "sae")
-		if oldState.PluggedIn && !cableConnected {
-			OnVehicleUnplugged(vehicle, oldState)
+		if !telemetryState.IsHome {
+			return
 		}
-		if !oldState.PluggedIn && cableConnected {
-			OnVehiclePluggedIn(vehicle)
+		now := time.Now().UTC()
+		if CanUpdateVehicleData(vehicle.VIN, &now) {
+			data, err := GetTeslaAPI().GetVehicleData(vehicle.VIN)
+			if err != nil {
+				log.Println(err)
+				return
+			}
+			GetDB().LogChargingEvent(vehicle.VIN, LogEventVehicleUpdateData, "")
+			cableConnected := (strings.ToLower(data.ChargeState.ConnectedChargeCable) == "iec" || strings.ToLower(data.ChargeState.ConnectedChargeCable) == "sae")
+			if oldState.PluggedIn && !cableConnected {
+				OnVehicleUnplugged(vehicle, oldState)
+			}
+			if !oldState.PluggedIn && cableConnected {
+				OnVehiclePluggedIn(vehicle)
+			}
 		}
 	}
 	/*

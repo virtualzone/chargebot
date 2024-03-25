@@ -56,6 +56,7 @@ chargebot.io supports sending push notifications using Telegram. To set it up, f
 | CRYPT_KEY | string |  | A key for encrypting your Tesla Refresh Token in the SQLite database |
 | TELEGRAM_TOKEN | string |  | Telegram Bot Authentication Token for push notifications |
 | TELEGRAM_CHAT_ID | string |  | Telegram Chat ID for push notifications |
+| PLUG_AUTODETECT | bool | 1 | Automatically detect vehicle's plugged in state (else, use the webhooks to notify node about plugged state) |
 
 ## More help
 Visit https://chargebot.io/help/ for more information.
