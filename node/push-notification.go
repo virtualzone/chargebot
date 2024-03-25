@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 )
 
@@ -20,7 +21,11 @@ type TelegramResponse struct {
 
 func SendPushNotification(msg string) error {
 	if GetConfig().TelegramToken != "" {
-		return sendTelegramMessage(msg)
+		err := sendTelegramMessage(msg)
+		if err != nil {
+			log.Println("Could not send telegram push notification: " + err.Error())
+		}
+		return err
 	}
 	return nil
 }

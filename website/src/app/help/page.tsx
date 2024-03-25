@@ -85,6 +85,15 @@ export default function PageHelp() {
       <p>When your vehicle got unplugged from your home charger:</p>
       <CopyBlock text={plugOutComand} language="shell" wrapLongLines={true} showLineNumbers={false} />
 
+      <h5 style={{ 'marginTop': '50px' }}>How can I receive push notifications?</h5>
+      <p>Your remote controller node can send push notifications using Telegram Bots. To set it up, follow these steps:</p>
+      <ol>
+        <li>Create a bot by sending <pre style={{'display': 'inline'}}>/newbot</pre> to Telegram's <a href='https://t.me/BotFather' target='_blank'>@BotFather</a> by following <a href='https://core.telegram.org/bots/features#botfather' target='_blank'>these instructions</a> and note down the displayed token.</li>
+        <li>Find out your Telegram User ID by i.e. sending any message to the <a href='https://t.me/getidsbot' target='_blank'>GetIDs bot</a>.</li>
+        <li>Set the <pre style={{'display': 'inline'}}>TELEGRAM_TOKEN</pre> and <pre style={{'display': 'inline'}}>TELEGRAM_CHAT_ID</pre> environment variables and restart your node.</li>
+      </ol>
+      
+
       <h5 style={{ 'marginTop': '50px' }}>How can I add authentication to my chargebot.io node's web interface?</h5>
       <p>The remote controller node does not have a built-in authentication mechanism.</p>
       <p>When authentication is required (i.e. when exposing the web interface to the internet), please use HTTP basic authentication on a reverse proxy in front of the node, or use a solution such as <a href="https://www.authelia.com" target="_blank">Authelia</a>.</p>

@@ -131,6 +131,7 @@ func OnVehicleUnplugged(vehicle *Vehicle, oldState *VehicleState) {
 		// Vehicle got unplugged while charging
 		GetDB().SetVehicleStateCharging(vehicle.VIN, ChargeStateNotCharging)
 	}
+	SendPushNotification(fmt.Sprintf("Vehicle %s unplugged", vehicle.DisplayName))
 }
 
 func OnVehiclePluggedIn(vehicle *Vehicle) {
@@ -145,6 +146,7 @@ func OnVehiclePluggedIn(vehicle *Vehicle) {
 		}
 		GetDB().SetVehicleStatePluggedIn(vehicle.VIN, true)
 		GetDB().LogChargingEvent(vehicle.VIN, LogEventVehiclePlugIn, "")
+		SendPushNotification(fmt.Sprintf("Vehicle %s plugged in", vehicle.DisplayName))
 	}()
 }
 

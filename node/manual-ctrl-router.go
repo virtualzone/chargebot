@@ -41,7 +41,7 @@ func (router *ManualControlRouter) testDrive(w http.ResponseWriter, r *http.Requ
 		log.Println("Test Drive: Charging in progress, check app...")
 		time.Sleep(30 * time.Second)
 		log.Println("Test Drive: Stop charging...")
-		cc.stopCharging(vehicle)
+		cc.stopCharging(vehicle, state)
 		log.Println("Test Drive: Done.")
 	}()
 }

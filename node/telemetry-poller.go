@@ -225,7 +225,7 @@ func (t *TelemetryPoller) processState(telemetryState *PersistedTelemetryState) 
 			now := time.Now().UTC()
 			if event.Timestamp.After(now.Add(-5 * time.Minute)) {
 				log.Printf("Anomaly detected: Vehicle %s was assumed to be not charging, but actually is - stopping it\n", vehicle.VIN)
-				GetChargeController().stopCharging(vehicle)
+				GetChargeController().stopCharging(vehicle, oldState)
 			}
 		}
 	}

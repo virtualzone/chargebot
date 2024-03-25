@@ -74,13 +74,13 @@ func (c *ChargeController) processVehicle(vehicle *Vehicle) {
 
 	if !vehicle.Enabled && state.Charging != ChargeStateNotCharging {
 		// Stop charging if vehicle is still charging but not enabled anymore
-		c.stopCharging(vehicle)
+		c.stopCharging(vehicle, state)
 	} else if !vehicle.SurplusCharging && state.Charging == ChargeStateChargingOnSolar {
 		// Stop charging if vehicle is still charging on solar but surplus charging is not enabled anymore
-		c.stopCharging(vehicle)
+		c.stopCharging(vehicle, state)
 	} else if !vehicle.LowcostCharging && state.Charging == ChargeStateChargingOnGrid {
 		// Stop charging if vehicle is still charging on grid but grid charging is not enabled anymore
-		c.stopCharging(vehicle)
+		c.stopCharging(vehicle, state)
 	} else if vehicle.Enabled && state.Charging == ChargeStateNotCharging {
 		// Check if we need to start charging
 		c.checkStartCharging(vehicle, state)
@@ -90,7 +90,7 @@ func (c *ChargeController) processVehicle(vehicle *Vehicle) {
 	}
 }
 
-func (c *ChargeController) stopCharging(vehicle *Vehicle) {
+func (c *ChargeController) stopCharging(vehicle *Vehicle, state *VehicleState) {
 	err := GetTeslaAPI().Wakeup(vehicle.VIN)
 	if err != nil {
 		GetDB().LogChargingEvent(vehicle.VIN, LogEventChargeStop, fmt.Sprintf("could not init session with car: %s", err.Error()))
@@ -107,7 +107,7 @@ func (c *ChargeController) stopCharging(vehicle *Vehicle) {
 	GetDB().SetVehicleStateCharging(vehicle.VIN, ChargeStateNotCharging)
 	GetDB().LogChargingEvent(vehicle.VIN, LogEventChargeStop, "charging stopped")
 
-	SendPushNotification(fmt.Sprintf("Charging stopped for %s.", vehicle.DisplayName))
+	SendPushNotification(fmt.Sprintf("Charging stopped for %s at %d %% SoC.", vehicle.DisplayName, state.SoC))
 }
 
 func (c *ChargeController) checkTargetState(vehicle *Vehicle, state *VehicleState) (ChargeState, int) {
@@ -588,7 +588,7 @@ func (c *ChargeController) chargeProcessAdjustSolarAmps(vehicle *Vehicle, state 
 func (c *ChargeController) checkChargeProcess(vehicle *Vehicle, state *VehicleState) {
 	// if target SoC is reached: stop charging
 	if state.SoC >= vehicle.TargetSoC {
-		c.stopCharging(vehicle)
+		c.stopCharging(vehicle, state)
 		return
 	}
 
@@ -606,6 +606,6 @@ func (c *ChargeController) checkChargeProcess(vehicle *Vehicle, state *VehicleSt
 
 	// else, check if charging needs to be stopped
 	if targetState == ChargeStateNotCharging {
-		c.stopCharging(vehicle)
+		c.stopCharging(vehicle, state)
 	}
 }
