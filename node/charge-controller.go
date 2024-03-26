@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"slices"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -19,6 +21,8 @@ type ChargeController struct {
 	Time                 Time
 	Async                bool
 	ChargeStartFailCount int
+	inTick               []string
+	inTickMutex          sync.Mutex
 }
 
 func NewChargeController() *ChargeController {
@@ -26,6 +30,7 @@ func NewChargeController() *ChargeController {
 		Time:                 new(RealTime),
 		Async:                true,
 		ChargeStartFailCount: 0,
+		inTick:               []string{},
 	}
 }
 
@@ -55,6 +60,27 @@ func (c *ChargeController) OnTick() {
 	}
 }
 
+func (c *ChargeController) setInTick(vin string) {
+	c.inTickMutex.Lock()
+	defer c.inTickMutex.Unlock()
+	if !slices.Contains(c.inTick, vin) {
+		c.inTick = append(c.inTick, vin)
+	}
+}
+
+func (c *ChargeController) unsetInTick(vin string) {
+	c.inTickMutex.Lock()
+	defer c.inTickMutex.Unlock()
+	idx := slices.Index(c.inTick, vin)
+	if idx > -1 {
+		c.inTick = slices.Delete(c.inTick, idx, 1)
+	}
+}
+
+func (c *ChargeController) isInTick(vin string) bool {
+	return slices.Contains(c.inTick, vin)
+}
+
 func (c *ChargeController) processVehicle(vehicle *Vehicle) {
 	state := GetDB().GetVehicleState(vehicle.VIN)
 	if state == nil {
@@ -71,6 +97,14 @@ func (c *ChargeController) processVehicle(vehicle *Vehicle) {
 		// nothing to do for a disabled vehicle which is not charging
 		return
 	}
+
+	if c.isInTick(vehicle.VIN) {
+		// skip this round if vehicle is still processing
+		return
+	}
+
+	c.setInTick(vehicle.VIN)
+	defer c.unsetInTick(vehicle.VIN)
 
 	if !vehicle.Enabled && state.Charging != ChargeStateNotCharging {
 		// Stop charging if vehicle is still charging but not enabled anymore

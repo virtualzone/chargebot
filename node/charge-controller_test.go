@@ -1331,3 +1331,19 @@ func TestChargeControl_getActualSurplus_oldRecords(t *testing.T) {
 	assert.NotNil(t, surplus)
 	assert.Equal(t, 3000, surplus)
 }
+
+func TestChargeControl_setInTick(t *testing.T) {
+	t.Cleanup(ResetTestDB)
+
+	cc := NewTestChargeController()
+	assert.False(t, cc.isInTick("123"))
+
+	cc.setInTick("123")
+	cc.setInTick("123")
+	assert.True(t, cc.isInTick("123"))
+	assert.Equal(t, 1, len(cc.inTick))
+	assert.Equal(t, "123", cc.inTick[0])
+
+	cc.unsetInTick("123")
+	assert.False(t, cc.isInTick("123"))
+}
