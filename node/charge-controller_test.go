@@ -1204,6 +1204,28 @@ func TestChargeControl_canAdjustSolarAmps_no(t *testing.T) {
 	assert.False(t, cc.canAdjustSolarAmps(v))
 }
 
+func TestChargeControl_canAdjustSolarAmps_startEvent_no(t *testing.T) {
+	t.Cleanup(ResetTestDB)
+
+	v := &Vehicle{VIN: "123"}
+	GetDB().GetConnection().Exec("insert into surpluses (ts, surplus_watts) values (?, ?)", GetDB().formatSqliteDatetime(GetDB().Time.UTCNow()), 2000)
+	GetDB().GetConnection().Exec("insert into logs values(?, ?, ?, ?)", v.VIN, GetDB().formatSqliteDatetime(GetDB().Time.UTCNow().Add(-15*time.Minute)), LogEventSetChargingAmps, "")
+	GetDB().GetConnection().Exec("insert into logs values(?, ?, ?, ?)", v.VIN, GetDB().formatSqliteDatetime(GetDB().Time.UTCNow().Add(-4*time.Minute)), LogEventChargeStart, "")
+	cc := NewTestChargeController()
+	assert.False(t, cc.canAdjustSolarAmps(v))
+}
+
+func TestChargeControl_canAdjustSolarAmps_startEvent_yes(t *testing.T) {
+	t.Cleanup(ResetTestDB)
+
+	v := &Vehicle{VIN: "123"}
+	GetDB().GetConnection().Exec("insert into surpluses (ts, surplus_watts) values (?, ?)", GetDB().formatSqliteDatetime(GetDB().Time.UTCNow()), 2000)
+	GetDB().GetConnection().Exec("insert into logs values(?, ?, ?, ?)", v.VIN, GetDB().formatSqliteDatetime(GetDB().Time.UTCNow().Add(-15*time.Minute)), LogEventSetChargingAmps, "")
+	GetDB().GetConnection().Exec("insert into logs values(?, ?, ?, ?)", v.VIN, GetDB().formatSqliteDatetime(GetDB().Time.UTCNow().Add(-6*time.Minute)), LogEventChargeStart, "")
+	cc := NewTestChargeController()
+	assert.True(t, cc.canAdjustSolarAmps(v))
+}
+
 func TestChargeControl_getActualSurplus_charging(t *testing.T) {
 	t.Cleanup(ResetTestDB)
 

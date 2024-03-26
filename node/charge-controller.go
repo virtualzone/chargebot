@@ -515,11 +515,21 @@ func (c *ChargeController) canAdjustSolarAmps(vehicle *Vehicle) bool {
 		return false
 	}
 	surplus := surpluses[0]
+	var latest *time.Time = nil
 	ampsEvent := GetDB().GetLatestChargingEvent(vehicle.VIN, LogEventSetChargingAmps)
-	if ampsEvent == nil {
+	if ampsEvent != nil {
+		latest = &ampsEvent.Timestamp
+	}
+	startEvent := GetDB().GetLatestChargingEvent(vehicle.VIN, LogEventChargeStart)
+	if startEvent != nil {
+		if (latest == nil) || (startEvent.Timestamp.After(*latest)) {
+			latest = &startEvent.Timestamp
+		}
+	}
+	if latest == nil {
 		return false
 	}
-	diff := surplus.Timestamp.Sub(ampsEvent.Timestamp)
+	diff := surplus.Timestamp.Sub(*latest)
 	return diff.Minutes() >= 5 // max. every 5 mins
 }
 
