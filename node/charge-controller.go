@@ -107,7 +107,7 @@ func (c *ChargeController) stopCharging(vehicle *Vehicle, state *VehicleState) {
 	GetDB().SetVehicleStateCharging(vehicle.VIN, ChargeStateNotCharging)
 	GetDB().LogChargingEvent(vehicle.VIN, LogEventChargeStop, "charging stopped")
 
-	SendPushNotification(fmt.Sprintf("Charging stopped for %s at %d %% SoC.", vehicle.DisplayName, state.SoC))
+	SendPushNotification(fmt.Sprintf("%s stopped charging %d %% SoC.", vehicle.DisplayName, state.SoC))
 }
 
 func (c *ChargeController) checkTargetState(vehicle *Vehicle, state *VehicleState) (ChargeState, int) {
@@ -204,7 +204,7 @@ func (c *ChargeController) activateCharging(vehicle *Vehicle, state *VehicleStat
 	if source == ChargeStateChargingOnGrid {
 		sourceText = "grid"
 	}
-	SendPushNotification(fmt.Sprintf("Charging activated for %s using %s with %d amps.", vehicle.DisplayName, sourceText, amps))
+	SendPushNotification(fmt.Sprintf("%s started charging on %s with %d amps.", vehicle.DisplayName, sourceText, amps))
 
 	// charging should start now
 	return true
@@ -579,6 +579,7 @@ func (c *ChargeController) chargeProcessAdjustSolarAmps(vehicle *Vehicle, state 
 				} else {
 					GetDB().SetVehicleStateAmps(vehicle.VIN, targetAmps)
 					GetDB().LogChargingEvent(vehicle.VIN, LogEventSetChargingAmps, fmt.Sprintf("charge amps set to %d", targetAmps))
+					SendPushNotification(fmt.Sprintf("Adjusted %s's current to %d amps.", vehicle.DisplayName, targetAmps))
 				}
 			}
 		}
