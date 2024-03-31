@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"slices"
 
 	"github.com/gorilla/mux"
 	. "github.com/virtualzone/chargebot/goshared"
@@ -23,6 +24,10 @@ type HomeLocation struct {
 	Radius    int     `json:"radius"`
 }
 
+type SetRegionRequest struct {
+	Region RegionCode `json:"region"`
+}
+
 func (router *AuthRouter) SetupRoutes(s *mux.Router) {
 	s.HandleFunc("/login", router.login).Methods("GET")
 	s.HandleFunc("/callback", router.callback).Methods("GET")
@@ -30,6 +35,7 @@ func (router *AuthRouter) SetupRoutes(s *mux.Router) {
 	s.HandleFunc("/tokenvalid", router.isTokenValid).Methods("GET")
 	s.HandleFunc("/me", router.getMe).Methods("GET")
 	s.HandleFunc("/home", router.setHomeLocation).Methods("POST")
+	s.HandleFunc("/region", router.setRegion).Methods("POST")
 }
 
 func (router *AuthRouter) login(w http.ResponseWriter, r *http.Request) {
@@ -66,6 +72,7 @@ func (router *AuthRouter) callback(w http.ResponseWriter, r *http.Request) {
 			HomeLatitude:  0.0,
 			HomeLongitude: 0.0,
 			HomeRadius:    100,
+			Region:        RegionCodeEU,
 		}
 		GetDB().CreateUpdateUser(user)
 	}
@@ -157,6 +164,32 @@ func (router *AuthRouter) setHomeLocation(w http.ResponseWriter, r *http.Request
 	user.HomeLatitude = m.Latitude
 	user.HomeLongitude = m.Longitude
 	user.HomeRadius = m.Radius
+	GetDB().CreateUpdateUser(user)
+
+	SendJSON(w, true)
+}
+
+func (router *AuthRouter) setRegion(w http.ResponseWriter, r *http.Request) {
+	var m SetRegionRequest
+	if err := UnmarshalValidateBody(r.Body, &m); err != nil {
+		SendBadRequest(w)
+		return
+	}
+
+	allowedRegionCodes := []RegionCode{RegionCodeEU, RegionCodeNA}
+	if !slices.Contains(allowedRegionCodes, m.Region) {
+		SendBadRequest(w)
+		return
+	}
+
+	userID := GetUserIDFromRequest(r)
+	user := GetDB().GetUser(userID)
+	if user == nil {
+		SendNotFound(w)
+		return
+	}
+
+	user.Region = m.Region
 	GetDB().CreateUpdateUser(user)
 
 	SendJSON(w, true)

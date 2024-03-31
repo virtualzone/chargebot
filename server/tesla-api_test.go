@@ -10,8 +10,8 @@ type TeslaAPIMock struct {
 	mock.Mock
 }
 
-func (a *TeslaAPIMock) GetTokens(userID string, code string, redirectURI string) (*TeslaAPITokenReponse, error) {
-	args := a.Called(userID, code, redirectURI)
+func (a *TeslaAPIMock) GetTokens(audience string, code string, redirectURI string) (*TeslaAPITokenReponse, error) {
+	args := a.Called(audience, code, redirectURI)
 	if resp, ok := args.Get(0).(*TeslaAPITokenReponse); !ok {
 		panic("assert: arguments wasn't correct type")
 	} else {
@@ -19,26 +19,14 @@ func (a *TeslaAPIMock) GetTokens(userID string, code string, redirectURI string)
 	}
 }
 
-func (a *TeslaAPIMock) RefreshToken(userID string, refreshToken string) (*TeslaAPITokenReponse, error) {
-	args := a.Called(userID, refreshToken)
+func (a *TeslaAPIMock) RefreshToken(refreshToken string) (*TeslaAPITokenReponse, error) {
+	args := a.Called(refreshToken)
 	if resp, ok := args.Get(0).(*TeslaAPITokenReponse); !ok {
 		panic("assert: arguments wasn't correct type")
 	} else {
 		return resp, args.Error(1)
 	}
 }
-
-/*
-func (a *TeslaAPIMock) GetOrRefreshAccessToken(userID string) string {
-	args := a.Called(userID)
-	return args.String(0)
-}
-
-func (a *TeslaAPIMock) GetCachedAccessToken(userID string) string {
-	args := a.Called(userID)
-	return args.String(0)
-}
-*/
 
 func (a *TeslaAPIMock) InitSession(accessToken string, vin string) (*vehicle.Vehicle, error) {
 	args := a.Called(accessToken, vin)
@@ -49,8 +37,8 @@ func (a *TeslaAPIMock) InitSession(accessToken string, vin string) (*vehicle.Veh
 	}
 }
 
-func (a *TeslaAPIMock) ListVehicles(accessToken string) ([]TeslaAPIVehicleEntity, error) {
-	args := a.Called(accessToken)
+func (a *TeslaAPIMock) ListVehicles(audience string, accessToken string) ([]TeslaAPIVehicleEntity, error) {
+	args := a.Called(audience, accessToken)
 	if resp, ok := args.Get(0).([]TeslaAPIVehicleEntity); !ok {
 		panic("assert: arguments wasn't correct type")
 	} else {
@@ -78,8 +66,8 @@ func (a *TeslaAPIMock) SetChargeAmps(car *vehicle.Vehicle, amps int) error {
 	return args.Error(0)
 }
 
-func (a *TeslaAPIMock) GetVehicleData(accessToken string, vin string) (*TeslaAPIVehicleData, error) {
-	args := a.Called(accessToken, vin)
+func (a *TeslaAPIMock) GetVehicleData(audience string, accessToken string, vin string) (*TeslaAPIVehicleData, error) {
+	args := a.Called(audience, accessToken, vin)
 	if resp, ok := args.Get(0).(*TeslaAPIVehicleData); !ok {
 		panic("assert: arguments wasn't correct type")
 	} else {
@@ -87,23 +75,22 @@ func (a *TeslaAPIMock) GetVehicleData(accessToken string, vin string) (*TeslaAPI
 	}
 }
 
-func (a *TeslaAPIMock) Wakeup(accessToken string, vin string) error {
-	args := a.Called(accessToken, vin)
+func (a *TeslaAPIMock) Wakeup(audience string, accessToken string, vin string) error {
+	args := a.Called(audience, accessToken, vin)
 	return args.Error(0)
 }
 
-func (a *TeslaAPIMock) CreateTelemetryConfig(accessToken string, vin string) error {
-	args := a.Called(accessToken, vin)
+func (a *TeslaAPIMock) CreateTelemetryConfig(audience string, accessToken string, vin string) error {
+	args := a.Called(audience, accessToken, vin)
 	return args.Error(0)
 }
 
-func (a *TeslaAPIMock) DeleteTelemetryConfig(accessToken string, vin string) error {
-	args := a.Called(accessToken, vin)
+func (a *TeslaAPIMock) DeleteTelemetryConfig(audience string, accessToken string, vin string) error {
+	args := a.Called(audience, accessToken, vin)
 	return args.Error(0)
 }
 
 func UpdateTeslaAPIMockData(api *TeslaAPIMock, vin string, batteryLevel int, chargingState string) {
-	//GetDB().SetVehicleStateCharging(vehicleID, chargingState)
 	vData := &TeslaAPIVehicleData{
 		VIN: vin,
 		ChargeState: TeslaAPIChargeState{

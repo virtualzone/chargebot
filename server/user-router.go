@@ -19,8 +19,9 @@ type UserRouter struct {
 }
 
 type AuthenticatedUserRequest struct {
-	Vehicle *Vehicle
-	UserID  string
+	Vehicle  *Vehicle
+	UserID   string
+	Audience string
 }
 
 func (router *UserRouter) SetupRoutes(s *mux.Router) {
@@ -193,7 +194,7 @@ func (router *UserRouter) listVehicles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res, err := GetTeslaAPI().ListVehicles(m.AccessToken)
+	res, err := GetTeslaAPI().ListVehicles(a.Audience, m.AccessToken)
 	if err != nil {
 		router.sendError(w, err)
 		return
@@ -222,8 +223,17 @@ func (router *UserRouter) addVehicle(w http.ResponseWriter, r *http.Request) {
 		SendBadRequest(w)
 		return
 	}
+	user := GetDB().GetUser(userID)
+	if user == nil {
+		SendBadRequest(w)
+		return
+	}
+	if !IsValidAudienceRegionCode(string(user.Region)) {
+		SendInternalServerError(w)
+		return
+	}
 
-	res, err := GetTeslaAPI().ListVehicles(m.AccessToken)
+	res, err := GetTeslaAPI().ListVehicles(GetAudienceURL(string(user.Region)), m.AccessToken)
 	if err != nil {
 		router.sendError(w, err)
 		return
@@ -270,8 +280,17 @@ func (router *UserRouter) deleteVehicle(w http.ResponseWriter, r *http.Request) 
 		SendBadRequest(w)
 		return
 	}
+	user := GetDB().GetUser(userID)
+	if user == nil {
+		SendBadRequest(w)
+		return
+	}
+	if !IsValidAudienceRegionCode(string(user.Region)) {
+		SendInternalServerError(w)
+		return
+	}
 
-	res, err := GetTeslaAPI().ListVehicles(m.AccessToken)
+	res, err := GetTeslaAPI().ListVehicles(GetAudienceURL(string(user.Region)), m.AccessToken)
 	if err != nil {
 		router.sendError(w, err)
 		return
@@ -350,7 +369,7 @@ func (router *UserRouter) vehicleData(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res, err := GetTeslaAPI().GetVehicleData(m.AccessToken, a.Vehicle.VIN)
+	res, err := GetTeslaAPI().GetVehicleData(a.Audience, m.AccessToken, a.Vehicle.VIN)
 	if err != nil {
 		router.sendError(w, err)
 		return
@@ -415,7 +434,7 @@ func (router *UserRouter) wakeup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := GetTeslaAPI().Wakeup(m.AccessToken, a.Vehicle.VIN)
+	err := GetTeslaAPI().Wakeup(a.Audience, m.AccessToken, a.Vehicle.VIN)
 	if err != nil {
 		router.sendError(w, err)
 		return
@@ -435,7 +454,7 @@ func (router *UserRouter) createTelemetryConfig(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	err := GetTeslaAPI().CreateTelemetryConfig(m.AccessToken, a.Vehicle.VIN)
+	err := GetTeslaAPI().CreateTelemetryConfig(a.Audience, m.AccessToken, a.Vehicle.VIN)
 	if err != nil {
 		router.sendError(w, err)
 		return
@@ -455,7 +474,7 @@ func (router *UserRouter) deleteTelemetryConfig(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	err := GetTeslaAPI().DeleteTelemetryConfig(m.AccessToken, a.Vehicle.VIN)
+	err := GetTeslaAPI().DeleteTelemetryConfig(a.Audience, m.AccessToken, a.Vehicle.VIN)
 	if err != nil {
 		router.sendError(w, err)
 		return
@@ -480,6 +499,17 @@ func (router *UserRouter) authenticateUserRequest(w http.ResponseWriter, r *http
 		return nil
 	}
 
+	user := GetDB().GetUser(userID)
+	if user == nil {
+		SendBadRequest(w)
+		return nil
+	}
+	if !IsValidAudienceRegionCode(string(user.Region)) {
+		SendInternalServerError(w)
+		return nil
+	}
+	audience := GetAudienceURL(string(user.Region))
+
 	var vehicle *Vehicle = nil
 	if vin != "" {
 		if !GetDB().IsUserOwnerOfVehicle(userID, vin) {
@@ -499,7 +529,8 @@ func (router *UserRouter) authenticateUserRequest(w http.ResponseWriter, r *http
 	}
 
 	return &AuthenticatedUserRequest{
-		Vehicle: vehicle,
-		UserID:  userID,
+		Vehicle:  vehicle,
+		UserID:   userID,
+		Audience: audience,
 	}
 }

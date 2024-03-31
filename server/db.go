@@ -13,13 +13,21 @@ import (
 
 var SQLITE_DATETIME_LAYOUT string = "2006-01-02 15:04:05"
 
+type RegionCode string
+
+const (
+	RegionCodeNA RegionCode = "na"
+	RegionCodeEU RegionCode = "eu"
+)
+
 type User struct {
-	ID            string  `json:"id"`
-	TeslaUserID   string  `json:"tesla_user_id"`
-	APIToken      string  `json:"api_token"`
-	HomeLatitude  float64 `json:"home_lat"`
-	HomeLongitude float64 `json:"home_lng"`
-	HomeRadius    int     `json:"home_radius"`
+	ID            string     `json:"id"`
+	TeslaUserID   string     `json:"tesla_user_id"`
+	APIToken      string     `json:"api_token"`
+	HomeLatitude  float64    `json:"home_lat"`
+	HomeLongitude float64    `json:"home_lng"`
+	HomeRadius    int        `json:"home_radius"`
+	Region        RegionCode `json:"region"`
 }
 
 type Vehicle struct {
@@ -86,6 +94,9 @@ create table if not exists telemetry_state(vin text primary key, plugged_in int,
 	if err != nil {
 		log.Panicln(err)
 	}
+	if _, err := db.GetConnection().Exec(`alter table users add column region text default 'eu';`); err != nil {
+		log.Println(err)
+	}
 }
 
 func (db *DB) CreateAuthCode() string {
@@ -124,7 +135,7 @@ func (db *DB) DeleteExpiredAuthCodes() {
 }
 
 func (db *DB) CreateUpdateUser(user *User) {
-	_, err := db.GetConnection().Exec("replace into users values(?, ?, ?, ?, ?)", user.ID, user.TeslaUserID, user.HomeLatitude, user.HomeLongitude, user.HomeRadius)
+	_, err := db.GetConnection().Exec("replace into users values(?, ?, ?, ?, ?, ?)", user.ID, user.TeslaUserID, user.HomeLatitude, user.HomeLongitude, user.HomeRadius, user.Region)
 	if err != nil {
 		log.Panicln(err)
 	}
@@ -132,12 +143,12 @@ func (db *DB) CreateUpdateUser(user *User) {
 
 func (db *DB) GetUser(ID string) *User {
 	e := &User{}
-	err := db.GetConnection().QueryRow("select id, tesla_user_id, home_lat, home_lng, home_radius, ifnull(token, '') "+
+	err := db.GetConnection().QueryRow("select id, tesla_user_id, home_lat, home_lng, home_radius, region, ifnull(token, '') "+
 		"from users "+
 		"left join api_tokens on api_tokens.user_id = users.id "+
 		"where id = ?",
 		ID).
-		Scan(&e.ID, &e.TeslaUserID, &e.HomeLatitude, &e.HomeLongitude, &e.HomeRadius, &e.APIToken)
+		Scan(&e.ID, &e.TeslaUserID, &e.HomeLatitude, &e.HomeLongitude, &e.HomeRadius, &e.Region, &e.APIToken)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			log.Println(err)

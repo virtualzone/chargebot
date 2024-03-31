@@ -69,24 +69,24 @@ type TeslaAPITelemetryConfigCreate struct {
 }
 
 type TeslaAPI interface {
-	GetTokens(userID string, code string, redirectURI string) (*TeslaAPITokenReponse, error)
-	RefreshToken(userID string, refreshToken string) (*TeslaAPITokenReponse, error)
+	GetTokens(audience string, code string, redirectURI string) (*TeslaAPITokenReponse, error)
+	RefreshToken(refreshToken string) (*TeslaAPITokenReponse, error)
 	InitSession(accessToken string, vin string) (*vehicle.Vehicle, error)
-	ListVehicles(accessToken string) ([]TeslaAPIVehicleEntity, error)
+	ListVehicles(audience string, accessToken string) ([]TeslaAPIVehicleEntity, error)
 	ChargeStart(car *vehicle.Vehicle) error
 	ChargeStop(car *vehicle.Vehicle) error
 	SetChargeLimit(car *vehicle.Vehicle, limitPercent int) error
 	SetChargeAmps(car *vehicle.Vehicle, amps int) error
-	GetVehicleData(accessToken string, vin string) (*TeslaAPIVehicleData, error)
-	Wakeup(accessToken string, vin string) error
-	CreateTelemetryConfig(accessToken string, vin string) error
-	DeleteTelemetryConfig(accessToken string, vin string) error
+	GetVehicleData(audience string, accessToken string, vin string) (*TeslaAPIVehicleData, error)
+	Wakeup(audience string, accessToken string, vin string) error
+	CreateTelemetryConfig(audience string, accessToken string, vin string) error
+	DeleteTelemetryConfig(audience string, accessToken string, vin string) error
 }
 
 type TeslaAPIImpl struct {
 }
 
-func (a *TeslaAPIImpl) GetTokens(userID string, code string, redirectURI string) (*TeslaAPITokenReponse, error) {
+func (a *TeslaAPIImpl) GetTokens(audience string, code string, redirectURI string) (*TeslaAPITokenReponse, error) {
 	target := "https://auth.tesla.com/oauth2/v3/token"
 	data := url.Values{}
 	data.Set("grant_type", "authorization_code")
@@ -94,7 +94,7 @@ func (a *TeslaAPIImpl) GetTokens(userID string, code string, redirectURI string)
 	data.Set("client_secret", GetConfig().TeslaClientSecret)
 	data.Set("code", code)
 	data.Set("redirect_uri", redirectURI)
-	data.Set("audience", GetConfig().TeslaAudience)
+	data.Set("audience", audience)
 	r, _ := http.NewRequest("POST", target, strings.NewReader(data.Encode()))
 	r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
@@ -118,7 +118,7 @@ func (a *TeslaAPIImpl) GetTokens(userID string, code string, redirectURI string)
 	return &m, nil
 }
 
-func (a *TeslaAPIImpl) RefreshToken(userID string, refreshToken string) (*TeslaAPITokenReponse, error) {
+func (a *TeslaAPIImpl) RefreshToken(refreshToken string) (*TeslaAPITokenReponse, error) {
 	target := "https://auth.tesla.com/oauth2/v3/token"
 	data := url.Values{}
 	data.Set("grant_type", "refresh_token")
@@ -167,8 +167,8 @@ func (a *TeslaAPIImpl) InitSession(accessToken string, vin string) (*vehicle.Veh
 	return car, nil
 }
 
-func (a *TeslaAPIImpl) ListVehicles(accessToken string) ([]TeslaAPIVehicleEntity, error) {
-	r, _ := http.NewRequest("GET", _configInstance.TeslaAudience+"/api/1/vehicles", nil)
+func (a *TeslaAPIImpl) ListVehicles(audience string, accessToken string) ([]TeslaAPIVehicleEntity, error) {
+	r, _ := http.NewRequest("GET", audience+"/api/1/vehicles", nil)
 
 	resp, err := RetryHTTPJSONRequest(r, accessToken)
 	if err != nil {
@@ -228,8 +228,8 @@ func (a *TeslaAPIImpl) SetChargeAmps(car *vehicle.Vehicle, amps int) error {
 	return err
 }
 
-func (a *TeslaAPIImpl) GetVehicleData(accessToken string, vin string) (*TeslaAPIVehicleData, error) {
-	target := GetConfig().TeslaAudience + "/api/1/vehicles/" + vin + "/vehicle_data"
+func (a *TeslaAPIImpl) GetVehicleData(audience string, accessToken string, vin string) (*TeslaAPIVehicleData, error) {
+	target := audience + "/api/1/vehicles/" + vin + "/vehicle_data"
 	r, _ := http.NewRequest("GET", target, nil)
 
 	resp, err := RetryHTTPJSONRequest(r, accessToken)
@@ -250,8 +250,8 @@ func (a *TeslaAPIImpl) GetVehicleData(accessToken string, vin string) (*TeslaAPI
 	return &m.Response, nil
 }
 
-func (a *TeslaAPIImpl) Wakeup(accessToken string, vin string) error {
-	target := GetConfig().TeslaAudience + "/api/1/vehicles/" + vin + "/wake_up"
+func (a *TeslaAPIImpl) Wakeup(audience string, accessToken string, vin string) error {
+	target := audience + "/api/1/vehicles/" + vin + "/wake_up"
 	r, _ := http.NewRequest("POST", target, nil)
 
 	_, err := RetryHTTPJSONRequest(r, accessToken)
@@ -264,7 +264,7 @@ func (a *TeslaAPIImpl) Wakeup(accessToken string, vin string) error {
 	return nil
 }
 
-func (a *TeslaAPIImpl) CreateTelemetryConfig(accessToken string, vin string) error {
+func (a *TeslaAPIImpl) CreateTelemetryConfig(audience string, accessToken string, vin string) error {
 	config := TeslaAPITelemetryConfigCreate{
 		VINs: []string{vin},
 		Config: TeslaAPITelemetryConfig{
@@ -288,7 +288,7 @@ func (a *TeslaAPIImpl) CreateTelemetryConfig(accessToken string, vin string) err
 		return err
 	}
 
-	target := GetConfig().TeslaAudience + "/api/1/vehicles/fleet_telemetry_config"
+	target := audience + "/api/1/vehicles/fleet_telemetry_config"
 	r, _ := http.NewRequest("POST", target, bytes.NewReader(json))
 
 	resp, err := RetryHTTPJSONRequest(r, accessToken)
@@ -303,8 +303,8 @@ func (a *TeslaAPIImpl) CreateTelemetryConfig(accessToken string, vin string) err
 	return nil
 }
 
-func (a *TeslaAPIImpl) DeleteTelemetryConfig(accessToken string, vin string) error {
-	target := GetConfig().TeslaAudience + "/api/1/vehicles/" + vin + "/fleet_telemetry_config"
+func (a *TeslaAPIImpl) DeleteTelemetryConfig(audience string, accessToken string, vin string) error {
+	target := audience + "/api/1/vehicles/" + vin + "/fleet_telemetry_config"
 	r, _ := http.NewRequest("DELETE", target, nil)
 
 	_, err := RetryHTTPJSONRequest(r, accessToken)
@@ -316,8 +316,8 @@ func (a *TeslaAPIImpl) DeleteTelemetryConfig(accessToken string, vin string) err
 	return nil
 }
 
-func (a *TeslaAPIImpl) GetTelemetryConfig(accessToken string, vin string) error {
-	target := GetConfig().TeslaAudience + "/api/1/vehicles/" + vin + "/fleet_telemetry_config"
+func (a *TeslaAPIImpl) GetTelemetryConfig(audience string, accessToken string, vin string) error {
+	target := audience + "/api/1/vehicles/" + vin + "/fleet_telemetry_config"
 	r, _ := http.NewRequest("GET", target, nil)
 
 	resp, err := RetryHTTPJSONRequest(r, accessToken)

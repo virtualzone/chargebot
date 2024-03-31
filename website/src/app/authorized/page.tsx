@@ -1,7 +1,7 @@
 'use client'
 
 import Image from "next/image";
-import { checkAuth, getAPI, getUserDetails, postAPI, saveUserDetails } from "../util";
+import { checkAuth, getAPI, postAPI, saveUserDetails } from "../util";
 import { useEffect, useState } from "react";
 import Loading from "../loading";
 import { Alert, Button, Container, Form, InputGroup } from "react-bootstrap";
@@ -21,6 +21,8 @@ export default function PageAuthorized() {
   const [homeLongitude, setHomeLongitude] = useState(0.0)
   const [homeRadius, setHomeRadius] = useState(100)
   const [savingHomeLocation, setSavingHomeLocation] = useState(false)
+  const [region, setRegion] = useState('')
+  const [savingRegion, setSavingRegion] = useState(false)
 
   const loadVehicles = async () => {
     const json = await getAPI("/api/1/tesla/my_vehicles");
@@ -49,6 +51,7 @@ export default function PageAuthorized() {
       setHomeLatitude(userDetails.home_lat);
       setHomeLongitude(userDetails.home_lng);
       setHomeRadius(userDetails.home_radius);
+      setRegion(userDetails.region);
       setLoading(false);
     }
     fetchData();
@@ -73,6 +76,20 @@ export default function PageAuthorized() {
       let user = await getAPI("/api/1/auth/me");
       saveUserDetails(user);
       setSavingHomeLocation(false);
+    }
+    fetchData();
+  }
+
+  async function saveRegion() {
+    const fetchData = async () => {
+      setSavingRegion(true);
+      let payload = {
+        "region": region
+      };
+      await postAPI("/api/1/auth/region", payload);
+      let user = await getAPI("/api/1/auth/me");
+      saveUserDetails(user);
+      setSavingRegion(false);
     }
     fetchData();
   }
@@ -234,6 +251,22 @@ export default function PageAuthorized() {
     </>
   );
 
+  let regionSection = (
+    <>
+      <h2 className="pb-3" style={{ 'marginTop': '50px' }}>Region</h2>
+      <p>Your region is required to call the correct Tesla API endpoint.</p>
+      <Form onSubmit={e => { e.preventDefault(); e.stopPropagation(); saveRegion() }}>
+        <InputGroup className="mb-3">
+          <Form.Select required={true} value={region} onChange={e => setRegion(e.target.value)} aria-label="Region">
+            <option value='eu'>Europe, Middle East, Africa</option>
+            <option value='na'>North America, Asia-Pacific (excluding China)</option>
+          </Form.Select>
+        </InputGroup>
+        <Button type="submit" variant="primary" disabled={savingRegion}>{savingRegion ? <><IconLoad className="feather-button loader" /> Saving...</> : 'Save'}</Button>
+      </Form>
+    </>
+  );
+
   return (
     <Container fluid="sm" className="pt-5 container-max-width min-height">
       <h2 className="pb-3">My account</h2>
@@ -242,6 +275,7 @@ export default function PageAuthorized() {
       {vehicleList}
       {tokenSection}
       {homeLocation}
+      {regionSection}
       {vehiclesSection}
     </Container>
   )

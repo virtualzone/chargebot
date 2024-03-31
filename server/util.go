@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -122,4 +123,17 @@ func getDistanceFromLatLonInMeters(lat1 float64, lon1 float64, lat2 float64, lon
 
 func deg2rad(deg float64) float64 {
 	return deg * (math.Pi / 180)
+}
+
+func IsValidAudienceRegionCode(code string) bool {
+	code = strings.ToLower(code)
+	allowedRegionCodes := []RegionCode{RegionCodeEU, RegionCodeNA}
+	return slices.Contains(allowedRegionCodes, RegionCode(code))
+}
+
+func GetAudienceURL(regionCode string) string {
+	if !IsValidAudienceRegionCode(regionCode) {
+		return ""
+	}
+	return "https://fleet-api.prd." + regionCode + ".vn.cloud.tesla.com"
 }

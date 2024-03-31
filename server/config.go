@@ -13,7 +13,6 @@ import (
 type Config struct {
 	TeslaClientID      string
 	TeslaClientSecret  string
-	TeslaAudience      string
 	TeslaTelemetryHost string
 	TeslaTelemetryCA   string
 	DBFile             string
@@ -45,7 +44,6 @@ func GetConfig() *Config {
 func (c *Config) ReadConfig() {
 	c.TeslaClientID = c.getEnv("TESLA_CLIENT_ID", "e9941f08e0d6-4c2f-b8ee-291060ec648a")
 	c.TeslaClientSecret = c.getEnv("TESLA_CLIENT_SECRET", "")
-	c.TeslaAudience = c.getEnv("TESLA_AUDIENCE", "https://fleet-api.prd.eu.vn.cloud.tesla.com")
 	c.TeslaTelemetryHost = c.getEnv("TESLA_TELEMETRY_HOST", "tesla-telemetry.chargebot.io")
 	c.TeslaTelemetryCA = c.getEnv("TESLA_TELEMETRY_CA", "")
 	if c.TeslaTelemetryCA != "" {
