@@ -1,9 +1,12 @@
 name: Build Node
 
 on:
-  workflow_dispatch:
-    branches: [ main ]
   push:
+    branches: [ main ]
+    paths:
+    - 'node/**'
+    - 'frontend-node/**'
+  workflow_dispatch:
     branches: [ main ]
 
 env:

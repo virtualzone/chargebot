@@ -1,9 +1,12 @@
 name: Build Server
 
 on:
-  workflow_dispatch:
-    branches: [ main ]
   push:
+    branches: [ main ]
+    paths:
+    - 'server/**'
+    - 'website/**'
+  workflow_dispatch:
     branches: [ main ]
 
 env:

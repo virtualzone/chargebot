@@ -1,6 +1,10 @@
 name: Build ZMQ Proxy
 
 on:
+  push:
+    branches: [ main ]
+    paths:
+    - 'zmq-proxy/**'
   workflow_dispatch:
     branches: [ main ]
 
