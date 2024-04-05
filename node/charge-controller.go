@@ -215,6 +215,7 @@ func (c *ChargeController) activateCharging(vehicle *Vehicle, state *VehicleStat
 			return false
 		}
 		GetDB().LogChargingEvent(vehicle.VIN, LogEventSetTargetSoC, fmt.Sprintf("target SoC set to %d", vehicle.TargetSoC))
+		GetDB().SetVehicleStateChargeLimit(vehicle.VIN, vehicle.TargetSoC)
 		time.Sleep(DelayBetweenAPICommands) // delay
 	}
 
@@ -225,6 +226,7 @@ func (c *ChargeController) activateCharging(vehicle *Vehicle, state *VehicleStat
 			return false
 		}
 		GetDB().LogChargingEvent(vehicle.VIN, LogEventSetChargingAmps, fmt.Sprintf("charge amps set to %d", amps))
+		GetDB().SetVehicleStateAmps(vehicle.VIN, amps)
 		time.Sleep(DelayBetweenAPICommands) // delay
 	}
 
@@ -235,8 +237,6 @@ func (c *ChargeController) activateCharging(vehicle *Vehicle, state *VehicleStat
 	}
 	c.ChargeStartFailCount = 0
 	GetDB().LogChargingEvent(vehicle.VIN, LogEventChargeStart, "")
-
-	GetDB().SetVehicleStateAmps(vehicle.VIN, amps)
 	GetDB().SetVehicleStateCharging(vehicle.VIN, source)
 
 	sourceText := "solar power"
@@ -636,6 +636,17 @@ func (c *ChargeController) chargeProcessAdjustSolarAmps(vehicle *Vehicle, state 
 }
 
 func (c *ChargeController) checkChargeProcess(vehicle *Vehicle, state *VehicleState) {
+	// check if target SoC has been changed in the meantime
+	if state.ChargeLimit != vehicle.TargetSoC {
+		if err := GetTeslaAPI().SetChargeLimit(vehicle.VIN, vehicle.TargetSoC); err != nil {
+			GetDB().LogChargingEvent(vehicle.VIN, LogEventSetTargetSoC, "could not set target SoC: "+err.Error())
+		} else {
+			GetDB().LogChargingEvent(vehicle.VIN, LogEventSetTargetSoC, fmt.Sprintf("target SoC set to %d", vehicle.TargetSoC))
+			GetDB().SetVehicleStateChargeLimit(vehicle.VIN, vehicle.TargetSoC)
+			time.Sleep(DelayBetweenAPICommands) // delay
+		}
+	}
+
 	// if target SoC is reached: stop charging
 	if state.SoC >= vehicle.TargetSoC {
 		c.stopCharging(vehicle, state)
