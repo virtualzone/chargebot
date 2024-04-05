@@ -125,17 +125,22 @@ func (c *ChargeController) processVehicle(vehicle *Vehicle) {
 }
 
 func (c *ChargeController) stopCharging(vehicle *Vehicle, state *VehicleState) {
-	err := GetTeslaAPI().Wakeup(vehicle.VIN)
-	if err != nil {
-		GetDB().LogChargingEvent(vehicle.VIN, LogEventChargeStop, fmt.Sprintf("could not init session with car: %s", err.Error()))
-		return
-	}
+	/*
+		err := GetTeslaAPI().Wakeup(vehicle.VIN)
+		if err != nil {
+			GetDB().LogChargingEvent(vehicle.VIN, LogEventChargeStop, fmt.Sprintf("could not init session with car: %s", err.Error()))
+			return
+		}
 
-	time.Sleep(DelayBetweenAPICommands) // delay
+		time.Sleep(DelayBetweenAPICommands) // delay
+	*/
 
 	if err := GetTeslaAPI().ChargeStop(vehicle.VIN); err != nil {
-		GetDB().LogChargingEvent(vehicle.VIN, LogEventChargeStop, fmt.Sprintf("could not stop charging: %s", err.Error()))
-		return
+		// Doesn't matter if vehicle is asleep, can't be charging then
+		if !strings.Contains(err.Error(), "asleep") {
+			GetDB().LogChargingEvent(vehicle.VIN, LogEventChargeStop, fmt.Sprintf("could not stop charging: %s", err.Error()))
+			return
+		}
 	}
 
 	GetDB().SetVehicleStateCharging(vehicle.VIN, ChargeStateNotCharging)
