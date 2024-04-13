@@ -3,7 +3,7 @@
 import { deleteAPI, getAPI, postAPI, putAPI } from "../util";
 import { useEffect, useState } from "react";
 import Loading from "../loading";
-import { Accordion, Button, Container, Form, InputGroup, Table } from "react-bootstrap";
+import { Accordion, Button, Col, Container, Form, InputGroup, Row, Table } from "react-bootstrap";
 import { useRouter } from "next/navigation";
 import { Loader as IconLoad } from 'react-feather';
 import Link from "next/link";
@@ -125,13 +125,6 @@ export default function PageVehicle() {
     fetchData();
   }
 
-  function getChargeStateText(id: number) {
-    if (id === 0) return 'Not charging';
-    if (id === 1) return 'Charging on solar';
-    if (id === 2) return 'Charging on grid';
-    return 'Unknown';
-  }
-
   function getChargingEventText(id: number) {
     if (id === 1) return 'Charging started';
     if (id === 2) return 'Charging stopped';
@@ -200,169 +193,146 @@ export default function PageVehicle() {
 
   let chargePrefs = (
     <Form onSubmit={e => { e.preventDefault(); e.stopPropagation(); saveVehicle() }}>
-      <Form.Check // prettier-ignore
-        type="switch"
-        label="Enable smart charging control"
-        checked={chargingEnabled}
-        onChange={e => setChargingEnabled(e.target.checked)}
-      />
-      <InputGroup className="mb-3">
-        <Form.Control
-          placeholder="Target SoC"
-          aria-label="Target SoC"
-          aria-describedby="target-soc-addon1"
-          type="number"
-          min={1}
-          max={100}
-          required={chargingEnabled}
-          disabled={!chargingEnabled}
-          value={targetSoC}
-          onChange={e => setTargetSoC(Number(e.target.value))}
-        />
-        <InputGroup.Text id="target-soc-addon1">%</InputGroup.Text>
-      </InputGroup>
-      <InputGroup className="mb-3">
-        <Form.Control
-          placeholder="Max. Amps"
-          aria-label="Max. Amps"
-          aria-describedby="maxamps-addon1"
-          type="number"
-          min={1}
-          max={32}
-          required={chargingEnabled}
-          disabled={!chargingEnabled}
-          value={maxAmps}
-          onChange={e => setMaxAmps(Number(e.target.value))}
-        />
-        <InputGroup.Text id="maxamps-addon1">A</InputGroup.Text>
-      </InputGroup>
-      <InputGroup className="mb-3">
-        <Form.Select
-          aria-label="Number of Phases"
-          required={chargingEnabled}
-          disabled={!chargingEnabled}
-          value={numPhases}
-          onChange={e => setNumPhases(Number(e.target.value))}>
-          <option value="1">uniphase</option>
-          <option value="3">three-phase</option>
-        </Form.Select>
-      </InputGroup>
-      <InputGroup className="mb-3">
-        <Form.Control plaintext={true} readOnly={true} defaultValue={'Up to ' + getMaxChargingPower()} />
-      </InputGroup>
-      <Form.Check // prettier-ignore
-        type="switch"
-        label="Charge on surplus of solar energy"
-        checked={chargeOnSurplus}
-        onChange={e => setChargeOnSurplus(e.target.checked)}
-        style={{ 'marginTop': '25px' }}
-      />
-      <InputGroup className="mb-3">
-        <Form.Control
-          placeholder="Minimum surplus"
-          aria-label="Minimum surplus"
-          aria-describedby="min-surplus-addon1"
-          type="number"
-          min={1}
-          max={10000}
-          required={chargeOnSurplus}
-          disabled={!chargeOnSurplus}
-          value={minSurplus}
-          onChange={e => setMinSurplus(Number(e.target.value))}
-        />
-        <InputGroup.Text id="min-surplus-addon1">Watts</InputGroup.Text>
-      </InputGroup>
-      <InputGroup className="mb-3">
-        <Form.Control
-          placeholder="Minimum Charging Time"
-          aria-label="Minimum Charging Time"
-          aria-describedby="chargetime-addon1"
-          type="number"
-          min={1}
-          max={120}
-          required={chargeOnSurplus}
-          disabled={!chargeOnSurplus}
-          value={minChargetime}
-          onChange={e => setMinChargetime(Number(e.target.value))}
-        />
-        <InputGroup.Text id="chargetime-addon1">Minutes</InputGroup.Text>
-      </InputGroup>
-      <Form.Check // prettier-ignore
-        type="switch"
-        label="Charge on low grid price"
-        checked={chargeOnTibber}
-        onChange={e => setChargeOnTibber(e.target.checked)}
-        style={{ 'marginTop': '25px' }}
-      />
-      <InputGroup className="mb-3">
-        <Form.Select
-          aria-label="Provider"
-          required={chargeOnTibber}
-          disabled={!chargeOnTibber}
-          value={gridProvider}
-          onChange={e => setGridProvider(e.target.value)}>
-          <option value="tibber">Tibber</option>
-        </Form.Select>
-      </InputGroup>
-      <InputGroup className="mb-3">
-        <Form.Select
-          aria-label="Strategy"
-          required={chargeOnTibber}
-          disabled={!chargeOnTibber}
-          value={gridStrategy}
-          onChange={e => setGridStrategy(Number(e.target.value))}>
-          <option value="1">min. price, but at least below x</option>
-          <option value="2">price below x, possibly charged at departure</option>
-          <option value="3">min. price, certainly charged at departure</option>
-        </Form.Select>
-      </InputGroup>
-      <InputGroup className="mb-3" hidden={gridStrategy === 3}>
-        <Form.Control
-          placeholder="Maximum Grid Price"
-          aria-label="Maximum Grid Price"
-          aria-describedby="tibber-price-addon1"
-          type="number"
-          min={1}
-          max={100}
-          required={chargeOnTibber}
-          disabled={!chargeOnTibber}
-          value={maxPrice}
-          onChange={e => setMaxPrice(Number(e.target.value))}
-        />
-        <InputGroup.Text id="tibber-price-addon1">Cents</InputGroup.Text>
-      </InputGroup>
-      <InputGroup className="mb-3" hidden={gridStrategy === 1}>
-        <Form.Check inline={true} label="Mo" type="checkbox" disabled={!chargeOnTibber} checked={departDays.indexOf(1) > -1} onChange={e => setDepartDays(e.target.checked ? [...departDays, 1] : [...departDays].toSpliced(departDays.indexOf(1), 1))} />
-        <Form.Check inline={true} label="Tu" type="checkbox" disabled={!chargeOnTibber} checked={departDays.indexOf(2) > -1} onChange={e => setDepartDays(e.target.checked ? [...departDays, 2] : [...departDays].toSpliced(departDays.indexOf(2), 1))} />
-        <Form.Check inline={true} label="We" type="checkbox" disabled={!chargeOnTibber} checked={departDays.indexOf(3) > -1} onChange={e => setDepartDays(e.target.checked ? [...departDays, 3] : [...departDays].toSpliced(departDays.indexOf(3), 1))} />
-        <Form.Check inline={true} label="Th" type="checkbox" disabled={!chargeOnTibber} checked={departDays.indexOf(4) > -1} onChange={e => setDepartDays(e.target.checked ? [...departDays, 4] : [...departDays].toSpliced(departDays.indexOf(4), 1))} />
-        <Form.Check inline={true} label="Fr" type="checkbox" disabled={!chargeOnTibber} checked={departDays.indexOf(5) > -1} onChange={e => setDepartDays(e.target.checked ? [...departDays, 5] : [...departDays].toSpliced(departDays.indexOf(5), 1))} />
-        <Form.Check inline={true} label="Sa" type="checkbox" disabled={!chargeOnTibber} checked={departDays.indexOf(6) > -1} onChange={e => setDepartDays(e.target.checked ? [...departDays, 6] : [...departDays].toSpliced(departDays.indexOf(6), 1))} />
-        <Form.Check inline={true} label="Su" type="checkbox" disabled={!chargeOnTibber} checked={departDays.indexOf(7) > -1} onChange={e => setDepartDays(e.target.checked ? [...departDays, 7] : [...departDays].toSpliced(departDays.indexOf(7), 1))} />
-      </InputGroup>
-      <InputGroup className="mb-3" hidden={gridStrategy === 1}>
-        <Form.Control
-          type="time"
-          min="00:00"
-          max="23:59"
-          required={chargeOnTibber}
-          disabled={!chargeOnTibber}
-          value={departTime}
-          onChange={e => setDepartTime(e.target.value)}
-        />
-      </InputGroup>
-      <InputGroup className="mb-3" hidden={gridProvider !== 'tibber'}>
-        <Form.Control
-          placeholder="Tibber Token"
-          aria-label="Tibber Token"
-          type="text"
-          required={chargeOnTibber}
-          disabled={!chargeOnTibber}
-          value={tibberToken}
-          onChange={e => setTibberToken(e.target.value)}
-        />
-      </InputGroup>
-      <p><a href="https://developer.tibber.com/settings/accesstoken" target="_blank">Get your Tibber Access Token</a></p>
+      <Form.Group as={Row}>
+        <Col>
+          <Form.Check // prettier-ignore
+            type="switch"
+            label="Enable smart charging control"
+            checked={chargingEnabled}
+            onChange={e => setChargingEnabled(e.target.checked)}
+          />
+        </Col>
+      </Form.Group>
+      <Form.Group as={Row}>
+        <Form.Label column={true} className="sm-4">Target SoC: {targetSoC} %</Form.Label>
+        <Col sm={8} style={{ 'paddingTop': '7px', 'paddingBottom': '7px' }}><Form.Range min={1} max={100} value={targetSoC} onChange={e => setTargetSoC(Number(e.target.value))} /></Col>
+      </Form.Group>
+      <Form.Group as={Row}>
+        <Form.Label column={true} className="sm-4">Max. Amps: {maxAmps} A</Form.Label>
+        <Col sm={8} style={{ 'paddingTop': '7px', 'paddingBottom': '7px' }}><Form.Range min={1} max={32} value={maxAmps} onChange={e => setMaxAmps(Number(e.target.value))} /></Col>
+      </Form.Group>
+      <Form.Group as={Row}>
+        <Form.Label column={true} className="sm-4">Num. Phases:</Form.Label>
+        <Col sm={8}>
+          <Form.Select
+            aria-label="Number of Phases"
+            required={chargingEnabled}
+            value={numPhases}
+            onChange={e => setNumPhases(Number(e.target.value))}>
+            <option value="1">uniphase</option>
+            <option value="3">three-phase</option>
+          </Form.Select>
+        </Col>
+      </Form.Group>
+      <Form.Group as={Row}>
+        <Form.Label column={true} className="sm-4"></Form.Label>
+        <Col sm={8}>
+          <Form.Control plaintext={true} readOnly={true} defaultValue={'Up to ' + getMaxChargingPower()} />
+        </Col>
+      </Form.Group>
+      <Form.Group as={Row}>
+        <Col>
+          <Form.Check // prettier-ignore
+            type="switch"
+            label="Charge on surplus of solar energy"
+            checked={chargeOnSurplus}
+            onChange={e => setChargeOnSurplus(e.target.checked)}
+            style={{ 'marginTop': '25px' }}
+          />
+        </Col>
+      </Form.Group>
+      <Form.Group as={Row}>
+        <Form.Label column={true} className="sm-4">Min. surplus: {minSurplus} W</Form.Label>
+        <Col sm={8} style={{ 'paddingTop': '7px', 'paddingBottom': '7px' }}><Form.Range required={chargeOnSurplus} disabled={!chargeOnSurplus} min={230} max={5000} value={minSurplus} onChange={e => setMinSurplus(Number(e.target.value))} /></Col>
+      </Form.Group>
+      <Form.Group as={Row}>
+        <Form.Label column={true} className="sm-4">Min. charge time: {minChargetime} m</Form.Label>
+        <Col sm={8} style={{ 'paddingTop': '7px', 'paddingBottom': '7px' }}><Form.Range required={chargeOnSurplus} disabled={!chargeOnSurplus} min={0} max={60} value={minChargetime} onChange={e => setMinChargetime(Number(e.target.value))} /></Col>
+      </Form.Group>
+      <Form.Group as={Row}>
+        <Col>
+          <Form.Check // prettier-ignore
+            type="switch"
+            label="Charge on low grid price"
+            checked={chargeOnTibber}
+            onChange={e => setChargeOnTibber(e.target.checked)}
+            style={{ 'marginTop': '25px' }}
+          />
+        </Col>
+      </Form.Group>
+      <Form.Group as={Row}>
+        <Form.Label column={true} className="sm-4">Grid provider:</Form.Label>
+        <Col sm={8}>
+          <Form.Select
+            aria-label="Provider"
+            required={chargeOnTibber}
+            disabled={!chargeOnTibber}
+            value={gridProvider}
+            onChange={e => setGridProvider(e.target.value)}>
+            <option value="tibber">Tibber</option>
+          </Form.Select>
+        </Col>
+      </Form.Group>
+      <Form.Group as={Row}>
+        <Form.Label column={true} className="sm-4">Strategy:</Form.Label>
+        <Col sm={8}>
+          <Form.Select
+            aria-label="Strategy"
+            required={chargeOnTibber}
+            disabled={!chargeOnTibber}
+            value={gridStrategy}
+            onChange={e => setGridStrategy(Number(e.target.value))}>
+            <option value="1">min. price, but at least below x</option>
+            <option value="2">price below x, possibly charged at departure</option>
+            <option value="3">min. price, certainly charged at departure</option>
+          </Form.Select>
+        </Col>
+      </Form.Group>
+      <Form.Group as={Row} hidden={gridStrategy === 3}>
+        <Form.Label column={true} className="sm-4">Max. price: {maxPrice} Cents</Form.Label>
+        <Col sm={8} style={{ 'paddingTop': '7px', 'paddingBottom': '7px' }}><Form.Range required={chargeOnTibber} disabled={!chargeOnTibber} min={1} max={100} value={maxPrice} onChange={e => setMaxPrice(Number(e.target.value))} /></Col>
+      </Form.Group>
+      <Form.Group as={Row} hidden={gridStrategy === 1}>
+        <Form.Label column={true} className="sm-4"></Form.Label>
+        <Col sm={8}>
+          <Form.Check inline={true} label="Mo" type="checkbox" disabled={!chargeOnTibber} checked={departDays.indexOf(1) > -1} onChange={e => setDepartDays(e.target.checked ? [...departDays, 1] : [...departDays].toSpliced(departDays.indexOf(1), 1))} />
+          <Form.Check inline={true} label="Tu" type="checkbox" disabled={!chargeOnTibber} checked={departDays.indexOf(2) > -1} onChange={e => setDepartDays(e.target.checked ? [...departDays, 2] : [...departDays].toSpliced(departDays.indexOf(2), 1))} />
+          <Form.Check inline={true} label="We" type="checkbox" disabled={!chargeOnTibber} checked={departDays.indexOf(3) > -1} onChange={e => setDepartDays(e.target.checked ? [...departDays, 3] : [...departDays].toSpliced(departDays.indexOf(3), 1))} />
+          <Form.Check inline={true} label="Th" type="checkbox" disabled={!chargeOnTibber} checked={departDays.indexOf(4) > -1} onChange={e => setDepartDays(e.target.checked ? [...departDays, 4] : [...departDays].toSpliced(departDays.indexOf(4), 1))} />
+          <Form.Check inline={true} label="Fr" type="checkbox" disabled={!chargeOnTibber} checked={departDays.indexOf(5) > -1} onChange={e => setDepartDays(e.target.checked ? [...departDays, 5] : [...departDays].toSpliced(departDays.indexOf(5), 1))} />
+          <Form.Check inline={true} label="Sa" type="checkbox" disabled={!chargeOnTibber} checked={departDays.indexOf(6) > -1} onChange={e => setDepartDays(e.target.checked ? [...departDays, 6] : [...departDays].toSpliced(departDays.indexOf(6), 1))} />
+          <Form.Check inline={true} label="Su" type="checkbox" disabled={!chargeOnTibber} checked={departDays.indexOf(7) > -1} onChange={e => setDepartDays(e.target.checked ? [...departDays, 7] : [...departDays].toSpliced(departDays.indexOf(7), 1))} />
+        </Col>
+      </Form.Group>
+      <Form.Group as={Row} hidden={gridStrategy === 1}>
+        <Form.Label column={true} className="sm-4"></Form.Label>
+        <Col sm={8}>
+          <Form.Control
+            type="time"
+            min="00:00"
+            max="23:59"
+            required={chargeOnTibber}
+            disabled={!chargeOnTibber}
+            value={departTime}
+            onChange={e => setDepartTime(e.target.value)}
+          />
+        </Col>
+      </Form.Group>
+      <Form.Group as={Row} hidden={gridProvider !== 'tibber'}>
+        <Form.Label column={true} className="sm-4">Tibber Token</Form.Label>
+        <Col sm={8}>
+          <Form.Control
+            placeholder="Tibber Token"
+            aria-label="Tibber Token"
+            type="text"
+            required={chargeOnTibber}
+            disabled={!chargeOnTibber}
+            value={tibberToken}
+            onChange={e => setTibberToken(e.target.value)}
+          />
+          <p><a href="https://developer.tibber.com/settings/accesstoken" target="_blank">Get your Tibber Access Token</a></p>
+        </Col>
+      </Form.Group>
       <Button type="submit" variant="primary" disabled={savingVehicle}>{savingVehicle ? <><IconLoad className="feather-button loader" /> Saving...</> : 'Save'}</Button>
     </Form>
   );

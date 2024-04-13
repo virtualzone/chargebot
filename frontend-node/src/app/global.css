@@ -46,6 +46,10 @@ body {
     margin-right: 5px;
 }
 
+form > div.row {
+    margin-bottom: 15px;
+}
+
 @-moz-keyframes spin {
     100% {
         -moz-transform: rotate(360deg);
