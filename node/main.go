@@ -48,7 +48,7 @@ func sanityCheck() {
 	}
 
 	if err := PingCommandServer(); err != nil {
-		log.Panicf("Could not ping command server: %s\n", err.Error())
+		log.Panicf("Could not ping command server: %s - check if TOKEN and PASSWORD are correct, get yours at https://chargebot.io\n", err.Error())
 	}
 
 	log.Println("Sanity check completed.")
@@ -59,6 +59,9 @@ func main() {
 	GetConfig().ReadConfig()
 	GetDB().Connect()
 	GetDB().InitDBStructure()
+	if GetConfig().InitDBOnly {
+		return
+	}
 	sanityCheck()
 
 	TeslaAPIInstance = &TeslaAPIProxy{}

@@ -1,2 +1,8 @@
 #!/bin/sh
-PORT=8081 DEV_PROXY=1 CRYPT_KEY=12345678901234567890123456789012 TOKEN=f8f78ed5-204e-4e5b-a0cf-ceac819c3b2d PASSWORD=z2fxvdzMEOrqi1cB CMD_ENDPOINT="http://localhost:8080/api/1/user/{token}" TELEMETRY_ENDPOINT=ws://localhost:8080/api/1/user/{token}/ws go run `ls *.go | grep -v _test.go`
+if command -v sqlite3 -version &> /dev/null
+then
+    rm -f /tmp/chargebot_node.db
+    INIT_DB_ONLY=1 go run `ls *.go | grep -v _test.go`
+    sqlite3 /tmp/chargebot_node.db "insert into vehicles (vin, display_name, enabled, target_soc, max_amps, surplus_charging, min_surplus, min_chargetime, lowcost_charging, max_price, tibber_token) values ('5YJXCBE24KF152671', 'Model Y', 0, 0, 0, 0, 0, 0, 0, 0, '')"
+fi
+DEMO_MODE=1 PORT=8081 DEV_PROXY=1 CRYPT_KEY=12345678901234567890123456789012 TOKEN=f8f78ed5-204e-4e5b-a0cf-ceac819c3b2d PASSWORD=z2fxvdzMEOrqi1cB CMD_ENDPOINT="http://localhost:8080/api/1/user/{token}" TELEMETRY_ENDPOINT=ws://localhost:8080/api/1/user/{token}/ws go run `ls *.go | grep -v _test.go`

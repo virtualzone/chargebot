@@ -28,6 +28,7 @@ type Config struct {
 	AuthRolesPath      string
 	AuthFieldEmail     string
 	AuthFieldUsername  string
+	InitDBOnly         bool
 }
 
 var _configInstance *Config
@@ -73,6 +74,7 @@ func (c *Config) ReadConfig() {
 	c.AuthRolesPath = c.getEnv("AUTH_ROLES_PATH", "resource_access.portfolio-test.roles")
 	c.AuthFieldEmail = c.getEnv("AUTH_FIELD_EMAIL", "email")
 	c.AuthFieldUsername = c.getEnv("AUTH_FIELD_USERNAME", "preferred_username")
+	c.InitDBOnly = (c.getEnv("INIT_DB_ONLY", "0") == "1")
 }
 
 func (c *Config) Print() {

@@ -35,6 +35,9 @@ func NewChargeController() *ChargeController {
 }
 
 func (c *ChargeController) Init() {
+	if GetConfig().DemoMode {
+		return
+	}
 	c.Ticker = time.NewTicker(time.Minute * 1)
 	go func() {
 		for {

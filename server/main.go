@@ -19,6 +19,9 @@ func main() {
 		GetDB().ResetDBStructure()
 	}
 	GetDB().InitDBStructure()
+	if GetConfig().InitDBOnly {
+		return
+	}
 	GetOIDCProvider().Init()
 
 	TeslaAPIInstance = &TeslaAPIImpl{}

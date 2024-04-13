@@ -8,12 +8,18 @@ import (
 	. "github.com/virtualzone/chargebot/goshared"
 )
 
+type VehicleWithState struct {
+	Vehicle *Vehicle      `json:"vehicle"`
+	State   *VehicleState `json:"state"`
+}
+
 type TeslaRouter struct {
 }
 
 func (router *TeslaRouter) SetupRoutes(s *mux.Router) {
 	s.HandleFunc("/vehicles", router.listVehicles).Methods("GET")
 	s.HandleFunc("/my_vehicles", router.myVehicles).Methods("GET")
+	s.HandleFunc("/my_vehicle/{vin}", router.myVehicleByVIN).Methods("GET")
 	s.HandleFunc("/vehicle_add/{vin}", router.addVehicle).Methods("POST")
 	s.HandleFunc("/vehicle_update/{vin}", router.updateVehicle).Methods("PUT")
 	s.HandleFunc("/vehicle_delete/{vin}", router.deleteVehicle).Methods("DELETE")
@@ -35,8 +41,35 @@ func (router *TeslaRouter) listVehicles(w http.ResponseWriter, r *http.Request) 
 }
 
 func (router *TeslaRouter) myVehicles(w http.ResponseWriter, r *http.Request) {
+	res := []VehicleWithState{}
 	list := GetDB().GetVehicles()
-	SendJSON(w, list)
+	for _, v := range list {
+		s := GetDB().GetVehicleState(v.VIN)
+		item := VehicleWithState{
+			Vehicle: v,
+			State:   s,
+		}
+		res = append(res, item)
+	}
+	SendJSON(w, res)
+}
+
+func (router *TeslaRouter) myVehicleByVIN(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	vin := vars["vin"]
+
+	v := GetDB().GetVehicleByVIN(vin)
+	if v == nil {
+		SendNotFound(w)
+		return
+	}
+
+	s := GetDB().GetVehicleState(v.VIN)
+	item := VehicleWithState{
+		Vehicle: v,
+		State:   s,
+	}
+	SendJSON(w, item)
 }
 
 func (router *TeslaRouter) addVehicle(w http.ResponseWriter, r *http.Request) {

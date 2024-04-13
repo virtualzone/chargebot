@@ -7,6 +7,7 @@ import { Accordion, Button, Container, Form, InputGroup, Table } from "react-boo
 import { useRouter } from "next/navigation";
 import { Loader as IconLoad } from 'react-feather';
 import Link from "next/link";
+import VehicleStatus from "../vehicle-status";
 
 export default function PageVehicle() {
   let vehicleVIN = ""
@@ -40,47 +41,50 @@ export default function PageVehicle() {
     }
     vehicleVIN = vin;
     const fetchData = async () => {
-      await loadVehicle();
+      await loadVehicle(vehicleVIN);
       setLoading(false);
     }
     fetchData();
   }, [router]);
 
+  /*
   const loadVehicleState = async (vin: string) => {
     const json = await getAPI("/api/1/tesla/state/" + vin);
     if (json) {
       setVehicleState(json);
     }
   }
+  */
 
   const loadLatestChargingEvents = async (vin: string) => {
     const json = await getAPI("/api/1/tesla/events/" + vin);
     setChargingEvents(json);
   }
 
-  const loadVehicle = async () => {
-    const json = await getAPI("/api/1/tesla/my_vehicles");
-    (json as any[]).forEach(e => {
-      if (e.vin === vehicleVIN) {
-        setChargingEnabled(e.enabled);
-        setTargetSoC(e.target_soc);
-        setMaxAmps(e.max_amps);
-        setNumPhases(e.num_phases);
-        setChargeOnSurplus(e.surplus_charging);
-        setMinSurplus(e.min_surplus);
-        setMinChargetime(e.min_chargetime);
-        setChargeOnTibber(e.lowcost_charging);
-        setMaxPrice(e.max_price);
-        setGridProvider(e.gridProvider);
-        setGridStrategy(e.gridStrategy);
-        setDepartDays([...e.departDays].map(i => Number(i)));
-        setDepartTime(e.departTime);
-        setTibberToken(e.tibber_token);
-        loadVehicleState(e.vin);
-        loadLatestChargingEvents(e.vin);
-        setVehicle(e);
-      }
-    });
+  const setVehicleDetails = (e: any) => {
+    setChargingEnabled(e.enabled);
+    setTargetSoC(e.target_soc);
+    setMaxAmps(e.max_amps);
+    setNumPhases(e.num_phases);
+    setChargeOnSurplus(e.surplus_charging);
+    setMinSurplus(e.min_surplus);
+    setMinChargetime(e.min_chargetime);
+    setChargeOnTibber(e.lowcost_charging);
+    setMaxPrice(e.max_price);
+    setGridProvider(e.gridProvider);
+    setGridStrategy(e.gridStrategy);
+    setDepartDays([...e.departDays].map(i => Number(i)));
+    setDepartTime(e.departTime);
+    setTibberToken(e.tibber_token);
+  }
+
+  const loadVehicle = async (vin: string) => {
+    const e = await getAPI("/api/1/tesla/my_vehicle/" + vin);
+    setVehicleDetails(e.vehicle);
+    setVehicleState(e.state);
+    //loadVehicleState(e.vin);
+    loadLatestChargingEvents(e.vehicle.vin);
+    setVehicle(e.vehicle);
   }
 
   function saveVehicle() {
@@ -103,7 +107,7 @@ export default function PageVehicle() {
         "tibber_token": tibberToken
       };
       await putAPI("/api/1/tesla/vehicle_update/" + vehicle.vin, payload);
-      await loadVehicle();
+      await loadVehicle(vehicle.vin);
       setSavingVehicle(false);
     }
     fetchData();
@@ -371,34 +375,6 @@ export default function PageVehicle() {
       </Accordion.Body>
     </Accordion.Item>
   );
-  let accordionState = <></>;
-  accordionState = (
-    <Accordion.Item eventKey="2">
-      <Accordion.Header>Vehicle State</Accordion.Header>
-      <Accordion.Body>
-        <Table>
-          <tbody>
-            <tr>
-              <td>Plugged In</td>
-              <td>{vehicleState.pluggedIn ? 'Yes' : 'No'}</td>
-            </tr>
-            <tr>
-              <td>Charging State</td>
-              <td>{getChargeStateText(vehicleState.chargingState)}</td>
-            </tr>
-            <tr>
-              <td>SoC</td>
-              <td>{vehicleState.soc ? vehicleState.soc + ' %' : 'Unknown'}</td>
-            </tr>
-            <tr>
-              <td>Amps</td>
-              <td>{vehicleState.amps !== undefined ? vehicleState.amps + ' A' : 'Unknown'}</td>
-            </tr>
-          </tbody>
-        </Table>
-      </Accordion.Body>
-    </Accordion.Item>
-  );
   let accordionManualControl = (
     <Accordion.Item eventKey="5">
       <Accordion.Header>Test Drive</Accordion.Header>
@@ -419,17 +395,19 @@ export default function PageVehicle() {
   );
   return (
     <Container fluid="sm" className="pt-5 container-max-width min-height">
-      <h2 className="pb-3">{vehicle.display_name}</h2>
-      <p>VIN: {vehicle.vin}</p>
-      <p>Before chargebot.io can control your vehicle's charging process, you need to set up the virtual key:</p>
-      <p><a href="https://tesla.com/_ak/chargebot.io" target="_blank">Set Up Virtual Key</a></p>
-      <br />
-      <Accordion defaultActiveKey={'2'} flush={true}>
-        {accordionState}
+      <VehicleStatus state={vehicleState} vehicle={vehicle} />
+      <Accordion defaultActiveKey={'0'} flush={true} style={{ 'marginTop': '50px' }}>
         <Accordion.Item eventKey="0">
           <Accordion.Header>Charging Preferences</Accordion.Header>
           <Accordion.Body>
             {chargePrefs}
+          </Accordion.Body>
+        </Accordion.Item>
+        <Accordion.Item eventKey="1">
+          <Accordion.Header>Setup</Accordion.Header>
+          <Accordion.Body>
+            <p>Before chargebot.io can control your vehicle's charging process, you need to set up the virtual key:</p>
+            <p><a href="https://tesla.com/_ak/chargebot.io" target="_blank">Set Up Virtual Key</a></p>
           </Accordion.Body>
         </Accordion.Item>
         {accordionChargingEvents}

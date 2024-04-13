@@ -23,6 +23,8 @@ type Config struct {
 	TelegramToken          string
 	TelegramChatID         string
 	PlugStateAutodetection bool
+	InitDBOnly             bool
+	DemoMode               bool
 }
 
 var _configInstance *Config
@@ -56,6 +58,8 @@ func (c *Config) ReadConfig() {
 	c.TelegramToken = c.getEnv("TELEGRAM_TOKEN", "")
 	c.TelegramChatID = c.getEnv("TELEGRAM_CHAT_ID", "")
 	c.PlugStateAutodetection = (c.getEnv("PLUG_AUTODETECT", "1") == "1")
+	c.InitDBOnly = (c.getEnv("INIT_DB_ONLY", "0") == "1")
+	c.DemoMode = (c.getEnv("DEMO_MODE", "0") == "1")
 }
 
 func (c *Config) Print() {
