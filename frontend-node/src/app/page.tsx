@@ -4,10 +4,11 @@ import Link from "next/link";
 import { getAPI, postAPI } from "./util";
 import { useEffect, useState } from "react";
 import Loading from "./loading";
-import { Alert, Button, Container, ListGroup, Table } from "react-bootstrap";
+import { Alert, Button, Container, ListGroup } from "react-bootstrap";
 import { useRouter } from "next/navigation";
 import VehicleStatus from "./vehicle-status";
-import Chart from "react-apexcharts";
+import dynamic from "next/dynamic";
+const Chart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
 export default function PageAuthorized() {
   const [vehicles, setVehicles] = useState([] as any[])
@@ -15,7 +16,6 @@ export default function PageAuthorized() {
   const [permanentError, setPermanentError] = useState(false)
   const [showAlertAdded, setShowAlertAdded] = useState(false)
   const [showAlertRemoved, setShowAlertRemoved] = useState(false)
-  const [surpluses, setSurpluses] = useState([] as any)
   const [surplusChartOptions, setSurplusChartOptions] = useState({} as ApexCharts.ApexOptions)
   const [surplusChartSeries, setSurplusChartSeries] = useState([] as ApexCharts.ApexOptions["series"])
   const router = useRouter();
@@ -27,7 +27,6 @@ export default function PageAuthorized() {
 
   const loadLatestSurpluses = async () => {
     const json = await getAPI("/api/1/tesla/surplus");
-    setSurpluses(json);
     let options = {
       chart: {
         toolbar: {
