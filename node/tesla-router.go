@@ -255,7 +255,7 @@ func (router *TeslaRouter) getVehicleState(w http.ResponseWriter, r *http.Reques
 }
 
 func (router *TeslaRouter) getLatestSurpluses(w http.ResponseWriter, r *http.Request) {
-	res := GetDB().GetLatestSurplusRecords(50)
+	res := GetDB().GetLatestSurplusRecords(60)
 	SendJSON(w, res)
 }
 

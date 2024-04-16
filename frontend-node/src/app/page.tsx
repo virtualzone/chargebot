@@ -7,6 +7,7 @@ import Loading from "./loading";
 import { Alert, Button, Container, ListGroup, Table } from "react-bootstrap";
 import { useRouter } from "next/navigation";
 import VehicleStatus from "./vehicle-status";
+import Chart from "react-apexcharts";
 
 export default function PageAuthorized() {
   const [vehicles, setVehicles] = useState([] as any[])
@@ -15,6 +16,8 @@ export default function PageAuthorized() {
   const [showAlertAdded, setShowAlertAdded] = useState(false)
   const [showAlertRemoved, setShowAlertRemoved] = useState(false)
   const [surpluses, setSurpluses] = useState([] as any)
+  const [surplusChartOptions, setSurplusChartOptions] = useState({} as ApexCharts.ApexOptions)
+  const [surplusChartSeries, setSurplusChartSeries] = useState([] as ApexCharts.ApexOptions["series"])
   const router = useRouter();
 
   const loadVehicles = async () => {
@@ -25,6 +28,28 @@ export default function PageAuthorized() {
   const loadLatestSurpluses = async () => {
     const json = await getAPI("/api/1/tesla/surplus");
     setSurpluses(json);
+    let options = {
+      chart: {
+        toolbar: {
+          show: false
+        },
+        id: "surplus-chart"
+      },
+      stroke: {
+        width: 1
+      },
+      xaxis: {
+        categories: json.map((s: any) => s.ts.replace('T', ' ').replace('Z', ''))
+      }
+    };
+    let series = [
+      {
+        name: "Surplus (Watts)",
+        data: json.map((s: any) => s.surplus_watts)
+      }
+    ];
+    setSurplusChartOptions(options);
+    setSurplusChartSeries(series);
   }
 
   useEffect(() => {
@@ -49,10 +74,10 @@ export default function PageAuthorized() {
   }
 
   function resetPermanentError() {
-      postAPI("/api/1/tesla/resolve_permanent_error", {});
-      setPermanentError(false);
+    postAPI("/api/1/tesla/resolve_permanent_error", {});
+    setPermanentError(false);
   }
-  
+
   if (isLoading) {
     return <Loading />
   }
@@ -81,29 +106,8 @@ export default function PageAuthorized() {
     );
   }
 
-  let surplusRows = <tr><td colSpan={2}>No records founds</td></tr>;
-  if (surpluses && surpluses.length > 0) {
-    surplusRows = surpluses.map((s: any) => {
-      return (
-        <tr key={"surplus-" + s.ts}>
-          <td>{s.ts.replace('T', ' ').replace('Z', '')}</td>
-          <td>{s.surplus_watts} W</td>
-        </tr>
-      );
-    });
-  }
   let surplusTable = (
-    <Table>
-      <thead>
-        <tr>
-          <th>Time (UTC)</th>
-          <th>Surplus</th>
-        </tr>
-      </thead>
-      <tbody>
-        {surplusRows}
-      </tbody>
-    </Table>
+    <Chart type="line" width="100%" height={300} options={surplusChartOptions} series={surplusChartSeries} />
   );
   let surplusSection = (
     <>
