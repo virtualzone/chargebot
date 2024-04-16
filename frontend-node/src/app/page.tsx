@@ -27,6 +27,9 @@ export default function PageAuthorized() {
 
   const loadLatestSurpluses = async () => {
     const json = await getAPI("/api/1/tesla/surplus");
+    if ((json === 'undefined') || (json.length === 0)) {
+      return;
+    }
     let options = {
       chart: {
         toolbar: {
@@ -38,13 +41,13 @@ export default function PageAuthorized() {
         width: 1
       },
       xaxis: {
-        categories: json.map((s: any) => s.ts.replace('T', ' ').replace('Z', ''))
+        categories: json.map((s: any) => s.ts.replace('T', ' ').replace('Z', '')).reverse()
       }
     };
     let series = [
       {
         name: "Surplus (Watts)",
-        data: json.map((s: any) => s.surplus_watts)
+        data: json.map((s: any) => s.surplus_watts).reverse()
       }
     ];
     setSurplusChartOptions(options);
