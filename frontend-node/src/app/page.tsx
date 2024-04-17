@@ -27,6 +27,11 @@ export default function PageAuthorized() {
 
   const loadLatestSurpluses = async () => {
     const json = await getAPI("/api/1/tesla/surplus");
+    const htmlElement = document.querySelector("html");
+    let darkMode = false;
+    if (htmlElement !== null) {
+      darkMode = (htmlElement.getAttribute("data-bs-theme") === 'dark');
+    }
     if ((json === 'undefined') || (json.length === 0)) {
       return;
     }
@@ -35,19 +40,27 @@ export default function PageAuthorized() {
         toolbar: {
           show: false
         },
-        id: "surplus-chart"
+        id: "surplus-chart",
+        background: darkMode ? 'rgb(33, 37, 41)' : undefined,
+        zoom: {
+          enabled: false
+        }
       },
       stroke: {
         width: 1
       },
       xaxis: {
-        categories: json.map((s: any) => s.ts.replace('T', ' ').replace('Z', '')).reverse()
+        categories: json.map((s: any) => s.ts.replace('T', ' ').replace('Z', '')).reverse(),
+      },
+      theme: {
+        mode: darkMode ? 'dark' as 'dark': 'light' as 'light'
       }
     };
     let series = [
       {
         name: "Surplus (Watts)",
         data: json.map((s: any) => s.surplus_watts).reverse()
+        
       }
     ];
     setSurplusChartOptions(options);
