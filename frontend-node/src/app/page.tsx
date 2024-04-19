@@ -116,7 +116,6 @@ export default function PageAuthorized() {
             )
           })}
         </ListGroup>
-        <Link className="btn btn-primary" href="/addvehicle">Add vehicle</Link>
       </>
     );
   }
@@ -146,7 +145,10 @@ export default function PageAuthorized() {
 
   return (
     <Container fluid="sm" className="pt-5 container-max-width min-height">
-      <h2 className="pb-3">My vehicles</h2>
+      <h2 className="pb-3">
+        My vehicles
+        <Link className="btn btn-secondary btn-sm" href="/addvehicle" style={{'float': 'right'}}>+</Link>
+      </h2>
       {permanentErrorSection}
       <Alert variant='success' dismissible={true} hidden={!showAlertAdded}>Vehicle successfully added to your account.</Alert>
       <Alert variant='success' dismissible={true} hidden={!showAlertRemoved}>Vehicle successfully removed from your account.</Alert>
