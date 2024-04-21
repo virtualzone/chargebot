@@ -31,6 +31,7 @@ export default function PageVehicle() {
   const [tibberToken, setTibberToken] = useState('')
   const [vehicleState, setVehicleState] = useState({} as any)
   const [chargingEvents, setChargingEvents] = useState([] as any)
+  const [maxChargingPower, setMaxChargingPower] = useState('0 kW')
 
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
@@ -82,6 +83,7 @@ export default function PageVehicle() {
     const e = await getAPI("/api/1/tesla/my_vehicle/" + vin);
     setVehicleDetails(e.vehicle);
     setVehicleState(e.state);
+    updateMaxChargingPower(e.vehicle.max_amps, e.vehicle.num_phases);
     //loadVehicleState(e.vin);
     loadLatestChargingEvents(e.vehicle.vin);
     setVehicle(e.vehicle);
@@ -138,7 +140,7 @@ export default function PageVehicle() {
     return 'Unknown';
   }
 
-  function getMaxChargingPower() {
+  function updateMaxChargingPower(maxAmps: number, numPhases: number) {
     let i = 0;
     if (maxAmps !== undefined && maxAmps !== undefined) {
       i = maxAmps!;
@@ -149,9 +151,10 @@ export default function PageVehicle() {
     }
     let p = i * phases * 230;
     if (p > 1000) {
-      return Math.round(p / 1000) + " kW";
+      setMaxChargingPower(Math.round(p / 1000) + " kW");
+      return;
     }
-    return p + " W";
+    setMaxChargingPower(p + " W");
   }
 
   function manualControlTestDrive() {
@@ -209,7 +212,7 @@ export default function PageVehicle() {
       </Form.Group>
       <Form.Group as={Row}>
         <Form.Label column={true} className="sm-4">Max. Amps: {maxAmps} A</Form.Label>
-        <Col sm={8} style={{ 'paddingTop': '7px', 'paddingBottom': '7px' }}><Form.Range min={1} max={32} value={maxAmps} onChange={e => setMaxAmps(Number(e.target.value))} /></Col>
+        <Col sm={8} style={{ 'paddingTop': '7px', 'paddingBottom': '7px' }}><Form.Range min={1} max={32} value={maxAmps} onChange={e => { setMaxAmps(Number(e.target.value)); updateMaxChargingPower(Number(e.target.value), numPhases) }} /></Col>
       </Form.Group>
       <Form.Group as={Row}>
         <Form.Label column={true} className="sm-4">Num. Phases:</Form.Label>
@@ -218,7 +221,7 @@ export default function PageVehicle() {
             aria-label="Number of Phases"
             required={chargingEnabled}
             value={numPhases}
-            onChange={e => setNumPhases(Number(e.target.value))}>
+            onChange={e => { setNumPhases(Number(e.target.value)); updateMaxChargingPower(maxAmps, Number(e.target.value)) }}>
             <option value="1">uniphase</option>
             <option value="3">three-phase</option>
           </Form.Select>
@@ -227,7 +230,7 @@ export default function PageVehicle() {
       <Form.Group as={Row}>
         <Form.Label column={true} className="sm-4"></Form.Label>
         <Col sm={8}>
-          <Form.Control plaintext={true} readOnly={true} defaultValue={'Up to ' + getMaxChargingPower()} />
+          <Form.Control plaintext={true} readOnly={true} value={'Up to ' + maxChargingPower} />
         </Col>
       </Form.Group>
       <Form.Group as={Row}>
