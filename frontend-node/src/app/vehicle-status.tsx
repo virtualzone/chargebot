@@ -18,6 +18,12 @@ export default function VehicleStatus({ vehicle, state }) {
   }
 
   if (state === null) state = {};
+  if (process.env.NODE_ENV === 'development') {
+    state.chargingState = 1;
+    state.pluggedIn = true;
+    state.amps = 7;
+    state.soc = 53;
+  }
 
   return (
     <div>
