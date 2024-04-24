@@ -51,6 +51,12 @@ export default function Home() {
           </Col>
         </Row>
       </Container>
+      <Container fluid="md" className="pb-5 pt-5 " style={{'overflowX': 'scroll', 'whiteSpace': 'nowrap'}}>
+        <img src="/screens/1.png" />
+        <img src="/screens/4.png" />
+        <img src="/screens/2.png" />
+        <img src="/screens/3.png" />
+      </Container>
       <Container fluid="md" className="pb-5 pt-5 container-max-width">
         <h2 className="pb-3">FAQ</h2>
         <Accordion flush={true}>
