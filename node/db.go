@@ -27,6 +27,7 @@ type Vehicle struct {
 	NumPhases           int          `json:"num_phases"`
 	SurplusCharging     bool         `json:"surplus_charging"`
 	MinSurplus          int          `json:"min_surplus"`
+	SurplusBuffer       int          `json:"surplus_buffer"`
 	MinChargeTime       int          `json:"min_chargetime"`
 	LowcostCharging     bool         `json:"lowcost_charging"`
 	MaxPrice            int          `json:"max_price"`
@@ -160,6 +161,9 @@ create table if not exists grid_hourblocks(vehicle_vin int text null, hourstamp 
 	if err != nil {
 		log.Panicln(err)
 	}
+	if _, err := db.GetConnection().Exec(`alter table vehicles add column surplus_buffer int default 0`); err != nil {
+		log.Println(err)
+	}
 }
 
 func (db *DB) SetSetting(key, value string) {
@@ -194,9 +198,9 @@ func (db *DB) CreateUpdateVehicle(e *Vehicle) {
 	if e.TelemetryEnrollDate != nil {
 		ts = db.formatSqliteDatetime(*e.TelemetryEnrollDate)
 	}
-	_, err := db.GetConnection().Exec("replace into vehicles values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+	_, err := db.GetConnection().Exec("replace into vehicles values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 		e.VIN, e.DisplayName,
-		e.Enabled, e.TargetSoC, e.MaxAmps, e.SurplusCharging, e.MinSurplus, e.MinChargeTime, e.LowcostCharging, e.MaxPrice, e.TibberToken, e.NumPhases, e.GridProvider, e.GridStrategy, e.DepartDays, e.DepartTime, ts)
+		e.Enabled, e.TargetSoC, e.MaxAmps, e.SurplusCharging, e.MinSurplus, e.MinChargeTime, e.LowcostCharging, e.MaxPrice, e.TibberToken, e.NumPhases, e.GridProvider, e.GridStrategy, e.DepartDays, e.DepartTime, ts, &e.SurplusBuffer)
 	if err != nil {
 		log.Panicln(err)
 	}
@@ -206,11 +210,11 @@ func (db *DB) GetVehicleByVIN(vin string) *Vehicle {
 	e := &Vehicle{}
 	var ts string
 	err := db.GetConnection().QueryRow("select vin, display_name, "+
-		"enabled, target_soc, max_amps, num_phases, surplus_charging, min_surplus, min_chargetime, lowcost_charging, grid_provider, grid_strategy, depart_days, depart_time, max_price, tibber_token, telemetry_enroll_date "+
+		"enabled, target_soc, max_amps, num_phases, surplus_charging, min_surplus, surplus_buffer, min_chargetime, lowcost_charging, grid_provider, grid_strategy, depart_days, depart_time, max_price, tibber_token, telemetry_enroll_date "+
 		"from vehicles "+
 		"where vehicles.vin = ?",
 		vin).
-		Scan(&e.VIN, &e.DisplayName, &e.Enabled, &e.TargetSoC, &e.MaxAmps, &e.NumPhases, &e.SurplusCharging, &e.MinSurplus, &e.MinChargeTime, &e.LowcostCharging, &e.GridProvider, &e.GridStrategy, &e.DepartDays, &e.DepartTime, &e.MaxPrice, &e.TibberToken, &ts)
+		Scan(&e.VIN, &e.DisplayName, &e.Enabled, &e.TargetSoC, &e.MaxAmps, &e.NumPhases, &e.SurplusCharging, &e.MinSurplus, &e.SurplusBuffer, &e.MinChargeTime, &e.LowcostCharging, &e.GridProvider, &e.GridStrategy, &e.DepartDays, &e.DepartTime, &e.MaxPrice, &e.TibberToken, &ts)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			log.Println(err)
@@ -227,7 +231,7 @@ func (db *DB) GetVehicleByVIN(vin string) *Vehicle {
 func (db *DB) GetVehicles() []*Vehicle {
 	result := []*Vehicle{}
 	rows, err := db.GetConnection().Query("select vin, display_name, " +
-		"enabled, target_soc, max_amps, num_phases, surplus_charging, min_surplus, min_chargetime, lowcost_charging, grid_provider, grid_strategy, depart_days, depart_time, max_price, tibber_token, telemetry_enroll_date " +
+		"enabled, target_soc, max_amps, num_phases, surplus_charging, min_surplus, surplus_buffer, min_chargetime, lowcost_charging, grid_provider, grid_strategy, depart_days, depart_time, max_price, tibber_token, telemetry_enroll_date " +
 		"from vehicles " +
 		"order by display_name")
 	if err != nil {
@@ -240,7 +244,7 @@ func (db *DB) GetVehicles() []*Vehicle {
 	for rows.Next() {
 		var ts string
 		e := &Vehicle{}
-		rows.Scan(&e.VIN, &e.DisplayName, &e.Enabled, &e.TargetSoC, &e.MaxAmps, &e.NumPhases, &e.SurplusCharging, &e.MinSurplus, &e.MinChargeTime, &e.LowcostCharging, &e.GridProvider, &e.GridStrategy, &e.DepartDays, &e.DepartTime, &e.MaxPrice, &e.TibberToken, &ts)
+		rows.Scan(&e.VIN, &e.DisplayName, &e.Enabled, &e.TargetSoC, &e.MaxAmps, &e.NumPhases, &e.SurplusCharging, &e.MinSurplus, &e.SurplusBuffer, &e.MinChargeTime, &e.LowcostCharging, &e.GridProvider, &e.GridStrategy, &e.DepartDays, &e.DepartTime, &e.MaxPrice, &e.TibberToken, &ts)
 		if ts != "" {
 			parsedDate, _ := time.Parse(SQLITE_DATETIME_LAYOUT, ts)
 			e.TelemetryEnrollDate = &parsedDate

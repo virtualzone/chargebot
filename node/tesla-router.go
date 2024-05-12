@@ -168,6 +168,7 @@ func (router *TeslaRouter) updateVehicle(w http.ResponseWriter, r *http.Request)
 		SurplusCharging: m.SurplusCharging,
 		MinChargeTime:   m.MinChargeTime,
 		MinSurplus:      m.MinSurplus,
+		SurplusBuffer:   m.SurplusBuffer,
 		LowcostCharging: m.LowcostCharging,
 		MaxPrice:        m.MaxPrice,
 		GridProvider:    m.GridProvider,

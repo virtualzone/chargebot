@@ -21,6 +21,7 @@ export default function PageVehicle() {
   const [numPhases, setNumPhases] = useState(0)
   const [chargeOnSurplus, setChargeOnSurplus] = useState(false)
   const [minSurplus, setMinSurplus] = useState(0)
+  const [surplusBuffer, setSurplusBuffer] = useState(0)
   const [minChargetime, setMinChargetime] = useState(0)
   const [chargeOnTibber, setChargeOnTibber] = useState(false)
   const [gridProvider, setGridProvider] = useState('tibber')
@@ -69,6 +70,7 @@ export default function PageVehicle() {
     setNumPhases(e.num_phases);
     setChargeOnSurplus(e.surplus_charging);
     setMinSurplus(e.min_surplus);
+    setSurplusBuffer(e.surplus_buffer);
     setMinChargetime(e.min_chargetime);
     setChargeOnTibber(e.lowcost_charging);
     setMaxPrice(e.max_price);
@@ -99,6 +101,7 @@ export default function PageVehicle() {
         "num_phases": numPhases,
         "surplus_charging": chargeOnSurplus,
         "min_surplus": minSurplus,
+        "surplus_buffer": surplusBuffer,
         "min_chargetime": minChargetime,
         "lowcost_charging": chargeOnTibber,
         "gridProvider": gridProvider,
@@ -247,6 +250,10 @@ export default function PageVehicle() {
       <Form.Group as={Row}>
         <Form.Label column={true} className="sm-4">Min. surplus: {minSurplus} W</Form.Label>
         <Col sm={8} style={{ 'paddingTop': '7px', 'paddingBottom': '7px' }}><Form.Range required={chargeOnSurplus} disabled={!chargeOnSurplus} min={230} max={5000} value={minSurplus} onChange={e => setMinSurplus(Number(e.target.value))} /></Col>
+      </Form.Group>
+      <Form.Group as={Row}>
+        <Form.Label column={true} className="sm-4">Buffer: {surplusBuffer} W</Form.Label>
+        <Col sm={8} style={{ 'paddingTop': '7px', 'paddingBottom': '7px' }}><Form.Range required={chargeOnSurplus} disabled={!chargeOnSurplus} min={0} max={5000} value={surplusBuffer} onChange={e => setSurplusBuffer(Number(e.target.value))} /></Col>
       </Form.Group>
       <Form.Group as={Row}>
         <Form.Label column={true} className="sm-4">Min. charge time: {minChargetime} m</Form.Label>

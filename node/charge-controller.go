@@ -601,7 +601,7 @@ func (c *ChargeController) getActualSurplus(vehicle *Vehicle, state *VehicleStat
 				}
 			}
 		}
-		return res
+		return res - vehicle.SurplusBuffer
 	}
 	// if aleady charging on solar, at least one sample must be above threshold
 	res := 0
@@ -615,7 +615,7 @@ func (c *ChargeController) getActualSurplus(vehicle *Vehicle, state *VehicleStat
 			}
 		}
 	}
-	return res
+	return res - vehicle.SurplusBuffer
 }
 
 func (c *ChargeController) chargeProcessAdjustSolarAmps(vehicle *Vehicle, state *VehicleState, targetAmps int) {

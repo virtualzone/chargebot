@@ -1262,6 +1262,42 @@ func TestChargeControl_getActualSurplus_notCharging(t *testing.T) {
 	assert.Equal(t, 2000, surplus)
 }
 
+func TestChargeControl_getActualSurplus_buffer_charging(t *testing.T) {
+	t.Cleanup(ResetTestDB)
+
+	v := &Vehicle{VIN: "123", NumPhases: 3, SurplusBuffer: 500}
+	s := &VehicleState{Charging: ChargeStateChargingOnSolar, Amps: 5}
+	GetDB().RecordSurplus(-2000)
+	cc := NewTestChargeController()
+	surplus := cc.getActualSurplus(v, s)
+	assert.NotNil(t, surplus)
+	assert.Equal(t, 1450-500, surplus)
+}
+
+func TestChargeControl_getActualSurplus_buffer_charging2(t *testing.T) {
+	t.Cleanup(ResetTestDB)
+
+	v := &Vehicle{VIN: "123", NumPhases: 1, SurplusBuffer: 500}
+	s := &VehicleState{Charging: ChargeStateChargingOnSolar, Amps: 1}
+	GetDB().RecordSurplus(0)
+	cc := NewTestChargeController()
+	surplus := cc.getActualSurplus(v, s)
+	assert.NotNil(t, surplus)
+	assert.Equal(t, 230-500, surplus)
+}
+
+func TestChargeControl_getActualSurplus_buffer_notCharging(t *testing.T) {
+	t.Cleanup(ResetTestDB)
+
+	v := &Vehicle{VIN: "123", NumPhases: 3, SurplusBuffer: 500}
+	s := &VehicleState{Charging: ChargeStateNotCharging, Amps: 0}
+	GetDB().RecordSurplus(2000)
+	cc := NewTestChargeController()
+	surplus := cc.getActualSurplus(v, s)
+	assert.NotNil(t, surplus)
+	assert.Equal(t, 2000-500, surplus)
+}
+
 func TestChargeControl_getActualSurplus_notCharging_multipleRecords(t *testing.T) {
 	t.Cleanup(ResetTestDB)
 
