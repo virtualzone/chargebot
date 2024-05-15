@@ -25,6 +25,11 @@ type Config struct {
 	PlugStateAutodetection bool
 	InitDBOnly             bool
 	DemoMode               bool
+	MqttBroker             string
+	MqttClientID           string
+	MqttUsername           string
+	MqttPassword           string
+	MqttTopicSurplus       string
 }
 
 var _configInstance *Config
@@ -60,6 +65,11 @@ func (c *Config) ReadConfig() {
 	c.PlugStateAutodetection = (c.getEnv("PLUG_AUTODETECT", "1") == "1")
 	c.InitDBOnly = (c.getEnv("INIT_DB_ONLY", "0") == "1")
 	c.DemoMode = (c.getEnv("DEMO_MODE", "0") == "1")
+	c.MqttBroker = c.getEnv("MQTT_BROKER", "")
+	c.MqttClientID = c.getEnv("MQTT_CLIENT_ID", "chargebot")
+	c.MqttUsername = c.getEnv("MQTT_USERNAME", "")
+	c.MqttPassword = c.getEnv("MQTT_PASSWORD", "")
+	c.MqttTopicSurplus = c.getEnv("MQTT_TOPIC_SURPLUS", "chargebot/surplus")
 }
 
 func (c *Config) Print() {

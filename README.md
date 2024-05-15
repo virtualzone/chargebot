@@ -57,6 +57,11 @@ chargebot.io supports sending push notifications using Telegram. To set it up, f
 | TELEGRAM_TOKEN | string |  | Telegram Bot Authentication Token for push notifications |
 | TELEGRAM_CHAT_ID | string |  | Telegram Chat ID for push notifications |
 | PLUG_AUTODETECT | bool | 1 | Automatically detect vehicle's plugged in state (else, use the webhooks to notify node about plugged state) |
+| MQTT_BROKER | string | | MQTT Broker address (i.e. 'tcp://broker.hivemq.com:1883') |
+| MQTT_CLIENT_ID | string | chargebot | MQTT Client ID |
+| MQTT_USERNAME | string | | MQTT username |
+| MQTT_PASSWORD | string | | MQTT password |
+| MQTT_TOPIC_SURPLUS | string | chargebot/surplus | MQTT topic for solar surplus |
 
 ## More help
 Visit https://chargebot.io/help/ for more information.

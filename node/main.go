@@ -75,15 +75,23 @@ func main() {
 
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
+
 	poller = &TelemetryPoller{
 		Interrupt: make(chan os.Signal),
 	}
 	poller.Poll()
+
+	mqttSubscriber := &MqttSubscriber{
+		Interrupt: make(chan os.Signal),
+	}
+	mqttSubscriber.Listen()
+
 	ServeHTTP()
 
 	for {
 		select {
 		case <-interrupt:
+			mqttSubscriber.Interrupt <- os.Interrupt
 			poller.Interrupt <- os.Interrupt
 			log.Println("Shutting down...")
 			os.Exit(0)
