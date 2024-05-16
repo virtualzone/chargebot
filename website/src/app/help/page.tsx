@@ -29,6 +29,12 @@ export default function PageHelp() {
       - db:/data
   volumes: 
     data:`
+  const mqtt = `environment:
+  MQTT_BROKER: 'tcp://localhost:1883'
+  MQTT_CLIENT_ID: 'chargebot'
+  MQTT_USERNAME: 'mqtt-username'
+  MQTT_PASSWORD: 'mqtt-password'
+  MQTT_TOPIC_SURPLUS: 'topic/surplus'`
 
   return (
     <Container fluid="sm" className="pt-5 container-max-width min-height">
@@ -92,7 +98,11 @@ export default function PageHelp() {
         <li>Find out your Telegram User ID by i.e. sending any message to the <a href='https://t.me/getidsbot' target='_blank'>GetIDs bot</a>.</li>
         <li>Set the <pre style={{'display': 'inline'}}>TELEGRAM_TOKEN</pre> and <pre style={{'display': 'inline'}}>TELEGRAM_CHAT_ID</pre> environment variables and restart your node.</li>
       </ol>
-      
+
+      <h5 style={{ 'marginTop': '50px' }}>Can I connect chargebot.io to MQTT?</h5>
+      <p>Yes, as an alternative to informing your chargebot.io node via HTTP push about your surplus, you can subscribe to an MQTT topic.</p>
+      <p>Configure your MQTT connecting by setting the following environment variables:</p>
+      <CopyBlock text={mqtt} language="yaml" wrapLongLines={true} showLineNumbers={false} />
 
       <h5 style={{ 'marginTop': '50px' }}>How can I add authentication to my chargebot.io node's web interface?</h5>
       <p>The remote controller node does not have a built-in authentication mechanism.</p>

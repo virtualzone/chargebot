@@ -72,7 +72,7 @@ export default function RootLayout({
           <Container>
             <Navbar.Brand href="/"><BatteryCharging /> chargebot.io</Navbar.Brand>
             <Navbar.Text className="justify-content-end">
-              <Button variant='link' href='/help/' hidden={!isAuthenticated}>Help</Button>
+              <Button variant='link' href='/help/'>Help</Button>
               <Button variant='link' href='/api/1/auth/login' hidden={isAuthenticated}>Sign In</Button>
               <Button variant='link' href='/authorized/' hidden={!isAuthenticated}>My account</Button>
             </Navbar.Text>
