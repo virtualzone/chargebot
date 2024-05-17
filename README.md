@@ -1,6 +1,9 @@
 # chargebot.io
 chargebot.io allows for charging your Tesla from your solar power plant and/or at the lowest grid prices (i.e. when using Tibber). Works with any wallbox and any inverter.
 
+![](https://raw.githubusercontent.com/virtualzone/chargebot/main/website/public/screens/1.png)
+![](https://raw.githubusercontent.com/virtualzone/chargebot/main/website/public/screens/2.png)
+
 ### Features
 * Controls a Tesla's charging process (start, stop, amps) via Tesla's new Fleet API
 * Supports charging on solar surplus and/or when dynamic grid prices are at their lowest
