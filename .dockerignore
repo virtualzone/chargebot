@@ -2,6 +2,9 @@
 website/node_modules/
 website/.next/
 website/out/
+website-old/node_modules/
+website-old/.next/
+website-old/out/
 frontend-node/node_modules/
 frontend-node/.next/
 frontend-node/out/
