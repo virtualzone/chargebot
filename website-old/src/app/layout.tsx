@@ -71,12 +71,19 @@ export default function RootLayout({
         <Navbar expand="lg" className="bg-body-tertiary" sticky='top' style={{ 'height': '59px' }}>
           <Container>
             <Navbar.Brand href="/"><BatteryCharging /> chargebot.io</Navbar.Brand>
+            <Navbar.Text className="justify-content-end">
+              <Button variant='link' href='/help/'>Help</Button>
+              <Button variant='link' href='/api/1/auth/login' hidden={isAuthenticated}>Sign In</Button>
+              <Button variant='link' href='/authorized/' hidden={!isAuthenticated}>My account</Button>
+            </Navbar.Text>
           </Container>
         </Navbar>
         {children}
         <footer className="py-3 my-4 border-top d-flex justify-content-center align-items-center">
           <ul className="nav">
+            <li className="nav-item"><Link href="/help" className="nav-link px-2 text-body-secondary">Help</Link></li>
             <li className="nav-item"><Link href="/imprint" className="nav-link px-2 text-body-secondary">Imprint</Link></li>
+            <li className="nav-item"><Link href="/privacy-policy" className="nav-link px-2 text-body-secondary">Privacy Policy</Link></li>
             <li className="nav-item"><Link href="https://github.com/virtualzone/chargebot" className="nav-link px-2 text-body-secondary" target='_blank'>GitHub</Link></li>
           </ul>
         </footer>
