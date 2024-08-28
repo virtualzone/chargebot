@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/teslamotors/vehicle-command/pkg/protocol"
 )
 
 type Config struct {
@@ -30,6 +32,8 @@ type Config struct {
 	MqttUsername           string
 	MqttPassword           string
 	MqttTopicSurplus       string
+	BLE                    bool
+	TeslaPrivateKey        protocol.ECDHPrivateKey
 }
 
 var _configInstance *Config
@@ -70,6 +74,19 @@ func (c *Config) ReadConfig() {
 	c.MqttUsername = c.getEnv("MQTT_USERNAME", "")
 	c.MqttPassword = c.getEnv("MQTT_PASSWORD", "")
 	c.MqttTopicSurplus = c.getEnv("MQTT_TOPIC_SURPLUS", "chargebot/surplus")
+	c.BLE = (c.getEnv("BLE", "0") == "1")
+
+	privateKeyFile := c.getEnv("TESLA_PRIVATE_KEY", "")
+	if c.BLE && privateKeyFile == "" {
+		log.Panicf("need to specify TESLA_PRIVATE_KEY when using BLE connection\n")
+	}
+	if privateKeyFile != "" {
+		privateKey, err := protocol.LoadPrivateKey(privateKeyFile)
+		if err != nil {
+			log.Panicf("could not load private key: %s\n", err.Error())
+		}
+		c.TeslaPrivateKey = privateKey
+	}
 }
 
 func (c *Config) Print() {

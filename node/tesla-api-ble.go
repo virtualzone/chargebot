@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,15 +13,17 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/teslamotors/vehicle-command/pkg/connector/ble"
+	"github.com/teslamotors/vehicle-command/pkg/vehicle"
 	. "github.com/virtualzone/chargebot/goshared"
 )
 
-type TeslaAPIProxy struct {
+type TeslaAPIBLE struct {
 	accessToken string
 	expiry      int64
 }
 
-func (a *TeslaAPIProxy) RefreshToken(refreshToken string) (*TeslaAPITokenReponse, error) {
+func (a *TeslaAPIBLE) RefreshToken(refreshToken string) (*TeslaAPITokenReponse, error) {
 	log.Println("Tesla API: Refreshing Access Token...")
 
 	target := "https://auth.tesla.com/oauth2/v3/token"
@@ -58,7 +61,7 @@ func (a *TeslaAPIProxy) RefreshToken(refreshToken string) (*TeslaAPITokenReponse
 	return &m, nil
 }
 
-func (a *TeslaAPIProxy) GetOrRefreshAccessToken() string {
+func (a *TeslaAPIBLE) GetOrRefreshAccessToken() string {
 	accessToken := a.GetCachedAccessToken()
 	if accessToken == "" {
 		refreshToken := GetDB().GetSetting(SettingRefreshToken)
@@ -72,7 +75,7 @@ func (a *TeslaAPIProxy) GetOrRefreshAccessToken() string {
 	return accessToken
 }
 
-func (a *TeslaAPIProxy) GetCachedAccessToken() string {
+func (a *TeslaAPIBLE) GetCachedAccessToken() string {
 	if a.accessToken == "" {
 		return ""
 	}
@@ -83,7 +86,7 @@ func (a *TeslaAPIProxy) GetCachedAccessToken() string {
 	return a.accessToken
 }
 
-func (a *TeslaAPIProxy) ListVehicles() ([]TeslaAPIVehicleEntity, error) {
+func (a *TeslaAPIBLE) ListVehicles() ([]TeslaAPIVehicleEntity, error) {
 	log.Println("Tesla API: List Vehicles...")
 
 	payload := AccessTokenRequest{
@@ -106,7 +109,7 @@ func (a *TeslaAPIProxy) ListVehicles() ([]TeslaAPIVehicleEntity, error) {
 	return m, nil
 }
 
-func (a *TeslaAPIProxy) ChargeStart(vin string) error {
+func (a *TeslaAPIBLE) ChargeStart(vin string) error {
 	log.Println("Tesla API: Start Charge...")
 
 	payload := AccessTokenRequest{
@@ -124,7 +127,7 @@ func (a *TeslaAPIProxy) ChargeStart(vin string) error {
 	return nil
 }
 
-func (a *TeslaAPIProxy) ChargeStop(vin string) error {
+func (a *TeslaAPIBLE) ChargeStop(vin string) error {
 	log.Println("Tesla API: Stop Charge...")
 
 	payload := AccessTokenRequest{
@@ -142,7 +145,7 @@ func (a *TeslaAPIProxy) ChargeStop(vin string) error {
 	return nil
 }
 
-func (a *TeslaAPIProxy) SetChargeLimit(vin string, limitPercent int) error {
+func (a *TeslaAPIBLE) SetChargeLimit(vin string, limitPercent int) error {
 	log.Printf("Tesla API: Set Charge Limit to % d ...\n", limitPercent)
 
 	payload := SetChargeLimitRequest{
@@ -163,7 +166,7 @@ func (a *TeslaAPIProxy) SetChargeLimit(vin string, limitPercent int) error {
 	return nil
 }
 
-func (a *TeslaAPIProxy) SetChargeAmps(vin string, amps int) error {
+func (a *TeslaAPIBLE) SetChargeAmps(vin string, amps int) error {
 	log.Printf("Tesla API: Set Charge Amps to % d ...\n", amps)
 
 	payload := SetChargeAmpsRequest{
@@ -184,7 +187,7 @@ func (a *TeslaAPIProxy) SetChargeAmps(vin string, amps int) error {
 	return nil
 }
 
-func (a *TeslaAPIProxy) GetVehicleData(vin string) (*TeslaAPIVehicleData, error) {
+func (a *TeslaAPIBLE) GetVehicleData(vin string) (*TeslaAPIVehicleData, error) {
 	log.Println("Tesla API: Get Vehicle Data...")
 
 	payload := AccessTokenRequest{
@@ -207,28 +210,36 @@ func (a *TeslaAPIProxy) GetVehicleData(vin string) (*TeslaAPIVehicleData, error)
 	return &m, nil
 }
 
-func (a *TeslaAPIProxy) Wakeup(vin string) error {
-	log.Println("Tesla API: Wake Up...")
+func (a *TeslaAPIBLE) Wakeup(vin string) error {
+	log.Println("Tesla BLE: Wake Up...")
 
-	payload := AccessTokenRequest{
-		PasswordProtectedRequest: PasswordProtectedRequest{
-			Password: GetConfig().TokenPassword,
-		},
-		AccessToken: a.GetOrRefreshAccessToken(),
-	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
-	_, err := a.sendRequest(vin+"/wakeup", payload)
+	conn, err := ble.NewConnection(ctx, vin)
 	if err != nil {
-		return err
+		return errors.New(fmt.Sprintf("failed to connect to vehicle: %s", err))
+	}
+	defer conn.Close()
+
+	car, err := vehicle.NewVehicle(conn, privateKey, nil)
+	if err != nil {
+		return errors.New(fmt.Sprintf("failed to connect to vehicle: %s", err))
 	}
 
-	// wait a few seconds to assure vehicle is online
-	time.Sleep(20 * time.Second)
+	if err := car.Connect(ctx); err != nil {
+		return errors.New(fmt.Sprintf("failed to connect to vehicle: %s", err))
+	}
+	defer car.Disconnect()
+
+	if err := car.StartSession(ctx, nil); err != nil {
+		return errors.New(fmt.Sprintf("failed to perform handshake with vehicle: %s", err))
+	}
 
 	return nil
 }
 
-func (a *TeslaAPIProxy) CreateTelemetryConfig(vin string) error {
+func (a *TeslaAPIBLE) CreateTelemetryConfig(vin string) error {
 	log.Println("Tesla API: Create Telemetry Config...")
 
 	payload := AccessTokenRequest{
@@ -246,7 +257,7 @@ func (a *TeslaAPIProxy) CreateTelemetryConfig(vin string) error {
 	return nil
 }
 
-func (a *TeslaAPIProxy) DeleteTelemetryConfig(vin string) error {
+func (a *TeslaAPIBLE) DeleteTelemetryConfig(vin string) error {
 	log.Println("Tesla API: Delete Telemetry Config...")
 
 	payload := AccessTokenRequest{
@@ -264,7 +275,7 @@ func (a *TeslaAPIProxy) DeleteTelemetryConfig(vin string) error {
 	return nil
 }
 
-func (a *TeslaAPIProxy) RegisterVehicle(vin string) error {
+func (a *TeslaAPIBLE) RegisterVehicle(vin string) error {
 	log.Println("Tesla API: Register Vehicle with chargebot.io...")
 
 	payload := AccessTokenRequest{
@@ -282,7 +293,7 @@ func (a *TeslaAPIProxy) RegisterVehicle(vin string) error {
 	return nil
 }
 
-func (a *TeslaAPIProxy) UnregisterVehicle(vin string) error {
+func (a *TeslaAPIBLE) UnregisterVehicle(vin string) error {
 	log.Println("Tesla API: Unregister Vehicle with chargebot.io...")
 
 	payload := AccessTokenRequest{
@@ -300,7 +311,7 @@ func (a *TeslaAPIProxy) UnregisterVehicle(vin string) error {
 	return nil
 }
 
-func (a *TeslaAPIProxy) GetTelemetryState(vin string) (*PersistedTelemetryState, error) {
+func (a *TeslaAPIBLE) GetTelemetryState(vin string) (*PersistedTelemetryState, error) {
 	payload := PasswordProtectedRequest{
 		Password: GetConfig().TokenPassword,
 	}
@@ -318,7 +329,7 @@ func (a *TeslaAPIProxy) GetTelemetryState(vin string) (*PersistedTelemetryState,
 	return &m, nil
 }
 
-func (a *TeslaAPIProxy) sendRequest(endpoint string, payload interface{}) (*http.Response, error) {
+func (a *TeslaAPIBLE) sendRequest(endpoint string, payload interface{}) (*http.Response, error) {
 	json, err := json.Marshal(payload)
 	if err != nil {
 		return nil, err

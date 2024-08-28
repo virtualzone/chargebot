@@ -1,0 +1,29 @@
+{
+  "name": "chargebot.io",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "bootstrap": "^5.3.3",
+    "next": "14.2.1",
+    "react": "^18",
+    "react-bootstrap": "^2.10.2",
+    "react-code-blocks": "^0.1.6",
+    "react-dom": "^18",
+    "react-feather": "^2.0.10"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "autoprefixer": "^10.4.19",
+    "eslint": "^8",
+    "eslint-config-next": "14.2.1",
+    "typescript": "^5"
+  }
+}
